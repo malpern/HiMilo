@@ -6,13 +6,13 @@ struct FeedbackBadge: View {
     var body: some View {
         if let text {
             Text(text)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(Color.white.opacity(0.2))
+                        .fill(.white.opacity(0.2))
                 )
                 .transition(.scale.combined(with: .opacity))
         }

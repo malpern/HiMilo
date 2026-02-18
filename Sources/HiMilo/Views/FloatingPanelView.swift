@@ -6,14 +6,14 @@ struct FloatingPanelView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color.black.opacity(0.85))
+                .fill(.black.opacity(0.85))
 
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     FlowLayout(spacing: 6) {
-                        ForEach(Array(appState.words.enumerated()), id: \.offset) { index, word in
+                        ForEach(appState.words.indices, id: \.self) { index in
                             WordView(
-                                word: word,
+                                word: appState.words[index],
                                 isHighlighted: index == appState.currentWordIndex,
                                 isPast: index < appState.currentWordIndex
                             )
@@ -49,14 +49,14 @@ private struct WordView: View {
     var body: some View {
         Text(word)
             .font(.custom("Helvetica Neue", size: 28).weight(.medium))
-            .foregroundColor(textColor)
+            .foregroundStyle(textColor)
             .padding(.horizontal, isHighlighted ? 4 : 0)
             .padding(.vertical, isHighlighted ? 2 : 0)
             .background(
                 Group {
                     if isHighlighted {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.yellow.opacity(0.35))
+                            .fill(.yellow.opacity(0.35))
                     }
                 }
             )
