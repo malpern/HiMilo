@@ -2,6 +2,9 @@ import SwiftUI
 
 struct MenuBarView: View {
     let appState: AppState
+    var onStartListening: () -> Void = {}
+    var onStopListening: () -> Void = {}
+    var onReadText: (String) async -> Void = { _ in }
 
     var body: some View {
         Group {
@@ -28,6 +31,27 @@ struct MenuBarView: View {
                 Task { await readFromFile() }
             }
 
+            Divider()
+
+            Toggle(
+                appState.isListening ? "HTTP Listener (port \(listenPort))" : "HTTP Listener",
+                isOn: Binding(
+                    get: { appState.isListening },
+                    set: { newValue in
+                        if newValue {
+                            onStartListening()
+                        } else {
+                            onStopListening()
+                        }
+                    }
+                )
+            )
+
+            if appState.isListening, let ip = NetworkListener.localIPAddress() {
+                Text("\(ip):\(listenPort)")
+                    .font(.caption)
+            }
+
             Toggle("Audio Only Mode", isOn: Binding(
                 get: { appState.audioOnly },
                 set: { appState.audioOnly = $0 }
@@ -40,6 +64,10 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("q", modifiers: .command)
         }
+    }
+
+    private var listenPort: UInt16 {
+        CLIContext.shared?.port ?? 4140
     }
 
     private func togglePause() async {
@@ -56,9 +84,7 @@ struct MenuBarView: View {
         guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
             return
         }
-        appState.inputText = text
-        let session = ReadingSession(appState: appState)
-        await session.start(text: text)
+        await onReadText(text)
     }
 
     @MainActor
@@ -71,9 +97,7 @@ struct MenuBarView: View {
 
         do {
             let text = try String(contentsOf: url, encoding: .utf8)
-            appState.inputText = text
-            let session = ReadingSession(appState: appState)
-            await session.start(text: text)
+            await onReadText(text)
         } catch {
             print("Error reading file: \(error)")
         }
