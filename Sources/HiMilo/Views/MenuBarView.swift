@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 struct MenuBarView: View {
@@ -7,6 +8,8 @@ struct MenuBarView: View {
     var onStartListening: () -> Void = {}
     var onStopListening: () -> Void = {}
     var onReadText: (String) async -> Void = { _ in }
+
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         Group {
@@ -58,6 +61,20 @@ struct MenuBarView: View {
                 get: { appState.audioOnly },
                 set: { appState.audioOnly = $0 }
             ))
+
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .onChange(of: launchAtLogin) { _, enabled in
+                    do {
+                        if enabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                    } catch {
+                        print("Launch at login error: \(error)")
+                        launchAtLogin = SMAppService.mainApp.status == .enabled
+                    }
+                }
 
             Divider()
 
