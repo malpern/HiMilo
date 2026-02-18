@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "HeyMilo",
+    name: "HiMilo",
     platforms: [
         .macOS(.v15)
     ],
@@ -12,11 +12,12 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "HeyMilo",
+            name: "HiMilo",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/HeyMilo"
+            path: "Sources/HiMilo",
+            exclude: ["Resources"]
         ),
     ]
 )

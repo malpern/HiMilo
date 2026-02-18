@@ -33,7 +33,7 @@ struct CLIParser: ParsableCommand {
             let cliContext = CLIContext(text: nil, audioOnly: audioOnly, voice: voice, listen: true, port: port)
             CLIContext.shared = cliContext
             MainActor.assumeIsolated {
-                HeyMiloApp.main()
+                HiMiloApp.main()
             }
             return
         }
@@ -51,7 +51,7 @@ struct CLIParser: ParsableCommand {
         let cliContext = CLIContext(text: resolvedText, audioOnly: audioOnly, voice: voice)
         CLIContext.shared = cliContext
         MainActor.assumeIsolated {
-            HeyMiloApp.main()
+            HiMiloApp.main()
         }
     }
 }

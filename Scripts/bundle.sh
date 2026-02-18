@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PRODUCT_NAME="HeyMilo"
+PRODUCT_NAME="HiMilo"
 APP_NAME="${PRODUCT_NAME}.app"
 BUILD_DIR=".build/release"
 BUNDLE_DIR="${BUILD_DIR}/${APP_NAME}"
@@ -24,13 +24,13 @@ cat > "${BUNDLE_DIR}/Contents/Info.plist" << 'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>HeyMilo</string>
+    <string>HiMilo</string>
     <key>CFBundleIdentifier</key>
-    <string>com.malpern.heymilo</string>
+    <string>com.malpern.himilo</string>
     <key>CFBundleName</key>
-    <string>HeyMilo</string>
+    <string>HiMilo</string>
     <key>CFBundleDisplayName</key>
-    <string>HeyMilo</string>
+    <string>HiMilo</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>
@@ -39,13 +39,18 @@ cat > "${BUNDLE_DIR}/Contents/Info.plist" << 'PLIST'
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>HeyMilo needs audio access for text-to-speech playback.</string>
+    <string>HiMilo needs audio access for text-to-speech playback.</string>
 </dict>
 </plist>
 PLIST
+
+# Copy icon
+cp "Sources/HiMilo/Resources/AppIcon.icns" "${BUNDLE_DIR}/Contents/Resources/AppIcon.icns"
 
 echo "App bundle created at: ${BUNDLE_DIR}"
 echo "To run: open ${BUNDLE_DIR}"

@@ -63,7 +63,7 @@ final class NetworkSession: Sendable {
 
     private func handleStatus() {
         let json = """
-        {"status":"ok","service":"HeyMilo"}
+        {"status":"ok","service":"HiMilo"}
         """
         sendResponse(status: 200, body: json, contentType: "application/json")
     }

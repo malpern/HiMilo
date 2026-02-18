@@ -1,24 +1,24 @@
 import SwiftUI
 
 @main
-struct HeyMiloLauncher {
+struct HiMiloLauncher {
     static func main() {
         let mode = ModeDetector.detect()
         switch mode {
         case .cli:
             CLIParser.main()
         case .menuBar:
-            HeyMiloApp.main()
+            HiMiloApp.main()
         }
     }
 }
 
-struct HeyMiloApp: App {
+struct HiMiloApp: App {
     @State private var appState = AppState()
     @State private var coordinator = AppCoordinator()
 
     var body: some Scene {
-        MenuBarExtra("HeyMilo", systemImage: "waveform") {
+        MenuBarExtra("HiMilo", systemImage: "waveform") {
             MenuBarView(
                 appState: appState,
                 onStartListening: { coordinator.startListening(appState: appState) },

@@ -24,7 +24,7 @@ final class NetworkListener {
         listener = try NWListener(using: params, on: nwPort)
 
         // Advertise via Bonjour for LAN discovery
-        listener?.service = NWListener.Service(name: "HeyMilo", type: "_milo._tcp")
+        listener?.service = NWListener.Service(name: "HiMilo", type: "_milo._tcp")
 
         listener?.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
@@ -48,13 +48,13 @@ final class NetworkListener {
         listener = nil
         appState.isListening = false
         onTextReceived = nil
-        print("HeyMilo listener stopped")
+        print("HiMilo listener stopped")
     }
 
     private func handleStateUpdate(_ state: NWListener.State) {
         switch state {
         case .ready:
-            print("HeyMilo HTTP listener ready")
+            print("HiMilo HTTP listener ready")
         case .failed(let error):
             print("Network listener failed: \(error)")
             stop()
@@ -75,7 +75,7 @@ final class NetworkListener {
     private func printListeningInfo() {
         let ip = Self.localIPAddress() ?? "localhost"
         print("")
-        print("  HeyMilo listening on port \(port)")
+        print("  HiMilo listening on port \(port)")
         print("")
         print("  Send text from another machine:")
         print("    curl -X POST http://\(ip):\(port)/read \\")

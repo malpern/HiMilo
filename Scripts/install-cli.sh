@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-PRODUCT_NAME="HeyMilo"
+PRODUCT_NAME="HiMilo"
 BUILD_DIR=".build/release"
 INSTALL_DIR="/usr/local/bin"
 CLI_NAME="milo"

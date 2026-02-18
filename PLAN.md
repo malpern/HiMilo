@@ -1,4 +1,4 @@
-# HeyMilo Implementation Plan
+# HiMilo Implementation Plan
 
 ## Context
 
@@ -31,12 +31,12 @@ Input (args/stdin/file/clipboard/network)
 ## File Structure
 
 ```
-HeyMilo/
+HiMilo/
   Package.swift                           # macOS 15+, swift-argument-parser dep
   README.md                               # Project documentation
   PLAN.md                                 # This file
-  Sources/HeyMilo/
-    HeyMiloApp.swift                      # @main dual-mode: CLI vs MenuBarExtra
+  Sources/HiMilo/
+    HiMiloApp.swift                      # @main dual-mode: CLI vs MenuBarExtra
     AppState.swift                        # @Observable shared state
     Views/
       FloatingPanelView.swift             # Dark panel, flowing text, yellow highlight
@@ -71,12 +71,12 @@ HeyMilo/
 
 ### Phase 1: Foundation ✅ (in progress)
 - Create `Package.swift` (macOS 15+, swift-argument-parser, Swift 6 language mode)
-- `HeyMiloApp.swift` — dual-mode `@main` using two-struct pattern (HeyMiloLauncher + HeyMiloApp)
+- `HiMiloApp.swift` — dual-mode `@main` using two-struct pattern (HiMiloLauncher + HiMiloApp)
 - `AppState.swift` — `@Observable @MainActor` with session state, word array, current index, pause flag
 - `KeychainHelper.swift` — read API key via Security framework (`SecItemCopyMatching`)
 - `ModeDetector.swift` — check `ProcessInfo.arguments` and `isatty(STDIN_FILENO)`
-- Create GitHub repo `malpern/HeyMilo`, init git, initial commit
-- **Verify:** `swift build` succeeds, `swift run HeyMilo` shows menu bar icon, keychain read works
+- Create GitHub repo `malpern/HiMilo`, init git, initial commit
+- **Verify:** `swift build` succeeds, `swift run HiMilo` shows menu bar icon, keychain read works
 
 ### Phase 2: Audio Pipeline
 - `TTSService.swift` — `actor`, POST to `/v1/audio/speech` with `gpt-4o-mini-tts`/`onyx`/`pcm`, stream via `URLSession.bytes(for:)`, yield 4800-byte chunks (100ms each)
@@ -185,8 +185,8 @@ dns-sd -B _milo._tcp
 ## Verification
 
 1. `swift build` compiles with no errors
-2. `swift run HeyMilo` shows menu bar icon, no Dock icon
-3. `swift run HeyMilo "Test sentence"` shows floating panel + plays audio with synchronized highlighting
+2. `swift run HiMilo` shows menu bar icon, no Dock icon
+3. `swift run HiMilo "Test sentence"` shows floating panel + plays audio with synchronized highlighting
 4. Spacebar pauses/resumes, Escape closes, arrows skip
 5. `milo -c` reads clipboard, `echo text | milo` reads stdin
 6. Panel slides down from top, collapses when done

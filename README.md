@@ -1,4 +1,4 @@
-# HeyMilo
+# HiMilo
 
 A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while displaying a teleprompter-style floating overlay with synchronized word highlighting.
 
@@ -73,7 +73,7 @@ echo "Read this text" | nc milo-mac.local 4140
 
 ### Menu Bar
 
-When launched without arguments, HeyMilo runs as a menu bar app with:
+When launched without arguments, HiMilo runs as a menu bar app with:
 
 - **Paste & Read** (⌘⇧V) — Read text from clipboard
 - **Read from File...** — Open a text file to read
