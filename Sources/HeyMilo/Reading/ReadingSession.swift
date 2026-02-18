@@ -1,0 +1,132 @@
+import Foundation
+
+@MainActor
+final class ReadingSession {
+    private let appState: AppState
+    private let audioPlayer = AudioPlayer()
+    private var panelController: PanelController?
+    private var timings: [WordTiming] = []
+    private var displayLink: Timer?
+
+    init(appState: AppState) {
+        self.appState = appState
+    }
+
+    func start(text: String, voice: String = "onyx") async {
+        appState.sessionState = .loading
+        appState.words = text.split(separator: " ").map(String.init)
+        appState.currentWordIndex = 0
+
+        // Show panel unless audio-only
+        if !appState.audioOnly {
+            panelController = PanelController(appState: appState)
+            panelController?.show()
+        }
+
+        do {
+            let apiKey = try KeychainHelper.readAPIKey()
+            let ttsService = TTSService(apiKey: apiKey, voice: voice)
+
+            try audioPlayer.start()
+            appState.sessionState = .playing
+
+            // Use heuristic timing until we know real duration
+            let heuristicDuration = WordTimingEstimator.heuristicDuration(for: text)
+            timings = WordTimingEstimator.estimate(words: appState.words, totalDuration: heuristicDuration)
+
+            // Start display link for word highlighting
+            startDisplayLink()
+
+            // Stream audio chunks
+            let stream = await ttsService.streamPCM(text: text)
+            for try await chunk in stream {
+                audioPlayer.scheduleChunk(chunk)
+            }
+
+            // Recalculate timings with actual duration
+            let realDuration = audioPlayer.totalDuration
+            if realDuration > 0 {
+                timings = WordTimingEstimator.estimate(words: appState.words, totalDuration: realDuration)
+            }
+
+            // Schedule completion
+            audioPlayer.scheduleEnd { [weak self] in
+                Task { @MainActor in
+                    self?.finish()
+                }
+            }
+
+        } catch {
+            print("Error: \(error)")
+            finish()
+        }
+    }
+
+    func togglePause() {
+        if appState.isPaused {
+            audioPlayer.resume()
+            appState.isPaused = false
+            appState.sessionState = .playing
+            startDisplayLink()
+        } else {
+            audioPlayer.pause()
+            appState.isPaused = true
+            appState.sessionState = .paused
+            stopDisplayLink()
+        }
+    }
+
+    func stop() {
+        audioPlayer.stop()
+        finish()
+    }
+
+    func skip(seconds: Double) {
+        // Skip is a nice-to-have — for MVP we just show feedback
+        let direction = seconds > 0 ? "→ \(Int(seconds))s" : "← \(Int(abs(seconds)))s"
+        showFeedback(direction)
+    }
+
+    private func startDisplayLink() {
+        displayLink = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.updateWordHighlight()
+            }
+        }
+    }
+
+    private func stopDisplayLink() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    private func updateWordHighlight() {
+        let currentTime = audioPlayer.currentTime
+        let index = WordTimingEstimator.wordIndex(at: currentTime, in: timings)
+        if index != appState.currentWordIndex {
+            appState.currentWordIndex = index
+        }
+    }
+
+    private func finish() {
+        stopDisplayLink()
+        appState.sessionState = .finished
+
+        // Auto-dismiss after 0.5s
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            panelController?.dismiss()
+            appState.reset()
+        }
+    }
+
+    private func showFeedback(_ text: String) {
+        appState.feedbackText = text
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            if appState.feedbackText == text {
+                appState.feedbackText = nil
+            }
+        }
+    }
+}

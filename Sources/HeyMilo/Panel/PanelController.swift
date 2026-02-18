@@ -60,9 +60,11 @@ final class PanelController {
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().setFrameOrigin(NSPoint(x: frame.origin.x, y: targetY))
             panel.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            self?.panel?.close()
-            self?.panel = nil
+        }, completionHandler: {
+            Task { @MainActor [weak self] in
+                self?.panel?.close()
+                self?.panel = nil
+            }
         })
     }
 }

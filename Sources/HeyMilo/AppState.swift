@@ -17,6 +17,7 @@ final class AppState {
     var currentWordIndex: Int = 0
     var isPaused: Bool = false
     var audioOnly: Bool = false
+    var isListening: Bool = false
     var feedbackText: String? = nil
     var inputText: String = ""
 
