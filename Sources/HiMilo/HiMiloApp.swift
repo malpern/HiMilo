@@ -21,6 +21,8 @@ struct HiMiloApp: App {
         MenuBarExtra("HiMilo", systemImage: "waveform") {
             MenuBarView(
                 appState: appState,
+                onTogglePause: { coordinator.togglePause() },
+                onStop: { coordinator.stop() },
                 onStartListening: { coordinator.startListening(appState: appState) },
                 onStopListening: { coordinator.stopListening() },
                 onReadText: { text in await coordinator.readText(text, appState: appState) }
@@ -64,6 +66,15 @@ final class AppCoordinator {
 
         let voice = CLIContext.shared?.voice ?? "onyx"
         await session.start(text: text, voice: voice)
+    }
+
+    func togglePause() {
+        activeSession?.togglePause()
+    }
+
+    func stop() {
+        activeSession?.stop()
+        activeSession = nil
     }
 
     func handleCLILaunch(appState: AppState) async {

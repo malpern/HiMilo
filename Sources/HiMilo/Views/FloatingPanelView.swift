@@ -29,6 +29,14 @@ struct FloatingPanelView: View {
                     }
                 }
             }
+
+            // Feedback badge overlay (pause/resume/skip indicators)
+            VStack {
+                Spacer()
+                FeedbackBadge(text: appState.feedbackText)
+                    .animation(.easeInOut(duration: 0.2), value: appState.feedbackText)
+                    .padding(.bottom, 12)
+            }
         }
     }
 }

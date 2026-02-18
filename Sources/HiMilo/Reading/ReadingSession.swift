@@ -5,6 +5,7 @@ final class ReadingSession {
     private let appState: AppState
     private let audioPlayer = AudioPlayer()
     private var panelController: PanelController?
+    private var keyboardMonitor: KeyboardMonitor?
     private var timings: [WordTiming] = []
     private var displayLink: Timer?
 
@@ -22,6 +23,10 @@ final class ReadingSession {
             panelController = PanelController(appState: appState)
             panelController?.show()
         }
+
+        // Start keyboard monitoring
+        keyboardMonitor = KeyboardMonitor(session: self)
+        keyboardMonitor?.start()
 
         do {
             let apiKey = try KeychainHelper.readAPIKey()
@@ -68,26 +73,30 @@ final class ReadingSession {
             appState.isPaused = false
             appState.sessionState = .playing
             startDisplayLink()
+            showFeedback("▶ Play")
         } else {
             audioPlayer.pause()
             appState.isPaused = true
             appState.sessionState = .paused
             stopDisplayLink()
+            showFeedback("⏸ Paused")
         }
     }
 
     func stop() {
+        keyboardMonitor?.stop()
+        keyboardMonitor = nil
         audioPlayer.stop()
         finish()
     }
 
     func skip(seconds: Double) {
-        // Skip is a nice-to-have — for MVP we just show feedback
         let direction = seconds > 0 ? "→ \(Int(seconds))s" : "← \(Int(abs(seconds)))s"
         showFeedback(direction)
     }
 
     private func startDisplayLink() {
+        stopDisplayLink()
         displayLink = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.updateWordHighlight()
@@ -101,6 +110,7 @@ final class ReadingSession {
     }
 
     private func updateWordHighlight() {
+        guard appState.sessionState == .playing else { return }
         let currentTime = audioPlayer.currentTime
         let index = WordTimingEstimator.wordIndex(at: currentTime, in: timings)
         if index != appState.currentWordIndex {
@@ -110,6 +120,8 @@ final class ReadingSession {
 
     private func finish() {
         stopDisplayLink()
+        keyboardMonitor?.stop()
+        keyboardMonitor = nil
         appState.sessionState = .finished
 
         // Auto-dismiss after 0.5s

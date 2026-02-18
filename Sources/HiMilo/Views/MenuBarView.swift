@@ -2,6 +2,8 @@ import SwiftUI
 
 struct MenuBarView: View {
     let appState: AppState
+    var onTogglePause: () -> Void = {}
+    var onStop: () -> Void = {}
     var onStartListening: () -> Void = {}
     var onStopListening: () -> Void = {}
     var onReadText: (String) async -> Void = { _ in }
@@ -10,12 +12,12 @@ struct MenuBarView: View {
         Group {
             if appState.isActive {
                 Button(appState.isPaused ? "Resume" : "Pause") {
-                    Task { await togglePause() }
+                    onTogglePause()
                 }
                 .keyboardShortcut(" ", modifiers: [])
 
                 Button("Stop") {
-                    Task { await stop() }
+                    onStop()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
@@ -68,15 +70,6 @@ struct MenuBarView: View {
 
     private var listenPort: UInt16 {
         CLIContext.shared?.port ?? 4140
-    }
-
-    private func togglePause() async {
-        appState.isPaused.toggle()
-        appState.sessionState = appState.isPaused ? .paused : .playing
-    }
-
-    private func stop() async {
-        appState.reset()
     }
 
     @MainActor
