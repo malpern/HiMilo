@@ -15,7 +15,7 @@ A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while dis
 
 ### Prerequisites
 
-- macOS 15+
+- macOS 26+
 - OpenAI API key stored in Keychain or environment variable
 
 ### Store your API key
@@ -92,9 +92,33 @@ When launched without arguments, HiMilo runs as a menu bar app with:
 | ← | Skip back 3 seconds |
 | → | Skip forward 3 seconds |
 
+## Development
+
+### Project Structure
+
+```
+Sources/
+  HiMiloCore/       Library target (all logic)
+  HiMilo/           Thin executable (entry point only)
+Tests/
+  HiMiloCoreTests/  Unit + integration tests
+```
+
+### Running Tests
+
+```bash
+swift test
+```
+
+59 tests across 8 suites covering word timing math, app state, HTTP parsing, mode detection, input resolution, and network listener integration.
+
+### CI
+
+GitHub Actions runs on every push to `main` and on pull requests. See `.github/workflows/ci.yml`.
+
 ## Architecture
 
-Single Swift Package Manager executable with dual-mode operation:
+Swift Package Manager with a library target (`HiMiloCore`) and thin executable (`HiMilo`):
 
 ```
 Input (args/stdin/file/clipboard/network)
@@ -108,7 +132,7 @@ Input (args/stdin/file/clipboard/network)
 ```
 
 **Tech Stack:**
-- Swift 6 with strict concurrency
+- Swift 6.2 with strict concurrency
 - SwiftUI + NSPanel for floating overlay
 - AVAudioEngine for low-latency audio playback
 - OpenAI TTS API (`gpt-4o-mini-tts`, `onyx` voice, raw PCM streaming)

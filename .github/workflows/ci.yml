@@ -20,6 +20,13 @@ jobs:
           xcodebuild -version
           sw_vers
 
+      - name: Patch Package.swift for CI runner
+        run: |
+          # CI runner may not have Swift 6.2 / macOS 26 SDK yet.
+          # The code itself doesn't use 6.2-only features, so this is safe.
+          sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.1/' Package.swift
+          sed -i '' 's/.macOS(.v26)/.macOS(.v15)/' Package.swift
+
       - name: Build
         run: swift build
 
@@ -32,6 +39,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Patch Package.swift for CI runner
+        run: |
+          sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.1/' Package.swift
+          sed -i '' 's/.macOS(.v26)/.macOS(.v15)/' Package.swift
 
       - name: Build Release
         run: swift build -c release
