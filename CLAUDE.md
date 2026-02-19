@@ -31,8 +31,8 @@ Other apps can send text to HiMilo via:
 - [ ] Create Mac App Store provisioning profile for `com.malpern.himilo`
 
 ### App Store Connect Metadata
-- [ ] **Privacy policy URL** — host at e.g. `https://malpern.github.io/himilo/privacy`. Must mention OpenAI data sharing, Keychain storage, link to OpenAI's privacy policy
-- [ ] **Support URL** — can be `https://github.com/malpern/HiMilo/issues`
+- [x] **Privacy policy URL** — https://malpern.github.io/HiMilo/privacy.html (in `docs/privacy.html`)
+- [x] **Support URL** — https://github.com/malpern/HiMilo/issues
 - [ ] **App Privacy nutrition labels** — declare "Other Data" (reading text) shared with OpenAI when user opts in. Purpose: "App Functionality". Not linked to identity. Not tracking.
 - [ ] **Screenshots** — at least 1 at 1280x800, 1440x900, 2560x1600, or 2880x1800
 - [ ] **Description, keywords, subtitle** (subtitle max 30 chars)
