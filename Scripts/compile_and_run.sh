@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="HiMilo"
+APP_NAME="VoxClaw"
 APP_BUNDLE="${ROOT_DIR}/${APP_NAME}.app"
 APP_PROCESS_PATTERN="${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
 

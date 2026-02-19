@@ -1,4 +1,4 @@
-# HiMilo
+# VoxClaw
 
 A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while displaying a teleprompter-style floating overlay with synchronized word highlighting.
 
@@ -7,7 +7,7 @@ A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while dis
 - **Teleprompter Overlay** — Dynamic Island-style floating panel at the top of your screen with word-by-word highlighting synced to audio
 - **Multiple Input Methods** — Text from arguments, stdin pipe, file, clipboard, or network
 - **Menu Bar App** — Lives in your menu bar, paste and read anytime
-- **CLI Tool** — Launch from terminal via `milo`
+- **CLI Tool** — Launch from terminal via `voxclaw`
 - **Network Mode** — Accept text from other devices on your local network
 - **Keyboard Controls** — Space (pause/resume), Escape (stop), Arrow keys (skip ±3s)
 
@@ -34,7 +34,7 @@ export OPENAI_API_KEY="sk-..."
 
 ```bash
 swift build -c release
-./Scripts/bundle.sh
+./Scripts/package_app.sh
 ./Scripts/install-cli.sh
 ```
 
@@ -43,37 +43,37 @@ swift build -c release
 ### CLI
 
 ```bash
-milo "Hello, this is a test."          # direct text
-echo "Read this aloud" | milo          # piped stdin
-milo --file ~/speech.txt               # from file
-milo --clipboard                       # from clipboard
-milo --audio-only "No overlay"         # audio only, no panel
-milo --listen                          # network mode: listen for text from LAN
-milo                                   # launch menu bar app (no args)
+voxclaw "Hello, this is a test."       # direct text
+echo "Read this aloud" | voxclaw       # piped stdin
+voxclaw --file ~/speech.txt            # from file
+voxclaw --clipboard                    # from clipboard
+voxclaw --audio-only "No overlay"      # audio only, no panel
+voxclaw --listen                       # network mode: listen for text from LAN
+voxclaw                                # launch menu bar app (no args)
 ```
 
 ### Network Mode
 
-Start Milo in network listener mode on your Mac:
+Start VoxClaw in network listener mode on your Mac:
 
 ```bash
-milo --listen                          # listens on port 4140
-milo --listen --port 8080              # custom port
+voxclaw --listen                       # listens on port 4140
+voxclaw --listen --port 8080           # custom port
 ```
 
 Send text from another device on your local network:
 
 ```bash
 # From any machine on the same network
-curl -X POST http://milo-mac.local:4140/read -d '{"text": "Hello from my phone"}'
+curl -X POST http://voxclaw-mac.local:4140/read -d '{"text": "Hello from my phone"}'
 
 # Or with netcat
-echo "Read this text" | nc milo-mac.local 4140
+echo "Read this text" | nc voxclaw-mac.local 4140
 ```
 
 ### Menu Bar
 
-When launched without arguments, HiMilo runs as a menu bar app with:
+When launched without arguments, VoxClaw runs as a menu bar app with:
 
 - **Paste & Read** (⌘⇧V) — Read text from clipboard
 - **Read from File...** — Open a text file to read
@@ -98,10 +98,10 @@ When launched without arguments, HiMilo runs as a menu bar app with:
 
 ```
 Sources/
-  HiMiloCore/       Library target (all logic)
-  HiMilo/           Thin executable (entry point only)
+  VoxClawCore/       Library target (all logic)
+  VoxClaw/           Thin executable (entry point only)
 Tests/
-  HiMiloCoreTests/  Unit + integration tests
+  VoxClawCoreTests/  Unit + integration tests
 ```
 
 ### Running Tests
@@ -118,7 +118,7 @@ GitHub Actions runs on every push to `main` and on pull requests. See `.github/w
 
 ## Architecture
 
-Swift Package Manager with a library target (`HiMiloCore`) and thin executable (`HiMilo`):
+Swift Package Manager with a library target (`VoxClawCore`) and thin executable (`VoxClaw`):
 
 ```
 Input (args/stdin/file/clipboard/network)

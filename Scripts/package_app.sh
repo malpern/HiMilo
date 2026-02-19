@@ -5,8 +5,8 @@ CONF=${1:-release}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
-APP_NAME="HiMilo"
-BUNDLE_ID="com.malpern.himilo"
+APP_NAME="VoxClaw"
+BUNDLE_ID="com.malpern.voxclaw"
 MACOS_MIN_VERSION="26.0"
 MENU_BAR_APP=1
 SIGNING_MODE=${SIGNING_MODE:-}
@@ -59,7 +59,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <string>${BUNDLE_ID}</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>himilo</string>
+                <string>voxclaw</string>
             </array>
         </dict>
     </array>
@@ -69,7 +69,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <key>NSMenuItem</key>
             <dict>
                 <key>default</key>
-                <string>Read with HiMilo</string>
+                <string>Read with VoxClaw</string>
             </dict>
             <key>NSMessage</key>
             <string>readText</string>
@@ -120,7 +120,7 @@ install_binary() {
 install_binary "$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
 
 # Copy app icon.
-ICON_SOURCE="$ROOT/Sources/HiMiloCore/Resources/AppIcon.icns"
+ICON_SOURCE="$ROOT/Sources/VoxClawCore/Resources/AppIcon.icns"
 if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$APP/Contents/Resources/AppIcon.icns"
 fi

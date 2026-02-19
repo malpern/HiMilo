@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "HiMilo",
+    name: "VoxClaw",
     platforms: [
         .macOS(.v26)
     ],
@@ -12,25 +12,25 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "HiMiloCore",
+            name: "VoxClawCore",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/HiMiloCore",
+            path: "Sources/VoxClawCore",
             exclude: ["Resources"],
             resources: [
                 .copy("Audio/Samples/onyx-sample.mp3"),
             ]
         ),
         .executableTarget(
-            name: "HiMilo",
-            dependencies: ["HiMiloCore"],
-            path: "Sources/HiMilo"
+            name: "VoxClaw",
+            dependencies: ["VoxClawCore"],
+            path: "Sources/VoxClaw"
         ),
         .testTarget(
-            name: "HiMiloCoreTests",
-            dependencies: ["HiMiloCore"],
-            path: "Tests/HiMiloCoreTests"
+            name: "VoxClawCoreTests",
+            dependencies: ["VoxClawCore"],
+            path: "Tests/VoxClawCoreTests"
         ),
     ]
 )

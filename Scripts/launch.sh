@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-APP_NAME="HiMilo"
+APP_NAME="VoxClaw"
 APP_PATH="$PROJECT_ROOT/${APP_NAME}.app"
 
 echo "==> Killing existing ${APP_NAME} instances"

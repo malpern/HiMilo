@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "name": "Debug VoxClaw",
+            "target": "VoxClaw",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug VoxClaw"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "name": "Release VoxClaw",
+            "target": "VoxClaw",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release VoxClaw"
+        }
+    ]
+}

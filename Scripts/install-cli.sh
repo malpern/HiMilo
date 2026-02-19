@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APP_NAME="HiMilo"
+APP_NAME="VoxClaw"
 APP_BUNDLE="$ROOT/${APP_NAME}.app"
 INSTALL_DIR="/usr/local/bin"
-CLI_NAME="milo"
+CLI_NAME="voxclaw"
 
 # Build the app bundle if it doesn't exist.
 if [[ ! -d "$APP_BUNDLE" ]]; then
@@ -31,8 +31,8 @@ ln -s "$BINARY_PATH" "${INSTALL_DIR}/${CLI_NAME}"
 echo "Installed: ${INSTALL_DIR}/${CLI_NAME} -> ${BINARY_PATH}"
 echo ""
 echo "Usage:"
-echo "  milo \"Hello, world!\""
-echo "  echo \"Read this\" | milo"
-echo "  milo --clipboard"
-echo "  milo --listen"
-echo "  milo  # (menu bar mode)"
+echo "  voxclaw \"Hello, world!\""
+echo "  echo \"Read this\" | voxclaw"
+echo "  voxclaw --clipboard"
+echo "  voxclaw --listen"
+echo "  voxclaw  # (menu bar mode)"

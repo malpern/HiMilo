@@ -1,8 +1,8 @@
-# HiMilo Implementation Plan
+# VoxClaw Implementation Plan
 
 ## Context
 
-Build a macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS (`onyx` voice) while displaying a teleprompter-style floating overlay with synchronized word highlighting. The app launches from the terminal via `milo` and accepts text from arguments, stdin, files, clipboard, or network. The overlay appears at the top center of the screen (Dynamic Island style) with dark background, white Helvetica text, and yellow word highlighting that tracks the spoken audio.
+Build a macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS (`onyx` voice) while displaying a teleprompter-style floating overlay with synchronized word highlighting. The app launches from the terminal via `voxclaw` and accepts text from arguments, stdin, files, clipboard, or network. The overlay appears at the top center of the screen (Dynamic Island style) with dark background, white Helvetica text, and yellow word highlighting that tracks the spoken audio.
 
 ## Architecture
 
@@ -31,12 +31,12 @@ Input (args/stdin/file/clipboard/network)
 ## File Structure
 
 ```
-HiMilo/
+VoxClaw/
   Package.swift                           # macOS 15+, swift-argument-parser dep
   README.md                               # Project documentation
   PLAN.md                                 # This file
-  Sources/HiMilo/
-    HiMiloApp.swift                      # @main dual-mode: CLI vs MenuBarExtra
+  Sources/VoxClaw/
+    main.swift                            # @main dual-mode: CLI vs MenuBarExtra
     AppState.swift                        # @Observable shared state
     Views/
       FloatingPanelView.swift             # Dark panel, flowing text, yellow highlight
@@ -63,25 +63,25 @@ HiMilo/
       KeychainHelper.swift                # Read API key from macOS Keychain
       KeyboardMonitor.swift               # NSEvent monitor: space/esc/arrows
   Scripts/
-    bundle.sh                             # Build .app bundle
-    install-cli.sh                        # Symlink milo -> /usr/local/bin
+    package_app.sh                        # Build .app bundle
+    install-cli.sh                        # Symlink voxclaw -> /usr/local/bin
 ```
 
 ## Implementation Phases
 
 ### Phase 1: Foundation ✅ (in progress)
 - Create `Package.swift` (macOS 15+, swift-argument-parser, Swift 6 language mode)
-- `HiMiloApp.swift` — dual-mode `@main` using two-struct pattern (HiMiloLauncher + HiMiloApp)
+- `VoxClawApp.swift` — dual-mode `@main` using two-struct pattern (VoxClawLauncher + VoxClawApp)
 - `AppState.swift` — `@Observable @MainActor` with session state, word array, current index, pause flag
 - `KeychainHelper.swift` — read API key via Security framework (`SecItemCopyMatching`)
 - `ModeDetector.swift` — check `ProcessInfo.arguments` and `isatty(STDIN_FILENO)`
-- Create GitHub repo `malpern/HiMilo`, init git, initial commit
-- **Verify:** `swift build` succeeds, `swift run HiMilo` shows menu bar icon, keychain read works
+- Create GitHub repo `malpern/VoxClaw`, init git, initial commit
+- **Verify:** `swift build` succeeds, `swift run VoxClaw` shows menu bar icon, keychain read works
 
 ### Phase 2: Audio Pipeline
 - `TTSService.swift` — `actor`, POST to `/v1/audio/speech` with `gpt-4o-mini-tts`/`onyx`/`pcm`, stream via `URLSession.bytes(for:)`, yield 4800-byte chunks (100ms each)
 - `AudioPlayer.swift` — `@MainActor`, AVAudioEngine + AVAudioPlayerNode at 24kHz mono Float32, `scheduleChunk()` converts Int16→Float32, `currentTime` via `playerTime(forNodeTime:)`, `totalDuration` from byte count
-- Wire up a basic test: `milo "Hello world"` plays audio
+- Wire up a basic test: `voxclaw "Hello world"` plays audio
 - **Verify:** Audio plays within ~500ms of invocation, `currentTime` advances correctly
 
 ### Phase 3: Floating Panel
@@ -95,13 +95,13 @@ HiMilo/
 - `WordTimingEstimator.swift` — split text into words, assign proportional durations by character count, add punctuation pauses (+300ms for `.!?`, +150ms for `,`, +500ms for paragraph breaks), normalize to total audio duration, binary search `wordIndex(at:in:)`
 - `ReadingSession.swift` — orchestrator: create TTS stream, pipe chunks to AudioPlayer, calculate timings when all bytes received, run 30fps Timer to update `currentWordIndex` from `audioPlayer.currentTime`
 - Handle the "timing not ready yet" gap: use heuristic 150ms/char until real duration known, then recalculate
-- **Verify:** `milo "The quick brown fox..."` highlights words in sync with audio
+- **Verify:** `voxclaw "The quick brown fox..."` highlights words in sync with audio
 
 ### Phase 5: CLI Input
 - `CLIParser.swift` — `ParsableCommand` with `--audio-only/-a`, `--clipboard/-c`, `--file/-f`, `--voice`, `--listen/-l`, `--port`, positional `text` args
 - `InputResolver.swift` — resolve from piped stdin, clipboard (NSPasteboard), file path, or positional args
 - Wire into dual-mode launcher
-- **Verify:** All input methods work: `milo "text"`, `echo text | milo`, `milo -f file.txt`, `milo -c`
+- **Verify:** All input methods work: `voxclaw "text"`, `echo text | voxclaw`, `voxclaw -f file.txt`, `voxclaw -c`
 
 ### Phase 6: Menu Bar, Keyboard, Polish
 - `MenuBarView.swift` — "Paste & Read" (Cmd+Shift+V), "Read from File...", "Network Listener" toggle, "Audio Only Mode" toggle, "Pause/Resume" (when active), "Stop", "Quit"
@@ -112,7 +112,7 @@ HiMilo/
 
 ### Phase 7: Network Listener
 - `NetworkListener.swift` — uses Network.framework `NWListener` on configurable TCP port (default 4140)
-  - Bonjour advertisement as `_milo._tcp` for easy discovery
+  - Bonjour advertisement as `_voxclaw._tcp` for easy discovery
   - Accepts incoming TCP connections
   - Supports two protocols:
     1. **HTTP POST** — `POST /read` with JSON body `{"text": "..."}` or plain text body
@@ -129,21 +129,21 @@ HiMilo/
 - **Verify:** `curl -X POST http://localhost:4140/read -d '{"text":"Hello from network"}'` triggers reading
 
 ### Phase 8: Build Scripts + Install
-- `Scripts/bundle.sh` — build release, create `.app` bundle with Info.plist
-- `Scripts/install-cli.sh` — symlink binary to `/usr/local/bin/milo`
-- **Verify:** `.app` launches as menu bar only, `milo` works from any terminal
+- `Scripts/package_app.sh` — build release, create `.app` bundle with Info.plist
+- `Scripts/install-cli.sh` — symlink binary to `/usr/local/bin/voxclaw`
+- **Verify:** `.app` launches as menu bar only, `voxclaw` works from any terminal
 
 ## CLI Usage
 
 ```bash
-milo "Hello, this is a test."          # direct text
-echo "Read this" | milo                # piped stdin
-milo --file ~/speech.txt               # from file
-milo --clipboard                       # from clipboard
-milo --audio-only "No overlay"         # audio only
-milo --listen                          # start network listener on port 4140
-milo --listen --port 8080              # custom port
-milo                                   # launch menu bar app (no args)
+voxclaw "Hello, this is a test."       # direct text
+echo "Read this" | voxclaw             # piped stdin
+voxclaw --file ~/speech.txt            # from file
+voxclaw --clipboard                    # from clipboard
+voxclaw --audio-only "No overlay"      # audio only
+voxclaw --listen                       # start network listener on port 4140
+voxclaw --listen --port 8080           # custom port
+voxclaw                                # launch menu bar app (no args)
 ```
 
 ## Network Protocol
@@ -165,12 +165,12 @@ Content-Type: application/json
 ```
 
 ### Raw TCP Mode
-Connect to the port, send plain text, close connection. Milo reads whatever was received.
+Connect to the port, send plain text, close connection. VoxClaw reads whatever was received.
 
 ### Discovery
-Milo advertises via Bonjour as `_milo._tcp` so other devices on the LAN can discover it:
+VoxClaw advertises via Bonjour as `_voxclaw._tcp` so other devices on the LAN can discover it:
 ```bash
-dns-sd -B _milo._tcp
+dns-sd -B _voxclaw._tcp
 ```
 
 ## Technical Notes
@@ -179,16 +179,16 @@ dns-sd -B _milo._tcp
 - **API key**: Keychain — `security find-generic-password -a "openai" -s "openai-voice-api-key" -w`
 - **Panel sizing**: 1/3 screen width, 162pt tall (~2.25"), 20pt corner radius, 8pt below menu bar
 - **Text**: Helvetica Neue Medium 28pt, white on black(0.85), yellow(0.35) highlight with 4pt corner radius
-- **Network**: TCP via Network.framework NWListener, default port 4140, Bonjour `_milo._tcp`
+- **Network**: TCP via Network.framework NWListener, default port 4140, Bonjour `_voxclaw._tcp`
 - **No Whisper alignment in MVP** — proportional estimation with punctuation weighting
 
 ## Verification
 
 1. `swift build` compiles with no errors
-2. `swift run HiMilo` shows menu bar icon, no Dock icon
-3. `swift run HiMilo "Test sentence"` shows floating panel + plays audio with synchronized highlighting
+2. `swift run VoxClaw` shows menu bar icon, no Dock icon
+3. `swift run VoxClaw "Test sentence"` shows floating panel + plays audio with synchronized highlighting
 4. Spacebar pauses/resumes, Escape closes, arrows skip
-5. `milo -c` reads clipboard, `echo text | milo` reads stdin
+5. `voxclaw -c` reads clipboard, `echo text | voxclaw` reads stdin
 6. Panel slides down from top, collapses when done
-7. `milo --listen` starts network listener, `curl` triggers reading
-8. `./Scripts/bundle.sh && ./Scripts/install-cli.sh` produces working CLI
+7. `voxclaw --listen` starts network listener, `curl` triggers reading
+8. `./Scripts/package_app.sh && ./Scripts/install-cli.sh` produces working CLI
