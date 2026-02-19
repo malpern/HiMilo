@@ -31,7 +31,34 @@ enum SharedApp {
     static let settings = SettingsManager()
 }
 
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var onboardingWindow: NSWindow?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard !SharedApp.settings.hasCompletedOnboarding else { return }
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Welcome to VoxClaw"
+        window.contentView = NSHostingView(rootView: OnboardingView(settings: SharedApp.settings))
+        window.center()
+        window.isReleasedWhenClosed = false
+        onboardingWindow = window
+
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        Log.onboarding.info("Onboarding window shown")
+    }
+}
+
 struct VoxClawApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     private var appState: AppState { SharedApp.appState }
     private var coordinator: AppCoordinator { SharedApp.coordinator }
     private var settings: SettingsManager { SharedApp.settings }
@@ -78,11 +105,6 @@ struct VoxClawApp: App {
         }
         .defaultSize(width: 440, height: 420)
 
-        Window("Welcome to VoxClaw", id: "onboarding") {
-            OnboardingView(settings: settings)
-        }
-        .defaultSize(width: 500, height: 440)
-        .windowResizability(.contentSize)
     }
 
     // MARK: - URL Scheme (voxclaw://read?text=...)

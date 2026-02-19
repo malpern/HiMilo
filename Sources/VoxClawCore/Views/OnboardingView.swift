@@ -25,8 +25,8 @@ struct OnboardingView: View {
 
     // Audio
     @State private var narrator = OnboardingNarrator()
-
-    @Environment(\.dismiss) private var dismiss
+    @State private var demoPlayer = VoiceDemoPlayer()
+    @State private var isMuted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,9 +37,9 @@ struct OnboardingView: View {
             Group {
                 switch currentStep {
                 case .welcome:
-                    WelcomeStep()
+                    WelcomeStep(demoPlayer: demoPlayer)
                 case .voice:
-                    VoiceStep(apiKey: $apiKey)
+                    VoiceStep(apiKey: $apiKey, demoPlayer: demoPlayer)
                 case .agentLocation:
                     AgentLocationStep(
                         location: $agentLocation,
@@ -63,7 +63,8 @@ struct OnboardingView: View {
 
             NavBar(
                 step: currentStep,
-                narrator: narrator,
+                isMuted: $isMuted,
+                isSpeaking: demoPlayer.isPlaying || narrator.isSpeaking,
                 onBack: goBack,
                 onNext: goNext,
                 onDone: handleComplete
@@ -72,29 +73,47 @@ struct OnboardingView: View {
         }
         .padding(.horizontal, 32)
         .frame(width: 500, height: 440)
+        .task {
+            // Auto-play demo on initial load (Welcome step)
+            guard !isMuted else { return }
+            demoPlayer.playDemo()
+        }
         .onChange(of: currentStep) { _, newStep in
-            narrateStep(newStep)
+            handleStepChange(newStep)
+        }
+        .onChange(of: isMuted) { _, muted in
+            if muted {
+                demoPlayer.stop()
+                narrator.stop()
+            } else {
+                // Replay current step audio on unmute
+                handleStepChange(currentStep)
+            }
         }
     }
 
     private func goBack() {
-        narrator.stop()
+        stopAllAudio()
         guard let prev = OnboardingStep(rawValue: currentStep.rawValue - 1) else { return }
         transitionEdge = .leading
         currentStep = prev
     }
 
     private func goNext() {
-        narrator.stop()
+        stopAllAudio()
         guard let next = OnboardingStep(rawValue: currentStep.rawValue + 1) else { return }
         transitionEdge = .trailing
         currentStep = next
     }
 
-    private func handleComplete() {
+    private func stopAllAudio() {
+        demoPlayer.stop()
         narrator.stop()
+    }
 
-        // Apply collected settings
+    private func handleComplete() {
+        stopAllAudio()
+
         if !apiKey.isEmpty {
             settings.openAIAPIKey = apiKey
             settings.voiceEngine = .openai
@@ -109,22 +128,31 @@ struct OnboardingView: View {
         settings.hasCompletedOnboarding = true
 
         Log.onboarding.info("Onboarding completed")
-        dismiss()
+        NSApp.keyWindow?.close()
     }
 
-    private func narrateStep(_ step: OnboardingStep) {
-        let text: String? = switch step {
+    private func handleStepChange(_ step: OnboardingStep) {
+        guard !isMuted else { return }
+
+        switch step {
+        case .welcome, .voice:
+            demoPlayer.playDemo()
         case .agentLocation:
-            "Where does your OpenClaw agent run? If it's on another machine, enable the network listener."
+            narrator.speak(
+                text: "OK so — where's your agent running? If it's on a different machine, like a Mac Mini, just flip on the network listener and VoxClaw picks it up. Super easy.",
+                apiKey: apiKey.isEmpty ? nil : apiKey
+            )
         case .launchAtLogin:
-            "VoxClaw lives in your menu bar. Turn on launch at login so it's always ready."
+            narrator.speak(
+                text: "Alright — VoxClaw hangs out in your menu bar. You probably want it to start automatically when you log in, so your agent can talk to you whenever.",
+                apiKey: apiKey.isEmpty ? nil : apiKey
+            )
         case .done:
-            "You're all set! VoxClaw is ready to give your agent a voice."
-        default:
-            nil
+            narrator.speak(
+                text: "Boom — you're all set! VoxClaw is ready to go. Your agent finally has a voice. This is gonna be great.",
+                apiKey: apiKey.isEmpty ? nil : apiKey
+            )
         }
-        guard let text else { return }
-        narrator.speak(text: text, apiKey: apiKey.isEmpty ? nil : apiKey)
     }
 }
 
@@ -154,7 +182,8 @@ private struct StepDots: View {
 
 private struct NavBar: View {
     let step: OnboardingStep
-    let narrator: OnboardingNarrator
+    @Binding var isMuted: Bool
+    let isSpeaking: Bool
     let onBack: () -> Void
     let onNext: () -> Void
     let onDone: () -> Void
@@ -168,7 +197,26 @@ private struct NavBar: View {
 
             Spacer()
 
-            NarrationPlayButton(narrator: narrator)
+            // Animated waveform when speaking
+            if isSpeaking && !isMuted {
+                Image(systemName: "waveform")
+                    .symbolEffect(.variableColor.iterative.reversing, isActive: true)
+                    .foregroundStyle(Color.accentColor)
+                    .font(.body)
+                    .transition(.opacity)
+            }
+
+            // Mute button
+            Button {
+                isMuted.toggle()
+            } label: {
+                Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.title3)
+                    .foregroundStyle(isMuted ? .secondary : Color.accentColor)
+            }
+            .buttonStyle(.plain)
+            .help(isMuted ? "Unmute" : "Mute")
+            .padding(.trailing, 8)
 
             if step == .welcome {
                 Button("Get Started") { onNext() }
@@ -185,35 +233,19 @@ private struct NavBar: View {
     }
 }
 
-// MARK: - Narration Play Button
-
-private struct NarrationPlayButton: View {
-    let narrator: OnboardingNarrator
-
-    var body: some View {
-        if narrator.isSpeaking {
-            Button {
-                narrator.stop()
-            } label: {
-                Image(systemName: "stop.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Stop narration")
-        }
-    }
-}
-
 // MARK: - Welcome Step
 
 private struct WelcomeStep: View {
+    let demoPlayer: VoiceDemoPlayer
+
     var body: some View {
         VStack(spacing: 16) {
-            if let icon = NSApp.applicationIconImage {
+            if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+               let icon = NSImage(contentsOf: iconURL) {
                 Image(nsImage: icon)
                     .resizable()
-                    .frame(width: 64, height: 64)
+                    .interpolation(.high)
+                    .frame(width: 192, height: 192)
             }
 
             Text("Welcome to VoxClaw")
@@ -224,6 +256,27 @@ private struct WelcomeStep: View {
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            // Voice indicator showing which voice is speaking
+            HStack(spacing: 24) {
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform")
+                        .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingOpenAI)
+                        .foregroundStyle(demoPlayer.isPlayingOpenAI ? Color.accentColor : Color.secondary.opacity(0.3))
+                    Text("OpenAI")
+                        .font(.caption)
+                        .foregroundStyle(demoPlayer.isPlayingOpenAI ? Color.accentColor : .secondary)
+                }
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform")
+                        .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingApple)
+                        .foregroundStyle(demoPlayer.isPlayingApple ? Color.secondary : Color.secondary.opacity(0.3))
+                    Text("Apple")
+                        .font(.caption)
+                        .foregroundStyle(demoPlayer.isPlayingApple ? .secondary : Color.secondary.opacity(0.3))
+                }
+            }
+            .padding(.top, 4)
         }
     }
 }
@@ -232,16 +285,7 @@ private struct WelcomeStep: View {
 
 private struct VoiceStep: View {
     @Binding var apiKey: String
-
-    @State private var openAIPlayer: AVAudioPlayer?
-    @State private var openAIDelegate: AudioFinishDelegate?
-    @State private var isPlayingOpenAI = false
-
-    @State private var appleSynth = AVSpeechSynthesizer()
-    @State private var appleSynthDelegate: SynthFinishDelegate?
-    @State private var isPlayingApple = false
-
-    private let appleDemoText = "Or you could listen to me instead. The built-in Mac voice. I work, but... you might want that API key."
+    let demoPlayer: VoiceDemoPlayer
 
     var body: some View {
         VStack(spacing: 16) {
@@ -260,14 +304,10 @@ private struct VoiceStep: View {
             VStack(spacing: 10) {
                 // OpenAI voice row
                 HStack(spacing: 12) {
-                    Button {
-                        toggleOpenAI()
-                    } label: {
-                        Image(systemName: isPlayingOpenAI ? "stop.circle.fill" : "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.accentColor)
-                    }
-                    .buttonStyle(.plain)
+                    Image(systemName: "waveform")
+                        .font(.title2)
+                        .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingOpenAI)
+                        .foregroundStyle(demoPlayer.isPlayingOpenAI ? Color.accentColor : Color.secondary.opacity(0.3))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("OpenAI Voice")
@@ -290,18 +330,14 @@ private struct VoiceStep: View {
                         .clipShape(.capsule)
                 }
                 .padding(10)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+                .glassEffect(.regular, in: .rect(cornerRadius: 10))
 
                 // Apple voice row
                 HStack(spacing: 12) {
-                    Button {
-                        toggleApple()
-                    } label: {
-                        Image(systemName: isPlayingApple ? "stop.circle.fill" : "play.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+                    Image(systemName: "waveform")
+                        .font(.title2)
+                        .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingApple)
+                        .foregroundStyle(demoPlayer.isPlayingApple ? Color.secondary : Color.secondary.opacity(0.3))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Built-in Voice")
@@ -315,91 +351,47 @@ private struct VoiceStep: View {
                     Spacer()
                 }
                 .padding(10)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+                .glassEffect(.regular, in: .rect(cornerRadius: 10))
             }
 
             // API Key field
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    SecureField("sk-...", text: $apiKey)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Paste") {
-                        if let clip = NSPasteboard.general.string(forType: .string) {
-                            apiKey = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !apiKey.isEmpty {
+                    HStack {
+                        Label("API key saved", systemImage: "checkmark.circle.fill")
+                            .font(.callout)
+                            .foregroundStyle(.green)
+                        Spacer()
+                        Button("Remove") {
+                            apiKey = ""
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    }
+                } else {
+                    HStack {
+                        SecureField("sk-...", text: $apiKey)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Paste") {
+                            if let clip = NSPasteboard.general.string(forType: .string) {
+                                apiKey = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
                         }
                     }
-                }
 
-                HStack(spacing: 4) {
-                    Link("Get an API key",
-                         destination: URL(string: "https://platform.openai.com/api-keys")!)
-                        .font(.caption)
-                    Text("— optional, you can always add it later")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    HStack(spacing: 4) {
+                        Link("Get an API key",
+                             destination: URL(string: "https://platform.openai.com/api-keys")!)
+                            .font(.caption)
+                        Text("— optional, you can always add it later")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
             .padding(12)
             .glassEffect(.regular, in: .rect(cornerRadius: 10))
         }
-    }
-
-    private func toggleOpenAI() {
-        // Stop Apple if playing
-        if isPlayingApple { stopApple() }
-
-        if isPlayingOpenAI {
-            openAIPlayer?.stop()
-            isPlayingOpenAI = false
-            return
-        }
-
-        guard let url = Bundle.module.url(forResource: "onboarding-openai", withExtension: "mp3") else {
-            Log.onboarding.error("Onboarding OpenAI sample not found in bundle")
-            return
-        }
-
-        do {
-            openAIPlayer = try AVAudioPlayer(contentsOf: url)
-            let delegate = AudioFinishDelegate { [self] in
-                Task { @MainActor in self.isPlayingOpenAI = false }
-            }
-            openAIDelegate = delegate
-            openAIPlayer?.delegate = delegate
-            openAIPlayer?.play()
-            isPlayingOpenAI = true
-        } catch {
-            Log.onboarding.error("Failed to play OpenAI sample: \(error)")
-        }
-    }
-
-    private func toggleApple() {
-        // Stop OpenAI if playing
-        if isPlayingOpenAI {
-            openAIPlayer?.stop()
-            isPlayingOpenAI = false
-        }
-
-        if isPlayingApple {
-            stopApple()
-            return
-        }
-
-        let utterance = AVSpeechUtterance(string: appleDemoText)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-
-        let delegate = SynthFinishDelegate {
-            Task { @MainActor in self.isPlayingApple = false }
-        }
-        appleSynthDelegate = delegate
-        appleSynth.delegate = delegate
-        appleSynth.speak(utterance)
-        isPlayingApple = true
-    }
-
-    private func stopApple() {
-        appleSynth.stopSpeaking(at: .immediate)
-        isPlayingApple = false
     }
 }
 
@@ -618,6 +610,74 @@ private struct SummaryRow: View {
     }
 }
 
+// MARK: - Voice Demo Player
+
+@MainActor @Observable
+final class VoiceDemoPlayer {
+    var isPlayingOpenAI = false
+    var isPlayingApple = false
+    var isPlaying: Bool { isPlayingOpenAI || isPlayingApple }
+
+    private var player: AVAudioPlayer?
+    private var playerDelegate: AudioFinishDelegate?
+    private var synthesizer = AVSpeechSynthesizer()
+    private var synthDelegate: SynthFinishDelegate?
+
+    private let appleDemoText = "Or you could listen to me instead. The built-in Mac voice. I work, but... I kind of suck. You may want that OpenAI key."
+
+    func playDemo() {
+        stop()
+        playOpenAI()
+    }
+
+    func stop() {
+        player?.stop()
+        player = nil
+        playerDelegate = nil
+        synthesizer.stopSpeaking(at: .immediate)
+        isPlayingOpenAI = false
+        isPlayingApple = false
+    }
+
+    private func playOpenAI() {
+        guard let url = Bundle.module.url(forResource: "onboarding-openai", withExtension: "mp3") else {
+            Log.onboarding.error("Onboarding OpenAI sample not found in bundle")
+            playApple()
+            return
+        }
+
+        do {
+            player = try AVAudioPlayer(contentsOf: url)
+            let delegate = AudioFinishDelegate { [weak self] in
+                Task { @MainActor in
+                    self?.isPlayingOpenAI = false
+                    self?.playApple()
+                }
+            }
+            playerDelegate = delegate
+            player?.delegate = delegate
+            player?.play()
+            isPlayingOpenAI = true
+        } catch {
+            Log.onboarding.error("Failed to play OpenAI sample: \(error)")
+            playApple()
+        }
+    }
+
+    private func playApple() {
+        let utterance = AVSpeechUtterance(string: appleDemoText)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+
+        let delegate = SynthFinishDelegate { [weak self] in
+            Task { @MainActor in self?.isPlayingApple = false }
+        }
+        synthDelegate = delegate
+        synthesizer.delegate = delegate
+        synthesizer.speak(utterance)
+        isPlayingApple = true
+    }
+}
+
 // MARK: - OnboardingNarrator
 
 @MainActor @Observable
@@ -665,6 +725,7 @@ final class OnboardingNarrator: NSObject {
                     "input": text,
                     "voice": "onyx",
                     "response_format": "mp3",
+                    "instructions": "You are a guy casually talking to a friend, super excited to show them this thing you found. Speak like a real human — use vocal fry, vary your pitch a lot, speed up when excited, slow down for emphasis. Sound genuinely stoked. Do NOT sound like an AI or a narrator. Sound like a real dude on a podcast who just discovered something awesome.",
                 ]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

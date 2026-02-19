@@ -26,13 +26,6 @@ struct MenuBarView: View {
 
     var body: some View {
         Group {
-            EmptyView()
-                .task {
-                    guard !settings.hasCompletedOnboarding else { return }
-                    try? await Task.sleep(for: .milliseconds(500))
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "onboarding")
-                }
             if appState.isActive {
                 Button(appState.isPaused ? "Resume" : "Pause") {
                     onTogglePause()
