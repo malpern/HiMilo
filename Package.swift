@@ -17,7 +17,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources/HiMiloCore",
-            exclude: ["Resources"]
+            exclude: ["Resources"],
+            resources: [
+                .copy("Audio/Samples/onyx-sample.mp3"),
+            ]
         ),
         .executableTarget(
             name: "HiMilo",

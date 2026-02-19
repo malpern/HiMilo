@@ -1,6 +1,5 @@
 import AppKit
 import os
-import ServiceManagement
 import SwiftUI
 
 struct MenuBarView: View {
@@ -11,7 +10,6 @@ struct MenuBarView: View {
     var onReadText: (String) async -> Void = { _ in }
 
     @Environment(\.openWindow) private var openWindow
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var clipboardPreview: String?
 
     var body: some View {
@@ -64,26 +62,14 @@ struct MenuBarView: View {
 
             Divider()
 
-            Toggle("Audio Only Mode", isOn: Binding(
-                get: { settings.audioOnly },
-                set: { settings.audioOnly = $0 }
-            ))
-
-            Toggle("Launch at Login", isOn: $launchAtLogin)
-                .onChange(of: launchAtLogin) { _, enabled in
-                    do {
-                        if enabled {
-                            try SMAppService.mainApp.register()
-                        } else {
-                            try SMAppService.mainApp.unregister()
-                        }
-                    } catch {
-                        Log.app.error("Launch at login error: \(error)")
-                        launchAtLogin = SMAppService.mainApp.status == .enabled
-                    }
+            if settings.voiceEngine == .apple {
+                Button {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openWindow(id: "settings")
+                } label: {
+                    Label("Better Voice...", systemImage: "sparkles")
                 }
-
-            Divider()
+            }
 
             Button("Settings...") {
                 NSApp.activate(ignoringOtherApps: true)

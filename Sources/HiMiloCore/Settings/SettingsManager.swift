@@ -1,5 +1,6 @@
 import Foundation
 import os
+import ServiceManagement
 
 enum VoiceEngineType: String, CaseIterable, Sendable {
     case apple = "apple"
@@ -9,43 +10,63 @@ enum VoiceEngineType: String, CaseIterable, Sendable {
 @Observable
 @MainActor
 final class SettingsManager {
+    // Stored properties so @Observable can track changes.
+    // Each syncs to UserDefaults/Keychain on write and loads on init.
+
     var voiceEngine: VoiceEngineType {
-        get { VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: "voiceEngine") }
+        didSet { UserDefaults.standard.set(voiceEngine.rawValue, forKey: "voiceEngine") }
     }
 
     var openAIAPIKey: String {
-        get { (try? SandboxedKeychainHelper.readAPIKey()) ?? "" }
-        set {
-            if newValue.isEmpty {
+        didSet {
+            if openAIAPIKey.isEmpty {
                 try? SandboxedKeychainHelper.deleteAPIKey()
             } else {
-                try? SandboxedKeychainHelper.saveAPIKey(newValue)
+                try? SandboxedKeychainHelper.saveAPIKey(openAIAPIKey)
             }
         }
     }
 
     var openAIVoice: String {
-        get { UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx" }
-        set { UserDefaults.standard.set(newValue, forKey: "openAIVoice") }
+        didSet { UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice") }
     }
 
     var appleVoiceIdentifier: String? {
-        get { UserDefaults.standard.string(forKey: "appleVoiceIdentifier") }
-        set { UserDefaults.standard.set(newValue, forKey: "appleVoiceIdentifier") }
+        didSet { UserDefaults.standard.set(appleVoiceIdentifier, forKey: "appleVoiceIdentifier") }
     }
 
     var audioOnly: Bool {
-        get { UserDefaults.standard.bool(forKey: "audioOnly") }
-        set { UserDefaults.standard.set(newValue, forKey: "audioOnly") }
+        didSet { UserDefaults.standard.set(audioOnly, forKey: "audioOnly") }
     }
 
-    /// Whether OpenAI is configured and usable.
+    var launchAtLogin: Bool {
+        didSet {
+            do {
+                if launchAtLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                Log.settings.error("Launch at login error: \(error)")
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        }
+    }
+
     var isOpenAIConfigured: Bool {
         !openAIAPIKey.isEmpty
     }
 
-    /// Create the appropriate SpeechEngine based on current settings.
+    init() {
+        self.voiceEngine = VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple
+        self.openAIAPIKey = (try? SandboxedKeychainHelper.readAPIKey()) ?? ""
+        self.openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx"
+        self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
+        self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
+        self.launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+
     func createEngine() -> any SpeechEngine {
         switch voiceEngine {
         case .apple:

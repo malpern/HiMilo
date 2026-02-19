@@ -3,25 +3,32 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: SettingsManager
-    @State private var showingAPIKeyField = false
 
     var body: some View {
         Form {
             voiceSection
+
+            if settings.voiceEngine == .apple {
+                appleVoiceSection
+            } else {
+                openAISetupSection
+            }
+
             playbackSection
+            generalSection
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: settings.voiceEngine == .openai ? 460 : 420)
+        .frame(width: 460, height: settings.voiceEngine == .openai ? 520 : 440)
     }
 
-    // MARK: - Voice
+    // MARK: - Voice Engine Picker
 
     @ViewBuilder
     private var voiceSection: some View {
-        Section("Voice") {
+        Section("Voice Engine") {
             VoiceOptionCard(
                 title: "Built-in Voice",
-                subtitle: "Uses your Mac's text-to-speech. No setup required.",
+                subtitle: "Uses your Mac's text-to-speech. Works instantly with no setup.",
                 systemImage: "desktopcomputer",
                 isSelected: settings.voiceEngine == .apple
             ) {
@@ -30,23 +37,19 @@ struct SettingsView: View {
 
             VoiceOptionCard(
                 title: "OpenAI Voice",
-                subtitle: "Natural-sounding neural voices. Bring your own API key.",
+                subtitle: "Natural-sounding neural voices powered by OpenAI. Bring your own API key.",
                 badge: "Higher Quality",
                 systemImage: "waveform.circle",
-                isSelected: settings.voiceEngine == .openai
+                isSelected: settings.voiceEngine == .openai,
+                samplePlayer: VoiceSamplePlayer()
             ) {
                 settings.voiceEngine = .openai
             }
         }
-
-        if settings.voiceEngine == .apple {
-            appleVoiceSection
-        } else {
-            openAISetupSection
-        }
     }
 
-    @ViewBuilder
+    // MARK: - Apple Voice
+
     private var appleVoiceSection: some View {
         Section("Apple Voice") {
             Picker("Voice", selection: appleVoiceBinding) {
@@ -59,10 +62,11 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - OpenAI Setup
+
     @ViewBuilder
     private var openAISetupSection: some View {
         if settings.isOpenAIConfigured {
-            // Configured state: show voice picker and key management
             Section("OpenAI Voice") {
                 Picker("Voice", selection: $settings.openAIVoice) {
                     ForEach(openAIVoices, id: \.self) { voice in
@@ -83,7 +87,6 @@ struct SettingsView: View {
                 }
             }
         } else {
-            // Onboarding state: guide the user through setup
             Section("Connect OpenAI") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("To use OpenAI voices, paste your API key below.")
@@ -124,7 +127,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("Your key is stored securely in your Mac's Keychain and never leaves your device except to authenticate with OpenAI.")
+                    Text("Your key is stored in your Mac's Keychain and never leaves your device except to authenticate with OpenAI.")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -146,6 +149,14 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - General
+
+    private var generalSection: some View {
+        Section("General") {
+            Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+        }
+    }
+
     // MARK: - Helpers
 
     private var appleVoiceBinding: Binding<String> {
@@ -164,6 +175,49 @@ struct SettingsView: View {
     private let openAIVoices = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]
 }
 
+// MARK: - Voice Sample Player
+
+@MainActor
+final class VoiceSamplePlayer: ObservableObject {
+    @Published var isPlaying = false
+    private var player: AVAudioPlayer?
+    private var playerDelegate: PlayerDelegate?
+
+    func togglePlayback() {
+        if isPlaying {
+            player?.stop()
+            isPlaying = false
+            return
+        }
+
+        guard let url = Bundle.module.url(forResource: "onyx-sample", withExtension: "mp3") else {
+            Log.settings.error("Voice sample not found in bundle")
+            return
+        }
+
+        do {
+            player = try AVAudioPlayer(contentsOf: url)
+            let delegate = PlayerDelegate { [weak self] in
+                Task { @MainActor in self?.isPlaying = false }
+            }
+            playerDelegate = delegate
+            player?.delegate = delegate
+            player?.play()
+            isPlaying = true
+        } catch {
+            Log.settings.error("Failed to play voice sample: \(error)")
+        }
+    }
+}
+
+private final class PlayerDelegate: NSObject, AVAudioPlayerDelegate, Sendable {
+    let onFinish: @Sendable () -> Void
+    init(onFinish: @escaping @Sendable () -> Void) { self.onFinish = onFinish }
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        onFinish()
+    }
+}
+
 // MARK: - Voice Option Card
 
 private struct VoiceOptionCard: View {
@@ -172,19 +226,21 @@ private struct VoiceOptionCard: View {
     var badge: String? = nil
     let systemImage: String
     let isSelected: Bool
+    var samplePlayer: VoiceSamplePlayer? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 Image(systemName: systemImage)
-                    .font(.title2)
+                    .font(.title)
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .frame(width: 28)
+                    .frame(width: 32)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(title)
+                            .font(.body)
                             .fontWeight(isSelected ? .semibold : .regular)
                         if let badge {
                             Text(badge)
@@ -200,6 +256,12 @@ private struct VoiceOptionCard: View {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let samplePlayer {
+                        SamplePlayButton(player: samplePlayer)
+                            .padding(.top, 2)
+                    }
                 }
 
                 Spacer()
@@ -208,7 +270,28 @@ private struct VoiceOptionCard: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.3))
                     .font(.title3)
             }
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Sample Play Button
+
+private struct SamplePlayButton: View {
+    @ObservedObject var player: VoiceSamplePlayer
+
+    var body: some View {
+        Button {
+            player.togglePlayback()
+        } label: {
+            Label(
+                player.isPlaying ? "Stop Preview" : "Preview Voice",
+                systemImage: player.isPlaying ? "stop.circle.fill" : "play.circle.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(Color.accentColor)
         }
         .buttonStyle(.plain)
     }
