@@ -79,33 +79,41 @@
             text-align: center;
         }
 
-        /* Red lobster gradient button — KeyPath style */
+        /* Red lobster gradient button */
         .download-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 10px;
-            padding: 12px 32px;
-            background: var(--red);
+            padding: 16px 40px;
+            background: linear-gradient(180deg, #f06050 0%, #e04040 40%, #c43030 100%);
             color: #fff !important;
-            font-weight: 500;
-            font-size: 1rem;
-            border-radius: 8px;
-            border: none;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            font-weight: 600;
+            font-size: 1.05rem;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow:
+                0 1px 0 0 rgba(255,180,160,0.3) inset,
+                0 -1px 0 0 rgba(0,0,0,0.15) inset,
+                0 2px 8px rgba(180,40,30,0.3),
+                0 4px 16px rgba(0,0,0,0.2);
             transition: all 150ms ease;
             text-decoration: none;
             cursor: pointer;
         }
         .download-btn:hover {
-            background: var(--red-dark);
+            background: linear-gradient(180deg, #f47060 0%, #e84848 40%, #cc3838 100%);
             color: #fff !important;
             transform: translateY(-1px);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            box-shadow:
+                0 1px 0 0 rgba(255,180,160,0.35) inset,
+                0 -1px 0 0 rgba(0,0,0,0.15) inset,
+                0 4px 12px rgba(180,40,30,0.4),
+                0 8px 24px rgba(0,0,0,0.25);
         }
         .download-btn:active {
             transform: translateY(0);
-            background: #a02828;
+            background: linear-gradient(180deg, #d83838 0%, #c02828 40%, #a82020 100%);
         }
         .download-btn svg {
             width: 18px;
@@ -188,21 +196,28 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            padding: 10px 24px;
-            background: var(--red);
+            padding: 12px 28px;
+            background: linear-gradient(180deg, #f06050 0%, #e04040 40%, #c43030 100%);
             color: #fff;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 0.95em;
-            border-radius: 8px;
-            border: none;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow:
+                0 1px 0 0 rgba(255,180,160,0.3) inset,
+                0 -1px 0 0 rgba(0,0,0,0.15) inset,
+                0 2px 8px rgba(180,40,30,0.25);
             cursor: pointer;
             transition: all 150ms ease;
             font-family: inherit;
         }
         .play-btn:hover {
-            background: var(--red-dark);
+            background: linear-gradient(180deg, #f47060 0%, #e84848 40%, #cc3838 100%);
             transform: translateY(-1px);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            box-shadow:
+                0 1px 0 0 rgba(255,180,160,0.35) inset,
+                0 -1px 0 0 rgba(0,0,0,0.15) inset,
+                0 4px 12px rgba(180,40,30,0.35);
         }
         .play-btn svg {
             width: 18px;
