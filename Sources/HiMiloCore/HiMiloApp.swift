@@ -1,3 +1,4 @@
+import AppKit
 import os
 import SwiftUI
 
@@ -22,10 +23,21 @@ public struct HiMiloLauncher {
     }
 }
 
+/// Shared references for App Intents (which run in-process but can't access @State).
+@MainActor
+enum SharedApp {
+    static let appState = AppState()
+    static let coordinator = AppCoordinator()
+    static let settings = SettingsManager()
+}
+
 struct HiMiloApp: App {
-    @State private var appState = AppState()
-    @State private var coordinator = AppCoordinator()
-    @State private var settings = SettingsManager()
+    private var appState: AppState { SharedApp.appState }
+    private var coordinator: AppCoordinator { SharedApp.coordinator }
+    private var settings: SettingsManager { SharedApp.settings }
+
+    /// Retains the Services menu provider for the lifetime of the app.
+    @State private var serviceProvider: HiMiloServiceProvider?
 
     init() {
         Log.app.info("App init, creating MenuBarExtra")
@@ -40,7 +52,11 @@ struct HiMiloApp: App {
                 onStop: { coordinator.stop() },
                 onReadText: { text in await coordinator.readText(text, appState: appState, settings: settings) }
             )
+            .onOpenURL { url in
+                handleIncomingURL(url)
+            }
             .task {
+                setupServicesProvider()
                 await coordinator.handleCLILaunch(appState: appState, settings: settings)
             }
         }
@@ -48,7 +64,38 @@ struct HiMiloApp: App {
         Window("Settings", id: "settings") {
             SettingsView(settings: settings)
         }
-        .defaultSize(width: 400, height: 320)
+        .defaultSize(width: 440, height: 420)
+    }
+
+    // MARK: - URL Scheme (himilo://read?text=...)
+
+    private func handleIncomingURL(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == "himilo" else { return }
+
+        switch components.host {
+        case "read":
+            if let text = components.queryItems?.first(where: { $0.name == "text" })?.value,
+               !text.isEmpty {
+                Log.app.info("Received text via URL scheme (\(text.count) chars)")
+                Task {
+                    await coordinator.readText(text, appState: appState, settings: settings)
+                }
+            }
+        default:
+            Log.app.warning("Unknown URL action: \(components.host ?? "nil")")
+        }
+    }
+
+    // MARK: - Services Menu
+
+    private func setupServicesProvider() {
+        let provider = HiMiloServiceProvider { text in
+            await coordinator.readText(text, appState: appState, settings: settings)
+        }
+        NSApplication.shared.servicesProvider = provider
+        serviceProvider = provider
+        Log.app.info("Registered macOS Services provider")
     }
 }
 

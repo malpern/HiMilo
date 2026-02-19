@@ -17,6 +17,15 @@ struct CLIParser: ParsableCommand {
           milo --status                     Check if listener is running
           milo --send "Hello from CLI"      Send text to a running listener
 
+        INTEGRATION (send text to the running menu bar app):
+          URL Scheme:
+            open "himilo://read?text=Hello%20world"
+          Services Menu:
+            Select text in any app > right-click > Services > Read with HiMilo
+          Shortcuts / Siri:
+            Search for "Read Text Aloud" in the Shortcuts app
+            shortcuts run "Read with HiMilo"
+
         NETWORK API (when --listen is active):
           POST /read  Send text (JSON {"text":"..."} or plain body)
           GET /status Health check

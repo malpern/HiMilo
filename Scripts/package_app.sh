@@ -48,6 +48,37 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>BuildTimestamp</key><string>${BUILD_TIMESTAMP}</string>
     <key>GitCommit</key><string>${GIT_COMMIT}</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>${BUNDLE_ID}</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>himilo</string>
+            </array>
+        </dict>
+    </array>
+    <key>NSServices</key>
+    <array>
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>Read with HiMilo</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>readText</string>
+            <key>NSPortName</key>
+            <string>${APP_NAME}</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>NSStringPboardType</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <dict/>
+        </dict>
+    </array>
 </dict>
 </plist>
 PLIST
