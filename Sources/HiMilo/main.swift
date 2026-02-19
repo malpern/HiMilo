@@ -1,0 +1,3 @@
+import HiMiloCore
+
+HiMiloLauncher.main()

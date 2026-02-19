@@ -11,13 +11,23 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     ],
     targets: [
-        .executableTarget(
-            name: "HiMilo",
+        .target(
+            name: "HiMiloCore",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Sources/HiMilo",
+            path: "Sources/HiMiloCore",
             exclude: ["Resources"]
+        ),
+        .executableTarget(
+            name: "HiMilo",
+            dependencies: ["HiMiloCore"],
+            path: "Sources/HiMilo"
+        ),
+        .testTarget(
+            name: "HiMiloCoreTests",
+            dependencies: ["HiMiloCore"],
+            path: "Tests/HiMiloCoreTests"
         ),
     ]
 )

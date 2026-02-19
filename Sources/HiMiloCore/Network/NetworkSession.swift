@@ -74,7 +74,7 @@ final class NetworkSession: Sendable {
 
     private func handleRead(raw: String, initialData: Data) {
         // Find Content-Length header
-        let contentLength = parseContentLength(from: raw)
+        let contentLength = Self.parseContentLength(from: raw)
 
         // Split headers from body
         guard let headerEndRange = raw.range(of: "\r\n\r\n") else {
@@ -114,7 +114,7 @@ final class NetworkSession: Sendable {
                    let headerEndRange = raw.range(of: "\r\n\r\n") {
                     let headerByteCount = raw[raw.startIndex..<headerEndRange.lowerBound].utf8.count + 4
                     let bodyBytes = combined.count - headerByteCount
-                    let contentLength = parseContentLength(from: raw)
+                    let contentLength = Self.parseContentLength(from: raw)
 
                     if contentLength == nil || bodyBytes >= (contentLength ?? 0) {
                         processFullRequest(data: combined)
@@ -152,8 +152,8 @@ final class NetworkSession: Sendable {
             return
         }
 
-        let body = extractBody(from: raw)
-        let text = parseTextFromBody(body)
+        let body = Self.extractBody(from: raw)
+        let text = Self.parseTextFromBody(body)
 
         guard !text.isEmpty else {
             Log.network.info("400: empty text body")
@@ -168,12 +168,12 @@ final class NetworkSession: Sendable {
         }
     }
 
-    private func extractBody(from raw: String) -> String {
+    static func extractBody(from raw: String) -> String {
         guard let range = raw.range(of: "\r\n\r\n") else { return "" }
         return String(raw[range.upperBound...])
     }
 
-    private func parseTextFromBody(_ body: String) -> String {
+    static func parseTextFromBody(_ body: String) -> String {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
@@ -190,7 +190,7 @@ final class NetworkSession: Sendable {
 
     // MARK: - HTTP Helpers
 
-    private func parseContentLength(from raw: String) -> Int? {
+    static func parseContentLength(from raw: String) -> Int? {
         for line in raw.components(separatedBy: "\r\n") {
             let lower = line.lowercased()
             if lower.hasPrefix("content-length:") {

@@ -1,9 +1,8 @@
 import os
 import SwiftUI
 
-@main
-struct HiMiloLauncher {
-    static func main() {
+public struct HiMiloLauncher {
+    @MainActor public static func main() {
         let args = ProcessInfo.processInfo.arguments
         Log.app.info("launch args: \(args, privacy: .public)")
         Log.app.info("bundlePath: \(Bundle.main.bundlePath, privacy: .public)")

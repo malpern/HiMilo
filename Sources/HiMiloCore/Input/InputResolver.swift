@@ -32,7 +32,7 @@ enum InputResolver {
         return ""
     }
 
-    private static func readFile(at path: String) throws -> String {
+    static func readFile(at path: String) throws -> String {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         return try String(contentsOf: url, encoding: .utf8)
     }
