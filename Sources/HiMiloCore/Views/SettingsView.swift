@@ -3,15 +3,26 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settings: SettingsManager
+    @State private var isTestingVoice = false
 
     var body: some View {
         Form {
             Section("Voice Engine") {
                 Picker("Engine", selection: $settings.voiceEngine) {
                     Text("Apple (Built-in)").tag(VoiceEngineType.apple)
-                    Text("OpenAI").tag(VoiceEngineType.openai)
+                    Text("OpenAI (Higher Quality)").tag(VoiceEngineType.openai)
                 }
                 .pickerStyle(.radioGroup)
+
+                if settings.voiceEngine == .apple {
+                    Text("Uses your Mac's built-in text-to-speech. No account required.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Uses OpenAI's neural voices for natural-sounding speech. Requires your own OpenAI API key.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if settings.voiceEngine == .apple {
@@ -27,14 +38,24 @@ struct SettingsView: View {
             }
 
             if settings.voiceEngine == .openai {
-                Section("OpenAI") {
+                Section("OpenAI Account") {
                     SecureField("API Key", text: $settings.openAIAPIKey)
                         .textFieldStyle(.roundedBorder)
 
-                    if !settings.isOpenAIConfigured {
-                        Text("Enter your OpenAI API key to use premium voices.")
+                    HStack {
+                        if !settings.isOpenAIConfigured {
+                            Text("Paste your API key from OpenAI's dashboard.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Label("Key saved", systemImage: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                        Spacer()
+                        Link("Get API Key",
+                             destination: URL(string: "https://platform.openai.com/api-keys")!)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
 
                     Picker("Voice", selection: $settings.openAIVoice) {
@@ -43,14 +64,20 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                Section {
+                    Text("When using OpenAI voices, your text is sent to OpenAI's servers for processing. OpenAI's [privacy policy](https://openai.com/privacy) applies. No personal data beyond the reading text is shared.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Playback") {
-                Toggle("Audio Only (no overlay)", isOn: $settings.audioOnly)
+                Toggle("Audio Only (no teleprompter overlay)", isOn: $settings.audioOnly)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 320)
+        .frame(width: 420, height: 380)
     }
 
     private var appleVoiceBinding: Binding<String> {
