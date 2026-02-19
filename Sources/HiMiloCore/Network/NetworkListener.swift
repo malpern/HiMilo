@@ -23,6 +23,7 @@ final class NetworkListener {
         self.onTextReceived = onTextReceived
 
         let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
         let nwPort = NWEndpoint.Port(rawValue: port)!
         listener = try NWListener(using: params, on: nwPort)
 
