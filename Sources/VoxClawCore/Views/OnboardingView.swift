@@ -225,12 +225,16 @@ private struct NavBar: View {
     var body: some View {
         HStack {
             if !isFirstStep {
+#if compiler(>=6.2)
                 if #available(macOS 26, *) {
                     Button("Back") { onBack() }
                         .buttonStyle(.glass)
                 } else {
                     Button("Back") { onBack() }
                 }
+#else
+                Button("Back") { onBack() }
+#endif
             }
 
             Spacer()
@@ -246,32 +250,30 @@ private struct NavBar: View {
             }
 
             if isFirstStep {
-                if #available(macOS 26, *) {
-                    Button("Get Started") { onNext() }
-                        .buttonStyle(.glassProminent)
-                } else {
-                    Button("Get Started") { onNext() }
-                        .buttonStyle(.borderedProminent)
-                }
+                prominentActionButton(title: "Get Started", action: onNext)
             } else if step == .done {
-                if #available(macOS 26, *) {
-                    Button("Done") { onDone() }
-                        .buttonStyle(.glassProminent)
-                } else {
-                    Button("Done") { onDone() }
-                        .buttonStyle(.borderedProminent)
-                }
+                prominentActionButton(title: "Done", action: onDone)
             } else {
-                if #available(macOS 26, *) {
-                    Button("Continue") { onNext() }
-                        .buttonStyle(.glassProminent)
-                } else {
-                    Button("Continue") { onNext() }
-                        .buttonStyle(.borderedProminent)
-                }
+                prominentActionButton(title: "Continue", action: onNext)
             }
         }
         .padding(.top, 12)
+    }
+
+    @ViewBuilder
+    private func prominentActionButton(title: String, action: @escaping () -> Void) -> some View {
+#if compiler(>=6.2)
+        if #available(macOS 26, *) {
+            Button(title, action: action)
+                .buttonStyle(.glassProminent)
+        } else {
+            Button(title, action: action)
+                .buttonStyle(.borderedProminent)
+        }
+#else
+        Button(title, action: action)
+            .buttonStyle(.borderedProminent)
+#endif
     }
 }
 
@@ -750,21 +752,29 @@ final class OnboardingNarrator: NSObject {
 
 private struct GlassBackgroundModifier: ViewModifier {
     func body(content: Content) -> some View {
+#if compiler(>=6.2)
         if #available(macOS 26, *) {
             content.glassEffect(.regular, in: .rect(cornerRadius: 10))
         } else {
             content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
         }
+#else
+        content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+#endif
     }
 }
 
 private struct GlassInteractiveModifier: ViewModifier {
     func body(content: Content) -> some View {
+#if compiler(>=6.2)
         if #available(macOS 26, *) {
             content.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
         } else {
             content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
         }
+#else
+        content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+#endif
     }
 }
 
