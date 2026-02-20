@@ -92,6 +92,8 @@ VoxClaw advertises itself via Bonjour as `_voxclaw._tcp` on the local network. A
 
 Error responses are JSON: `{"error": "description"}`.
 
+**CORS:** The HTTP API allows requests from `http://localhost` only. For cross-machine access, use `curl` or any HTTP client directly (CORS only applies to browsers).
+
 ## Examples
 
 **Speak a summary after a task completes:**

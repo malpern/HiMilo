@@ -95,10 +95,15 @@ curl -X POST http://your-mac.local:4140/read \
   -H 'Content-Type: application/json' \
   -d '{"text": "Hello from my phone"}'
 
+# With voice and rate overrides
+curl -X POST http://your-mac.local:4140/read \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Hello", "voice": "nova", "rate": 1.3}'
+
 # Plain text body
 curl -X POST http://your-mac.local:4140/read -d 'Hello from my phone'
 
-# Health check
+# Health check (returns reading state, session state, word count)
 curl http://your-mac.local:4140/status
 ```
 
@@ -154,7 +159,7 @@ Tests/
 swift test
 ```
 
-81 tests across 13 suites covering word timing, app state, HTTP parsing, mode detection, input resolution, network listener integration, settings, keychain, and onboarding resources.
+85 tests across 13 suites covering word timing, app state, HTTP parsing, mode detection, input resolution, network listener integration, settings, keychain, and onboarding resources.
 
 ### CI
 
@@ -183,6 +188,10 @@ Input (args/stdin/file/clipboard/network)
 - Swift Argument Parser for CLI
 - NWListener (Network.framework) for LAN text input
 - Keychain Services for secure API key storage
+
+## OpenClaw Agent Skill
+
+VoxClaw ships a [`SKILL.md`](SKILL.md) for integration with [OpenClaw](https://github.com/openclaw/openclaw) agents. It documents the full HTTP API, error codes, Bonjour discovery, and usage examples. Agents can use it to speak text aloud on the user's Mac.
 
 ## License
 
