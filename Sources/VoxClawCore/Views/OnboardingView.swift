@@ -40,13 +40,7 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !hasExistingKey {
-                StepDots(count: steps.count, currentIndex: stepIndex)
-                    .padding(.top, 20)
-                    .padding(.bottom, 16)
-            } else {
-                Spacer().frame(height: 20)
-            }
+            Spacer().frame(height: 20)
 
             Group {
                 switch currentStep {
@@ -62,7 +56,10 @@ struct OnboardingView: View {
                         launchAtLogin: $launchAtLogin
                     )
                 case .done:
-                    SuccessStep()
+                    SuccessStep(
+                        isRemote: agentLocation == .remoteMachine,
+                        port: port
+                    )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -82,11 +79,16 @@ struct OnboardingView: View {
         .padding(.horizontal, 32)
         .frame(width: 500, height: 440)
         .task {
+            // Only use short flow if key is persisted in keychain (not just an env var)
             let existingKey = settings.openAIAPIKey
-            if !existingKey.isEmpty {
+            let envVarSet = ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            let isPersistedKey = !existingKey.isEmpty && !envVarSet
+
+            if isPersistedKey {
                 apiKey = existingKey
                 hasExistingKey = true
-                Log.onboarding.info("Existing API key found, using short flow")
+                Log.onboarding.info("Existing API key found in keychain, using short flow")
                 narrator.speak(
                     text: "Hey! Welcome to VoxClaw — your agent can finally talk! Let's go!",
                     apiKey: existingKey
@@ -111,6 +113,10 @@ struct OnboardingView: View {
             // Persist key to keychain immediately so it survives window close
             if !newKey.isEmpty {
                 settings.openAIAPIKey = newKey
+                // Auto-advance when a valid-looking key is entered on the API key step
+                if currentStep == .apiKey && newKey.hasPrefix("sk-") && newKey.count > 20 {
+                    goNext()
+                }
             }
         }
         .onChange(of: isPaused) { _, paused in
@@ -182,7 +188,7 @@ struct OnboardingView: View {
             break
         case .done:
             narrator.speak(
-                text: "Boom — you're all set! VoxClaw is ready to go. Your agent finally has a voice. This is gonna be great.",
+                text: "Let's F-ing go!",
                 apiKey: apiKey.isEmpty ? nil : apiKey
             )
         }
@@ -225,13 +231,15 @@ private struct NavBar: View {
 
             Spacer()
 
-            // Play/pause button
-            Image(systemName: isPaused ? "play.fill" : "pause.fill")
-                .font(.title3)
-                .foregroundStyle(Color.accentColor)
-                .onTapGesture { isPaused.toggle() }
-                .help(isPaused ? "Resume" : "Pause")
-                .padding(.trailing, 8)
+            // Play/pause button — only on steps with audio
+            if step == .welcome || step == .done {
+                Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentColor)
+                    .onTapGesture { isPaused.toggle() }
+                    .help(isPaused ? "Resume" : "Pause")
+                    .padding(.trailing, 8)
+            }
 
             if isFirstStep {
                 Button("Get Started") { onNext() }
@@ -395,6 +403,8 @@ private struct AgentLocationStep: View {
             Image(systemName: location == .thisMac ? "laptopcomputer" : "network")
                 .font(.largeTitle)
                 .foregroundStyle(Color.accentColor)
+                .frame(width: 44, height: 44)
+                .contentTransition(.symbolEffect(.replace))
 
             Text("Where's Your OpenClaw?")
                 .font(.title2)
@@ -406,88 +416,31 @@ private struct AgentLocationStep: View {
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 10) {
-                Button {
+                locationRow(
+                    icon: "laptopcomputer",
+                    title: "This Mac",
+                    subtitle: "Agent runs locally — no network needed",
+                    selected: location == .thisMac
+                ) {
                     location = .thisMac
                     networkEnabled = false
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "laptopcomputer")
-                            .font(.title2)
-                            .foregroundStyle(location == .thisMac ? Color.accentColor : .secondary)
-                            .frame(width: 32)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("This Mac")
-                                .font(.body)
-                                .fontWeight(.medium)
-                            Text("Agent runs locally — no network needed")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: location == .thisMac ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(location == .thisMac ? Color.accentColor : Color.secondary.opacity(0.3))
-                            .font(.title3)
-                    }
-                    .padding(10)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
 
-                Button {
+                locationRow(
+                    icon: "network",
+                    title: "Another Machine",
+                    subtitle: "Network listener on — agent sends text over the network",
+                    selected: location == .remoteMachine
+                ) {
                     location = .remoteMachine
                     networkEnabled = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "network")
-                            .font(.title2)
-                            .foregroundStyle(location == .remoteMachine ? Color.accentColor : .secondary)
-                            .frame(width: 32)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack(spacing: 6) {
-                                Text("Another Machine")
-                                    .font(.body)
-                                    .fontWeight(.medium)
-                                if location == .remoteMachine {
-                                    Text("port \(port)")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
-                            Text("Network listener on — agent sends text over the network")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        if location == .remoteMachine {
-                            Button {
-                                isEditingPort = true
-                            } label: {
-                                Text("Edit")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(Color.accentColor)
-                        }
-
-                        Image(systemName: location == .remoteMachine ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(location == .remoteMachine ? Color.accentColor : Color.secondary.opacity(0.3))
-                            .font(.title3)
-                    }
-                    .padding(10)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
             }
 
-            Toggle("Launch at Login", isOn: $launchAtLogin)
+            HStack {
+                Toggle("Launch at Login", isOn: $launchAtLogin)
+                Spacer()
+            }
         }
         .alert("Network Listener Port", isPresented: $isEditingPort) {
             TextField("Port", text: $port)
@@ -497,11 +450,55 @@ private struct AgentLocationStep: View {
             Text("Enter the port VoxClaw should listen on.")
         }
     }
+
+    private func locationRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundStyle(selected ? Color.accentColor : .secondary)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.body)
+                        .fontWeight(.medium)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.3))
+                    .font(.title3)
+            }
+            .padding(10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+    }
 }
 
 // MARK: - Success Step
 
 private struct SuccessStep: View {
+    let isRemote: Bool
+    let port: String
+
+    private var hostname: String {
+        ProcessInfo.processInfo.hostName
+            .replacingOccurrences(of: ".local", with: "")
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
@@ -515,6 +512,23 @@ private struct SuccessStep: View {
             Text("VoxClaw is ready to give your agent a voice.")
                 .font(.body)
                 .foregroundStyle(.secondary)
+
+            if isRemote {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Send text from your agent:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text("curl -X POST http://\(hostname).local:\(port)/read \\\n  -d '{\"text\": \"Hello from the network\"}'")
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.quaternary.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .padding(.top, 4)
+            }
         }
     }
 }
@@ -668,7 +682,7 @@ final class OnboardingNarrator: NSObject {
                     "input": text,
                     "voice": "onyx",
                     "response_format": "mp3",
-                    "instructions": "You are a guy casually talking to a friend, super excited to show them this thing you found. Speak like a real human — use vocal fry, vary your pitch a lot, speed up when excited, slow down for emphasis. Sound genuinely stoked. Do NOT sound like an AI or a narrator. Sound like a real dude on a podcast who just discovered something awesome.",
+                    "instructions": "You are genuinely PUMPED. Like a best friend who just watched someone nail something incredible. Big grin on your face, voice rising with real excitement — not screaming, but that infectious energy where you can HEAR the smile. Punchy, fast, celebratory. Think sports commentator after a buzzer-beater, or a hype man gassing up his crew. Let the energy BUILD through the line and absolutely PEAK on the last two words.",
                 ]
                 request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
