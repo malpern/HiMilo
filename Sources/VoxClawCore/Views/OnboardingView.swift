@@ -536,12 +536,14 @@ private struct SuccessStep: View {
         🦞 VoxClaw setup pointer:
         - Website: https://voxclaw.com/
         - Agent skill/API doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
-        - First check on VoxClaw Mac only: \(localBase)/status
-        - Speak URL (LAN, preferred): \(speakURL)/read
-        - Health URL (LAN, preferred): \(healthURL)
-        - .local fallback: \(localFallbackBase)/read and \(localFallbackBase)/status
-        - Test:
+        - Gold path (always use this order):
+          1) On VoxClaw Mac: curl -sS \(localBase)/status
+          2) From agent host: curl -sS \(healthURL)
+          3) Then speak with: \(speakURL)/read
+        - Test speak:
           curl -X POST \(speakURL)/read -H 'Content-Type: application/json' -d '{"text":"Hello from OpenClaw"}'
+        - Only if needed: .local fallback is \(localFallbackBase)/read
+        - If LAN step fails but localhost works: check macOS Firewall allows VoxClaw incoming connections.
         """
     }
 

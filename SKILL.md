@@ -26,6 +26,12 @@ If the human shares a `🦞 VoxClaw setup pointer`, use it directly. It includes
 Prefer those provided URLs over guessed hostnames when both are available.
 For LAN calls, prefer numeric IP URLs first; use `.local` hostnames as fallback only.
 
+Reliable connect order:
+1. Confirm on VoxClaw Mac: `curl -sS http://localhost:4140/status`
+2. Confirm from agent host: `curl -sS http://<lan-ip>:4140/status`
+3. Send speech to `<lan-ip>:4140/read`
+4. If step 1 passes but step 2 fails, treat as network/firewall issue (not app API issue).
+
 ## API
 
 ### Speak Text

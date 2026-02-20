@@ -117,6 +117,12 @@ Cross-machine tip: use the Mac's numeric LAN IP first (for example `http://192.1
 
 If you want a one-paste handoff for your agent, open VoxClaw Settings and use `Copy Agent Setup` in the Network section. It copies a `🦞` setup pointer with website/docs plus your live local `/read` and `/status` URLs.
 
+Reliable bring-up order:
+1. On the VoxClaw Mac: `curl -sS http://localhost:4140/status`
+2. From the agent host, use numeric IP: `curl -sS http://<lan-ip>:4140/status`
+3. Then send speech: `curl -sS -X POST http://<lan-ip>:4140/read -H 'Content-Type: application/json' -d '{"text":"hello"}'`
+4. Use `.local` only as fallback.
+
 ### URL Scheme & Integration
 
 ```bash
