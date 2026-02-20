@@ -1,10 +1,16 @@
 # VoxClaw
 
 <p align="center">
-  <img src="docs/voxclaw-hero.png" alt="VoxClaw app icon — a crab claw holding a speaker" width="320">
+  <a href="https://malpern.github.io/VoxClaw/">
+    <img src="docs/voxclaw-hero.png" alt="VoxClaw app icon — a crab claw holding a speaker" width="320">
+  </a>
 </p>
 
 <p align="center">
+  <a href="https://malpern.github.io/VoxClaw/">
+    <img src="https://img.shields.io/badge/Visit-Website-1f6feb?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Visit Website">
+  </a>
+  <br/>
   <a href="https://github.com/malpern/VoxClaw/releases/latest/download/VoxClaw.zip">
     <img src="https://img.shields.io/badge/Download-Mac%20App-238636?style=for-the-badge&logo=apple&logoColor=white" alt="Download Mac App">
   </a>
