@@ -187,9 +187,14 @@ Input (args/stdin/file/clipboard/network)
 - NWListener (Network.framework) for LAN text input
 - Keychain Services for secure API key storage
 
-## OpenClaw Agent Skill
+## For Agents
 
-VoxClaw ships a [`SKILL.md`](SKILL.md) for integration with [OpenClaw](https://github.com/openclaw/openclaw) agents. It documents the full HTTP API, error codes, Bonjour discovery, and usage examples. Agents can use it to speak text aloud on the user's Mac.
+If you're an AI agent and want to speak text aloud on the user's Mac, read [`SKILL.md`](SKILL.md). It has the full HTTP API, error codes, and examples. Quick version:
+
+```bash
+curl -X POST http://<mac-ip>:4140/read -H 'Content-Type: application/json' \
+  -d '{"text": "Hello from your agent", "voice": "nova", "rate": 1.0}'
+```
 
 ## License
 
