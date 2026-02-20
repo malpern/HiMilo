@@ -13,6 +13,11 @@ final class AudioPlayer {
     private var isPlaying = false
     private var onFinished: (() -> Void)?
 
+    enum AudioPlayerError: Error, CustomStringConvertible {
+        case formatInitFailed
+        var description: String { "Failed to create audio format (Float32, 24kHz, mono)" }
+    }
+
     var totalDuration: Double {
         // 16-bit mono = 2 bytes per sample
         Double(totalBytesScheduled) / 2.0 / sampleRate
@@ -27,13 +32,16 @@ final class AudioPlayer {
         return Double(playerTime.sampleTime) / playerTime.sampleRate
     }
 
-    init() {
-        format = AVAudioFormat(
+    init() throws {
+        guard let fmt = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: sampleRate,
             channels: 1,
             interleaved: false
-        )!
+        ) else {
+            throw AudioPlayerError.formatInitFailed
+        }
+        format = fmt
 
         engine.attach(playerNode)
         engine.connect(playerNode, to: engine.mainMixerNode, format: format)
@@ -72,7 +80,7 @@ final class AudioPlayer {
     func scheduleEnd(onFinished: @escaping @Sendable () -> Void) {
         self.onFinished = onFinished
         // Schedule an empty completion handler to detect when playback finishes
-        let emptyBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1)!
+        guard let emptyBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1) else { return }
         emptyBuffer.frameLength = 0
         playerNode.scheduleBuffer(emptyBuffer) { [weak self] in
             Task { @MainActor in

@@ -3,6 +3,11 @@ import Network
 import os
 
 final class NetworkSession: Sendable {
+    /// Maximum allowed request size (1 MB). Requests exceeding this are rejected with 413.
+    static let maxRequestSize = 1_000_000
+    /// Maximum allowed text length in characters.
+    static let maxTextLength = 50_000
+
     private let connection: NWConnection
     private let onTextReceived: @Sendable (String) async -> Void
 
@@ -76,6 +81,13 @@ final class NetworkSession: Sendable {
         // Find Content-Length header
         let contentLength = Self.parseContentLength(from: raw)
 
+        // Reject early if declared size exceeds limit
+        if let contentLength, contentLength > Self.maxRequestSize {
+            Log.network.warning("Content-Length too large: \(contentLength, privacy: .public) bytes")
+            sendErrorResponse(status: 413, message: "Request too large. Maximum size is \(Self.maxRequestSize / 1_000_000) MB.")
+            return
+        }
+
         // Split headers from body
         guard let headerEndRange = raw.range(of: "\r\n\r\n") else {
             // Haven't received full headers yet, keep reading
@@ -106,6 +118,12 @@ final class NetworkSession: Sendable {
             var combined = accumulated
             combined.append(data)
 
+            if combined.count > Self.maxRequestSize {
+                Log.network.warning("Request too large: \(combined.count, privacy: .public) bytes")
+                sendErrorResponse(status: 413, message: "Request too large. Maximum size is \(Self.maxRequestSize / 1_000_000) MB.")
+                return
+            }
+
             if isComplete {
                 processFullRequest(data: combined)
             } else {
@@ -135,6 +153,12 @@ final class NetworkSession: Sendable {
             var combined = accumulated
             combined.append(data)
 
+            if combined.count > Self.maxRequestSize {
+                Log.network.warning("Request too large: \(combined.count, privacy: .public) bytes")
+                sendErrorResponse(status: 413, message: "Request too large. Maximum size is \(Self.maxRequestSize / 1_000_000) MB.")
+                return
+            }
+
             let newRemaining = remaining - data.count
             if newRemaining <= 0 {
                 processFullRequest(data: combined)
@@ -158,6 +182,12 @@ final class NetworkSession: Sendable {
         guard !text.isEmpty else {
             Log.network.info("400: empty text body")
             sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\"} or plain text body.")
+            return
+        }
+
+        if text.count > Self.maxTextLength {
+            Log.network.info("400: text too long (\(text.count, privacy: .public) chars)")
+            sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(Self.maxTextLength) characters (got \(text.count)).")
             return
         }
 
@@ -208,6 +238,8 @@ final class NetworkSession: Sendable {
         case 204: statusText = "No Content"
         case 400: statusText = "Bad Request"
         case 404: statusText = "Not Found"
+        case 413: statusText = "Payload Too Large"
+        case 429: statusText = "Too Many Requests"
         default: statusText = "Error"
         }
 

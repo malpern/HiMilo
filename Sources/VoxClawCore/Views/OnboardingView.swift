@@ -691,8 +691,7 @@ final class OnboardingNarrator: NSObject {
                 guard !Task.isCancelled else { return }
                 guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                     let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    let body = String(data: data, encoding: .utf8) ?? "no body"
-                    Log.onboarding.error("Narrator OpenAI error (status \(statusCode)): \(body), falling back to Apple")
+                    Log.onboarding.error("Narrator OpenAI error (status \(statusCode, privacy: .public)), falling back to Apple")
                     didFailOpenAI = true
                     speakWithApple(text: text)
                     return

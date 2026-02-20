@@ -36,9 +36,10 @@ actor TTSService {
                         var errorBody = ""
                         for try await byte in bytes {
                             errorBody.append(Character(UnicodeScalar(byte)))
+                            if errorBody.count > 1000 { break } // Don't accumulate huge error bodies
                         }
-                        Log.tts.error("TTS API error (\(httpResponse.statusCode, privacy: .public)): \(errorBody, privacy: .public)")
-                        throw TTSError(message: "TTS API error (\(httpResponse.statusCode)): \(errorBody)")
+                        Log.tts.error("TTS API error: status=\(httpResponse.statusCode, privacy: .public)")
+                        throw TTSError(message: Self.friendlyError(status: httpResponse.statusCode, body: errorBody))
                     }
 
                     // Stream in chunks of 4800 bytes (~100ms of 24kHz 16-bit mono)
@@ -74,6 +75,21 @@ actor TTSService {
                     continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+
+    private static func friendlyError(status: Int, body: String) -> String {
+        switch status {
+        case 401:
+            return "Invalid OpenAI API key. Check your key in Settings or Keychain."
+        case 429:
+            return "OpenAI rate limit reached. Please wait a moment and try again."
+        case 400:
+            return "OpenAI rejected the request. The text may be too long or contain unsupported content."
+        case 500...599:
+            return "OpenAI service is temporarily unavailable (HTTP \(status)). Try again shortly."
+        default:
+            return "OpenAI TTS error (HTTP \(status)): \(body.prefix(200))"
         }
     }
 
