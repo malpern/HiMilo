@@ -41,31 +41,58 @@ struct NetworkSessionParsingTests {
         #expect(NetworkSession.extractBody(from: raw) == "")
     }
 
-    // MARK: - parseTextFromBody
+    // MARK: - parseReadRequest
 
-    @Test func parseTextFromBodyJSON() {
-        #expect(NetworkSession.parseTextFromBody("{\"text\":\"hello world\"}") == "hello world")
+    @Test func parseReadRequestJSON() {
+        let req = NetworkSession.parseReadRequest(from: "{\"text\":\"hello world\"}")
+        #expect(req?.text == "hello world")
+        #expect(req?.voice == nil)
+        #expect(req?.rate == nil)
     }
 
-    @Test func parseTextFromBodyPlainText() {
-        #expect(NetworkSession.parseTextFromBody("hello world") == "hello world")
+    @Test func parseReadRequestWithVoiceAndRate() {
+        let req = NetworkSession.parseReadRequest(from: "{\"text\":\"hello\",\"voice\":\"nova\",\"rate\":1.5}")
+        #expect(req?.text == "hello")
+        #expect(req?.voice == "nova")
+        #expect(req?.rate == 1.5)
     }
 
-    @Test func parseTextFromBodyEmpty() {
-        #expect(NetworkSession.parseTextFromBody("") == "")
+    @Test func parseReadRequestPlainText() {
+        let req = NetworkSession.parseReadRequest(from: "hello world")
+        #expect(req?.text == "hello world")
+        #expect(req?.voice == nil)
     }
 
-    @Test func parseTextFromBodyWhitespaceOnly() {
-        #expect(NetworkSession.parseTextFromBody("   \n  ") == "")
+    @Test func parseReadRequestEmpty() {
+        #expect(NetworkSession.parseReadRequest(from: "") == nil)
     }
 
-    @Test func parseTextFromBodyInvalidJSON() {
+    @Test func parseReadRequestWhitespaceOnly() {
+        #expect(NetworkSession.parseReadRequest(from: "   \n  ") == nil)
+    }
+
+    @Test func parseReadRequestInvalidJSON() {
         // Invalid JSON falls back to plain text
-        #expect(NetworkSession.parseTextFromBody("{not json}") == "{not json}")
+        let req = NetworkSession.parseReadRequest(from: "{not json}")
+        #expect(req?.text == "{not json}")
     }
 
-    @Test func parseTextFromBodyJSONWithExtraFields() {
-        let json = "{\"text\":\"hello\",\"voice\":\"nova\"}"
-        #expect(NetworkSession.parseTextFromBody(json) == "hello")
+    @Test func parseReadRequestJSONWithExtraFields() {
+        let req = NetworkSession.parseReadRequest(from: "{\"text\":\"hello\",\"extra\":true}")
+        #expect(req?.text == "hello")
+    }
+
+    @Test func parseReadRequestVoiceOnly() {
+        let req = NetworkSession.parseReadRequest(from: "{\"text\":\"hi\",\"voice\":\"alloy\"}")
+        #expect(req?.text == "hi")
+        #expect(req?.voice == "alloy")
+        #expect(req?.rate == nil)
+    }
+
+    @Test func parseReadRequestRateOnly() {
+        let req = NetworkSession.parseReadRequest(from: "{\"text\":\"hi\",\"rate\":2.0}")
+        #expect(req?.text == "hi")
+        #expect(req?.voice == nil)
+        #expect(req?.rate == 2.0)
     }
 }

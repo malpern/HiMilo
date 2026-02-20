@@ -8,7 +8,7 @@ final class NetworkListener {
     private let port: UInt16
     private let serviceName: String?
     private let appState: AppState
-    private var onTextReceived: (@Sendable (String) async -> Void)?
+    private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
 
     var isListening: Bool { listener != nil }
 
@@ -18,9 +18,9 @@ final class NetworkListener {
         self.appState = appState
     }
 
-    func start(onTextReceived: @escaping @Sendable (String) async -> Void) throws {
+    func start(onReadRequest: @escaping @Sendable (ReadRequest) async -> Void) throws {
         guard listener == nil else { return }
-        self.onTextReceived = onTextReceived
+        self.onReadRequest = onReadRequest
 
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
@@ -55,7 +55,7 @@ final class NetworkListener {
         listener?.cancel()
         listener = nil
         appState.isListening = false
-        onTextReceived = nil
+        onReadRequest = nil
         Log.network.info("Listener stopped")
         print("VoxClaw listener stopped")
     }
@@ -78,9 +78,28 @@ final class NetworkListener {
 
     private func handleNewConnection(_ connection: NWConnection) {
         Log.network.debug("New connection from \(String(describing: connection.endpoint), privacy: .public)")
-        let session = NetworkSession(connection: connection) { [weak self] text in
-            await self?.onTextReceived?(text)
-        }
+        let state = appState
+        let session = NetworkSession(
+            connection: connection,
+            statusProvider: { @Sendable in
+                // AppState is @MainActor — capture current values synchronously from main
+                MainActor.assumeIsolated {
+                    let reading = state.isActive
+                    let sessionState: String
+                    switch state.sessionState {
+                    case .idle: sessionState = "idle"
+                    case .loading: sessionState = "loading"
+                    case .playing: sessionState = "playing"
+                    case .paused: sessionState = "paused"
+                    case .finished: sessionState = "finished"
+                    }
+                    return (reading: reading, state: sessionState, wordCount: state.words.count)
+                }
+            },
+            onReadRequest: { [weak self] request in
+                await self?.onReadRequest?(request)
+            }
+        )
         session.start()
     }
 

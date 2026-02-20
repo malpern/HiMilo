@@ -11,14 +11,10 @@ struct NetworkListenerIntegrationTests {
     @Test func statusEndpointReturnsOK() async throws {
         let appState = AppState()
         let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
-        var receivedTexts: [String] = []
 
-        try listener.start { text in
-            await MainActor.run { receivedTexts.append(text) }
-        }
+        try listener.start { _ in }
         defer { listener.stop() }
 
-        // Wait for listener to be ready
         try await waitForListener(port: Self.testPort)
 
         // GET /status
@@ -30,15 +26,18 @@ struct NetworkListenerIntegrationTests {
         let body = String(data: data, encoding: .utf8) ?? ""
         #expect(body.contains("ok"))
         #expect(body.contains("VoxClaw"))
+        // Should include reading state
+        #expect(body.contains("\"reading\":false"))
+        #expect(body.contains("\"state\":\"idle\""))
     }
 
     @Test func readEndpointAcceptsJSON() async throws {
         let appState = AppState()
         let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
-        var receivedTexts: [String] = []
+        var receivedRequests: [ReadRequest] = []
 
-        try listener.start { text in
-            await MainActor.run { receivedTexts.append(text) }
+        try listener.start { request in
+            await MainActor.run { receivedRequests.append(request) }
         }
         defer { listener.stop() }
 
@@ -58,18 +57,46 @@ struct NetworkListenerIntegrationTests {
         let body = String(data: data, encoding: .utf8) ?? ""
         #expect(body.contains("reading"))
 
-        // Give the callback a moment to fire
         try await Task.sleep(for: .milliseconds(100))
-        #expect(receivedTexts.contains("integration test"))
+        #expect(receivedRequests.contains { $0.text == "integration test" })
+    }
+
+    @Test func readEndpointAcceptsVoiceAndRate() async throws {
+        let appState = AppState()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        var receivedRequests: [ReadRequest] = []
+
+        try listener.start { request in
+            await MainActor.run { receivedRequests.append(request) }
+        }
+        defer { listener.stop() }
+
+        try await waitForListener(port: Self.testPort)
+
+        // POST /read with voice and rate
+        let url = URL(string: "http://localhost:\(Self.testPort)/read")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "{\"text\":\"hello\",\"voice\":\"nova\",\"rate\":1.5}".data(using: .utf8)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        let http = try #require(response as? HTTPURLResponse)
+        #expect(http.statusCode == 200)
+
+        try await Task.sleep(for: .milliseconds(100))
+        let received = try #require(receivedRequests.first { $0.text == "hello" })
+        #expect(received.voice == "nova")
+        #expect(received.rate == 1.5)
     }
 
     @Test func readEndpointAcceptsPlainText() async throws {
         let appState = AppState()
         let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
-        var receivedTexts: [String] = []
+        var receivedRequests: [ReadRequest] = []
 
-        try listener.start { text in
-            await MainActor.run { receivedTexts.append(text) }
+        try listener.start { request in
+            await MainActor.run { receivedRequests.append(request) }
         }
         defer { listener.stop() }
 
@@ -87,7 +114,7 @@ struct NetworkListenerIntegrationTests {
         #expect(http.statusCode == 200)
 
         try await Task.sleep(for: .milliseconds(100))
-        #expect(receivedTexts.contains("plain text body"))
+        #expect(receivedRequests.contains { $0.text == "plain text body" })
     }
 
     @Test func notFoundForUnknownRoute() async throws {

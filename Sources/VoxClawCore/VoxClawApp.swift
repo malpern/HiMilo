@@ -149,13 +149,26 @@ final class AppCoordinator {
         let port = port ?? CLIContext.shared?.port ?? 4140
         let listener = NetworkListener(port: port, appState: appState)
         do {
-            try listener.start { [weak self] text in
-                await self?.readText(text, appState: appState, settings: settings)
+            try listener.start { [weak self] request in
+                await self?.handleReadRequest(request, appState: appState, settings: settings)
             }
             self.networkListener = listener
         } catch {
             Log.app.error("Failed to start listener: \(error)")
         }
+    }
+
+    private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
+        // Build engine with request overrides, falling back to settings defaults
+        let voice = request.voice ?? settings.openAIVoice
+        let rate = request.rate ?? 1.0
+        var engine: (any SpeechEngine)?
+        if !settings.openAIAPIKey.isEmpty {
+            engine = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate)
+        } else if request.rate != nil {
+            engine = AppleSpeechEngine(rate: rate)
+        }
+        await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
     }
 
     func stopListening() {

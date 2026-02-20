@@ -2,6 +2,13 @@ import Foundation
 import Network
 import os
 
+/// Parsed payload from a POST /read request.
+struct ReadRequest: Sendable {
+    let text: String
+    var voice: String?
+    var rate: Float?
+}
+
 final class NetworkSession: Sendable {
     /// Maximum allowed request size (1 MB). Requests exceeding this are rejected with 413.
     static let maxRequestSize = 1_000_000
@@ -9,11 +16,17 @@ final class NetworkSession: Sendable {
     static let maxTextLength = 50_000
 
     private let connection: NWConnection
-    private let onTextReceived: @Sendable (String) async -> Void
+    private let onReadRequest: @Sendable (ReadRequest) async -> Void
+    private let statusProvider: @Sendable () -> (reading: Bool, state: String, wordCount: Int)
 
-    init(connection: NWConnection, onTextReceived: @escaping @Sendable (String) async -> Void) {
+    init(
+        connection: NWConnection,
+        statusProvider: @escaping @Sendable () -> (reading: Bool, state: String, wordCount: Int),
+        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
+    ) {
         self.connection = connection
-        self.onTextReceived = onTextReceived
+        self.statusProvider = statusProvider
+        self.onReadRequest = onReadRequest
     }
 
     func start() {
@@ -71,9 +84,8 @@ final class NetworkSession: Sendable {
     // MARK: - Route Handlers
 
     private func handleStatus() {
-        let json = """
-        {"status":"ok","service":"VoxClaw"}
-        """
+        let info = statusProvider()
+        let json = "{\"status\":\"ok\",\"service\":\"VoxClaw\",\"reading\":\(info.reading),\"state\":\"\(info.state)\",\"word_count\":\(info.wordCount)}"
         sendResponse(status: 200, body: json, contentType: "application/json")
     }
 
@@ -177,23 +189,21 @@ final class NetworkSession: Sendable {
         }
 
         let body = Self.extractBody(from: raw)
-        let text = Self.parseTextFromBody(body)
-
-        guard !text.isEmpty else {
+        guard let request = Self.parseReadRequest(from: body), !request.text.isEmpty else {
             Log.network.info("400: empty text body")
-            sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\"} or plain text body.")
+            sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\", \"voice\":\"nova\", \"rate\":1.5} or plain text body.")
             return
         }
 
-        if text.count > Self.maxTextLength {
-            Log.network.info("400: text too long (\(text.count, privacy: .public) chars)")
-            sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(Self.maxTextLength) characters (got \(text.count)).")
+        if request.text.count > Self.maxTextLength {
+            Log.network.info("400: text too long (\(request.text.count, privacy: .public) chars)")
+            sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(Self.maxTextLength) characters (got \(request.text.count)).")
             return
         }
 
-        Log.network.info("Received text: \(text.count, privacy: .public) chars")
+        Log.network.info("Received text: \(request.text.count, privacy: .public) chars, voice=\(request.voice ?? "default", privacy: .public), rate=\(request.rate.map { String($0) } ?? "default", privacy: .public)")
         Task {
-            await onTextReceived(text)
+            await onReadRequest(request)
             sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
         }
     }
@@ -203,19 +213,21 @@ final class NetworkSession: Sendable {
         return String(raw[range.upperBound...])
     }
 
-    static func parseTextFromBody(_ body: String) -> String {
+    static func parseReadRequest(from body: String) -> ReadRequest? {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "" }
+        guard !trimmed.isEmpty else { return nil }
 
-        // Try JSON: {"text": "..."}
+        // Try JSON: {"text": "...", "voice": "nova", "rate": 1.5}
         if let jsonData = trimmed.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
            let text = json["text"] as? String {
-            return text
+            let voice = json["voice"] as? String
+            let rate = (json["rate"] as? NSNumber)?.floatValue
+            return ReadRequest(text: text, voice: voice, rate: rate)
         }
 
         // Fall back to plain text body
-        return trimmed
+        return ReadRequest(text: trimmed)
     }
 
     // MARK: - HTTP Helpers
@@ -244,7 +256,7 @@ final class NetworkSession: Sendable {
         }
 
         var headers = "HTTP/1.1 \(status) \(statusText)\r\n"
-        headers += "Access-Control-Allow-Origin: *\r\n"
+        headers += "Access-Control-Allow-Origin: http://localhost\r\n"
         headers += "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n"
         headers += "Access-Control-Allow-Headers: Content-Type\r\n"
         headers += "Connection: close\r\n"
