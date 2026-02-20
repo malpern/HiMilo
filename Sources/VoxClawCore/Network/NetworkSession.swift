@@ -17,11 +17,11 @@ final class NetworkSession: Sendable {
 
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
-    private let statusProvider: @Sendable () -> (reading: Bool, state: String, wordCount: Int)
+    private let statusProvider: @Sendable () -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?)
 
     init(
         connection: NWConnection,
-        statusProvider: @escaping @Sendable () -> (reading: Bool, state: String, wordCount: Int),
+        statusProvider: @escaping @Sendable () -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?),
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
     ) {
         self.connection = connection
@@ -87,6 +87,8 @@ final class NetworkSession: Sendable {
 
     private func handleStatus() {
         let info = statusProvider()
+        let ip = info.lanIP ?? "<lan-ip>"
+        let baseURL = "http://\(ip):\(info.port)"
         let payload: [String: Any] = [
             "status": "ok",
             "service": "VoxClaw",
@@ -96,7 +98,9 @@ final class NetworkSession: Sendable {
             "website": "https://voxclaw.com/",
             "skill_doc": "https://github.com/malpern/VoxClaw/blob/main/SKILL.md",
             "discovery": "_voxclaw._tcp",
-            "agent_handoff": "🦞 Give your agent https://voxclaw.com/ for setup, then use this Mac's /read and /status URLs."
+            "speak_url": "\(baseURL)/read",
+            "health_url": "\(baseURL)/status",
+            "agent_handoff": "🦞 Use speak_url and health_url from this payload. Do not auto-switch to .local unless a human explicitly gives one."
         ]
 
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),

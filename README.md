@@ -97,23 +97,23 @@ Send text from another device on your local network:
 
 ```bash
 # JSON body
-curl -X POST http://your-mac.local:4140/read \
+curl -X POST http://your-mac-ip:4140/read \
   -H 'Content-Type: application/json' \
   -d '{"text": "Hello from my phone"}'
 
 # With voice and rate overrides
-curl -X POST http://your-mac.local:4140/read \
+curl -X POST http://your-mac-ip:4140/read \
   -H 'Content-Type: application/json' \
   -d '{"text": "Hello", "voice": "nova", "rate": 1.3}'
 
 # Plain text body
-curl -X POST http://your-mac.local:4140/read -d 'Hello from my phone'
+curl -X POST http://your-mac-ip:4140/read -d 'Hello from my phone'
 
 # Health check (returns reading state, session state, word count)
-curl http://your-mac.local:4140/status
+curl http://your-mac-ip:4140/status
 ```
 
-Cross-machine tip: use the Mac's numeric LAN IP first (for example `http://192.168.1.50:4140`). Treat `.local` hostnames as a fallback if mDNS is working on your network.
+Cross-machine tip: use the Mac's numeric LAN IP only (for example `http://192.168.1.50:4140`) unless a human explicitly tells your agent to use a specific `.local` hostname.
 
 If you want a one-paste handoff for your agent, open VoxClaw Settings and use `Copy Agent Setup` in the Network section. It copies a `🦞` setup pointer with website/docs plus your live local `/read` and `/status` URLs.
 
@@ -121,7 +121,7 @@ Reliable bring-up order:
 1. On the VoxClaw Mac: `curl -sS http://localhost:4140/status`
 2. From the agent host, use numeric IP: `curl -sS http://<lan-ip>:4140/status`
 3. Then send speech: `curl -sS -X POST http://<lan-ip>:4140/read -H 'Content-Type: application/json' -d '{"text":"hello"}'`
-4. Use `.local` only as fallback.
+4. Do not auto-switch to `.local` hostnames unless the human explicitly provides one.
 
 ### URL Scheme & Integration
 

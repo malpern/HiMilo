@@ -24,7 +24,7 @@ If the human shares a `🦞 VoxClaw setup pointer`, use it directly. It includes
 - machine-specific `Health URL` (`/status`)
 
 Prefer those provided URLs over guessed hostnames when both are available.
-For LAN calls, prefer numeric IP URLs first; use `.local` hostnames as fallback only.
+Never auto-switch to `.local` hostnames. Use numeric LAN IP URLs unless a human explicitly provides a `.local` target.
 
 Reliable connect order:
 1. Confirm on VoxClaw Mac: `curl -sS http://localhost:4140/status`
@@ -79,7 +79,9 @@ curl http://<mac-ip>:4140/status
   "word_count": 42,
   "website": "https://voxclaw.com/",
   "skill_doc": "https://github.com/malpern/VoxClaw/blob/main/SKILL.md",
-  "discovery": "_voxclaw._tcp"
+  "discovery": "_voxclaw._tcp",
+  "speak_url": "http://192.168.1.50:4140/read",
+  "health_url": "http://192.168.1.50:4140/status"
 }
 ```
 

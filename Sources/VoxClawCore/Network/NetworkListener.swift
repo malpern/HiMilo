@@ -93,7 +93,13 @@ final class NetworkListener {
                     case .paused: sessionState = "paused"
                     case .finished: sessionState = "finished"
                     }
-                    return (reading: reading, state: sessionState, wordCount: state.words.count)
+                    return (
+                        reading: reading,
+                        state: sessionState,
+                        wordCount: state.words.count,
+                        port: self.port,
+                        lanIP: Self.localIPAddress()
+                    )
                 }
             },
             onReadRequest: { [weak self] request in

@@ -516,21 +516,11 @@ private struct SuccessStep: View {
     let port: String
     @State private var copiedAgentHandoff = false
 
-    private var hostname: String {
-        ProcessInfo.processInfo.hostName
-            .replacingOccurrences(of: ".local", with: "")
-    }
-
-    private var hostForAgents: String {
-        "\(hostname).local"
-    }
-
     private var agentHandoffText: String {
         let localBase = "http://localhost:\(port)"
         let lanIP = NetworkListener.localIPAddress()
-        let ipBase = lanIP.map { "http://\($0):\(port)" }
-        let localFallbackBase = "http://\(hostForAgents):\(port)"
-        let speakURL = ipBase ?? localFallbackBase
+        let speakURL = lanIP.map { "http://\($0):\(port)" }
+            ?? "http://<lan-ip>:\(port)"
         let healthURL = "\(speakURL)/status"
         return """
         🦞 VoxClaw setup pointer:
@@ -542,7 +532,7 @@ private struct SuccessStep: View {
           3) Then speak with: \(speakURL)/read
         - Test speak:
           curl -X POST \(speakURL)/read -H 'Content-Type: application/json' -d '{"text":"Hello from OpenClaw"}'
-        - Only if needed: .local fallback is \(localFallbackBase)/read
+        - Never auto-switch to .local hostnames. Use numeric LAN IP unless a human explicitly gives a .local target.
         - If LAN step fails but localhost works: check macOS Firewall allows VoxClaw incoming connections.
         """
     }
@@ -567,7 +557,7 @@ private struct SuccessStep: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
-                    Text("curl -X POST http://\(hostname).local:\(port)/read \\\n  -d '{\"text\": \"Hello from the network\"}'")
+                    Text("curl -X POST http://<lan-ip>:\(port)/read \\\n  -d '{\"text\": \"Hello from the network\"}'")
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .padding(8)
