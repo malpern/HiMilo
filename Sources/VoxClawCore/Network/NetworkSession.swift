@@ -100,7 +100,7 @@ final class NetworkSession: Sendable {
             "discovery": "_voxclaw._tcp",
             "speak_url": "\(baseURL)/read",
             "health_url": "\(baseURL)/status",
-            "agent_handoff": "🦞 Use speak_url and health_url from this payload. Do not auto-switch to .local unless a human explicitly gives one."
+            "agent_handoff": "🦞 Use speak_url and health_url from this payload exactly. Prefer numeric LAN IP endpoints unless a human explicitly provides a hostname."
         ]
 
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),

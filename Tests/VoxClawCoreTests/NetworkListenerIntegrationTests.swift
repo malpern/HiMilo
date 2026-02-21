@@ -29,6 +29,11 @@ struct NetworkListenerIntegrationTests {
         // Should include reading state
         #expect(body.contains("\"reading\":false"))
         #expect(body.contains("\"state\":\"idle\""))
+        // Canonical endpoint fields should always be present for agents
+        #expect(body.contains("\"speak_url\""))
+        #expect(body.contains("\"health_url\""))
+        // Agent guidance should not auto-route to .local hostnames
+        #expect(!body.contains(".local"))
     }
 
     @Test func readEndpointAcceptsJSON() async throws {
