@@ -5,6 +5,7 @@ import SwiftUI
 public struct VoxClawLauncher {
     @MainActor public static func main() {
         let args = ProcessInfo.processInfo.arguments
+        let currentPID = ProcessInfo.processInfo.processIdentifier
         Log.app.info("launch args: \(args, privacy: .public)")
         Log.app.info("bundlePath: \(Bundle.main.bundlePath, privacy: .public)")
         Log.app.debug("isatty: \(isatty(STDIN_FILENO), privacy: .public)")
@@ -17,8 +18,24 @@ public struct VoxClawLauncher {
             Log.app.info("entering CLI mode")
             CLIParser.main()
         case .menuBar:
+            terminateOtherMenuBarInstances(currentPID: currentPID)
             Log.app.info("entering menuBar mode")
             VoxClawApp.main()
+        }
+    }
+
+    @MainActor
+    private static func terminateOtherMenuBarInstances(currentPID: Int32) {
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.malpern.voxclaw"
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+
+        for app in running where app.processIdentifier != currentPID {
+            let terminated = app.terminate() || app.forceTerminate()
+            if terminated {
+                Log.app.warning("Terminated older VoxClaw instance pid=\(app.processIdentifier, privacy: .public)")
+            } else {
+                Log.app.error("Failed to terminate older VoxClaw instance pid=\(app.processIdentifier, privacy: .public)")
+            }
         }
     }
 }
