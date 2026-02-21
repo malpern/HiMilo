@@ -79,6 +79,9 @@ struct OnboardingView: View {
         .padding(.horizontal, 32)
         .frame(width: 500, height: 440)
         .task {
+            demoPlayer.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
+            narrator.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
+
             // Only use short flow if key is persisted in keychain (not just an env var)
             let existingKey = settings.openAIAPIKey
             let envVarSet = ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?
@@ -606,16 +609,20 @@ final class VoiceDemoPlayer {
     var isPlayingOpenAI = false
     var isPlayingApple = false
     var isPlaying: Bool { isPlayingOpenAI || isPlayingApple }
+    var pauseExternalAudioDuringSpeech = true
 
     private var player: AVAudioPlayer?
     private var playerDelegate: AudioFinishDelegate?
     private var synthesizer = AVSpeechSynthesizer()
     private var synthDelegate: SynthFinishDelegate?
+    private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
+    private var pausedExternalAudio = false
 
     private let appleDemoText = "Or you could listen to me instead. The built-in Mac voice. I work, but... I kind of suck. You may want that OpenAI key."
 
     func playDemo() {
         stop()
+        beginExternalAudioPauseWindow()
         playOpenAI()
     }
 
@@ -642,6 +649,7 @@ final class VoiceDemoPlayer {
         synthesizer.stopSpeaking(at: .immediate)
         isPlayingOpenAI = false
         isPlayingApple = false
+        endExternalAudioPauseWindow()
     }
 
     private func playOpenAI() {
@@ -674,12 +682,26 @@ final class VoiceDemoPlayer {
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
 
         let delegate = SynthFinishDelegate { [weak self] in
-            Task { @MainActor in self?.isPlayingApple = false }
+            Task { @MainActor in
+                self?.isPlayingApple = false
+                self?.endExternalAudioPauseWindow()
+            }
         }
         synthDelegate = delegate
         synthesizer.delegate = delegate
         synthesizer.speak(utterance)
         isPlayingApple = true
+    }
+
+    private func beginExternalAudioPauseWindow() {
+        guard pauseExternalAudioDuringSpeech else { return }
+        pausedExternalAudio = playbackController.pauseIfPlaying()
+    }
+
+    private func endExternalAudioPauseWindow() {
+        guard pausedExternalAudio else { return }
+        playbackController.resumePaused()
+        pausedExternalAudio = false
     }
 }
 
@@ -689,16 +711,20 @@ final class VoiceDemoPlayer {
 final class OnboardingNarrator: NSObject {
     var isSpeaking = false
     var didFailOpenAI = false
+    var pauseExternalAudioDuringSpeech = true
 
     private var player: AVAudioPlayer?
     private var playerDelegate: AudioFinishDelegate?
     private var synthesizer = AVSpeechSynthesizer()
     private var synthDelegate: SynthFinishDelegate?
     private var fetchTask: Task<Void, Never>?
+    private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
+    private var pausedExternalAudio = false
 
     func speak(text: String, apiKey: String?) {
         stop()
         didFailOpenAI = false
+        beginExternalAudioPauseWindow()
 
         if let apiKey, !apiKey.isEmpty {
             speakWithOpenAI(text: text, apiKey: apiKey)
@@ -730,6 +756,7 @@ final class OnboardingNarrator: NSObject {
         player = nil
         synthesizer.stopSpeaking(at: .immediate)
         isSpeaking = false
+        endExternalAudioPauseWindow()
     }
 
     private func speakWithOpenAI(text: String, apiKey: String) {
@@ -765,7 +792,10 @@ final class OnboardingNarrator: NSObject {
 
                 player = try AVAudioPlayer(data: data)
                 let delegate = AudioFinishDelegate { [weak self] in
-                    Task { @MainActor in self?.isSpeaking = false }
+                    Task { @MainActor in
+                        self?.isSpeaking = false
+                        self?.endExternalAudioPauseWindow()
+                    }
                 }
                 playerDelegate = delegate
                 player?.delegate = delegate
@@ -785,11 +815,25 @@ final class OnboardingNarrator: NSObject {
         utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
 
         let delegate = SynthFinishDelegate { [weak self] in
-            Task { @MainActor in self?.isSpeaking = false }
+            Task { @MainActor in
+                self?.isSpeaking = false
+                self?.endExternalAudioPauseWindow()
+            }
         }
         synthDelegate = delegate
         synthesizer.delegate = delegate
         synthesizer.speak(utterance)
+    }
+
+    private func beginExternalAudioPauseWindow() {
+        guard pauseExternalAudioDuringSpeech else { return }
+        pausedExternalAudio = playbackController.pauseIfPlaying()
+    }
+
+    private func endExternalAudioPauseWindow() {
+        guard pausedExternalAudio else { return }
+        playbackController.resumePaused()
+        pausedExternalAudio = false
     }
 }
 
