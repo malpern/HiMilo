@@ -10,10 +10,7 @@ struct FeedbackBadge: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(
-                    Capsule()
-                        .fill(.white.opacity(0.2))
-                )
+                .glassEffect(.regular, in: .capsule)
                 .transition(.scale.combined(with: .opacity))
         }
     }

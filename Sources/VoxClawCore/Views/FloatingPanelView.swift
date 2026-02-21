@@ -45,15 +45,10 @@ struct FloatingPanelView: View {
                     Spacer()
                     Button(action: onTogglePause) {
                         Image(systemName: appState.isPaused ? "play.fill" : "pause.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(.caption, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(width: 30, height: 30)
-                            .background(.black.opacity(0.45))
-                            .clipShape(Circle())
-                            .overlay(
-                                Circle()
-                                    .stroke(.white.opacity(0.35), lineWidth: 1)
-                            )
+                            .glassEffect(.regular.interactive(), in: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(appState.isPaused ? "Resume" : "Pause")

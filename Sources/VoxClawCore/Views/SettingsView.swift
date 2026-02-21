@@ -33,7 +33,8 @@ struct SettingsView: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(agentHandoffText, forType: .string)
                         copiedAgentHandoff = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        Task {
+                            try? await Task.sleep(for: .seconds(1.5))
                             copiedAgentHandoff = false
                         }
                     } label: {
@@ -71,8 +72,7 @@ struct SettingsView: View {
                         .textSelection(.enabled)
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 6))
                 }
             }
         }

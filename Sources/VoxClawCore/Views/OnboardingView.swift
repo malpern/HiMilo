@@ -271,12 +271,17 @@ private struct NavBar: View {
 
             // Play/pause button — only on steps with audio
             if step == .welcome {
-                Image(systemName: isPaused ? "play.fill" : "pause.fill")
-                    .font(.title3)
-                    .foregroundStyle(Color.accentColor)
-                    .onTapGesture { isPaused.toggle() }
-                    .help(isPaused ? "Resume" : "Pause")
-                    .padding(.trailing, 8)
+                Button {
+                    isPaused.toggle()
+                } label: {
+                    Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .help(isPaused ? "Resume" : "Pause")
+                .accessibilityLabel(isPaused ? "Resume" : "Pause")
+                .padding(.trailing, 8)
             }
 
             if isFirstStep {
@@ -572,7 +577,8 @@ private struct SuccessStep: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
+                .font(.system(.largeTitle, weight: .regular))
+                .imageScale(.large)
                 .foregroundStyle(.green)
 
             Text("You're All Set")
