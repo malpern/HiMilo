@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FloatingPanelView: View {
     let appState: AppState
+    var onTogglePause: () -> Void = {}
 
     var body: some View {
         ZStack {
@@ -36,6 +37,29 @@ struct FloatingPanelView: View {
                 FeedbackBadge(text: appState.feedbackText)
                     .animation(.easeInOut(duration: 0.2), value: appState.feedbackText)
                     .padding(.bottom, 12)
+            }
+
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: onTogglePause) {
+                        Image(systemName: appState.isPaused ? "play.fill" : "pause.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 30, height: 30)
+                            .background(.black.opacity(0.45))
+                            .clipShape(Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(.white.opacity(0.35), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(appState.isPaused ? "Resume" : "Pause")
+                }
+                .padding(.trailing, 12)
+                .padding(.bottom, 10)
             }
         }
     }

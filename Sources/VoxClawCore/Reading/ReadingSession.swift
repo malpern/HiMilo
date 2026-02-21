@@ -34,7 +34,9 @@ final class ReadingSession: SpeechEngineDelegate {
 
         // Show panel unless audio-only
         if !appState.audioOnly {
-            panelController = PanelController(appState: appState)
+            panelController = PanelController(appState: appState, onTogglePause: { [weak self] in
+                self?.togglePause()
+            })
             panelController?.show()
         }
 

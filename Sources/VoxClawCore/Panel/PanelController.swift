@@ -6,9 +6,11 @@ import SwiftUI
 final class PanelController {
     private var panel: FloatingPanel?
     private let appState: AppState
+    private let onTogglePause: () -> Void
 
-    init(appState: AppState) {
+    init(appState: AppState, onTogglePause: @escaping () -> Void) {
         self.appState = appState
+        self.onTogglePause = onTogglePause
     }
 
     func show() {
@@ -30,7 +32,7 @@ final class PanelController {
         let panel = FloatingPanel(contentRect: contentRect)
 
         let hostingView = NSHostingView(rootView:
-            FloatingPanelView(appState: appState)
+            FloatingPanelView(appState: appState, onTogglePause: onTogglePause)
                 .frame(width: panelWidth, height: panelHeight)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         )
