@@ -5,9 +5,19 @@ import Security
 enum KeychainHelper {
     private static let defaultService = "openai-voice-api-key"
     private static let defaultAccount = "openai"
-    private static let legacyServiceCandidates = [
-        "openclaw.OPENAI_API_KEY",
-        "OPENAI_API_KEY",
+    private struct LegacyKeychainCandidate {
+        let service: String
+        let preferredAccounts: [String]
+    }
+    private static let legacyServiceCandidates: [LegacyKeychainCandidate] = [
+        LegacyKeychainCandidate(
+            service: "openclaw.OPENAI_API_KEY",
+            preferredAccounts: ["openai", "openclaw"]
+        ),
+        LegacyKeychainCandidate(
+            service: "OPENAI_API_KEY",
+            preferredAccounts: ["openai"]
+        ),
     ]
 
     enum KeychainError: Error, CustomStringConvertible {
@@ -81,6 +91,44 @@ enum KeychainHelper {
         }
     }
 
+    static func readAllFromKeychain(service: String) throws -> [String] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            if let single = result as? Data,
+               let raw = String(data: single, encoding: .utf8),
+               let key = normalizedIfLikelyOpenAIKey(raw) {
+                return [key]
+            }
+            guard let dataArray = result as? [Data] else {
+                throw KeychainError.unexpectedData
+            }
+            return dataArray.compactMap { data in
+                guard let raw = String(data: data, encoding: .utf8) else { return nil }
+                return normalizedIfLikelyOpenAIKey(raw)
+            }
+        case errSecItemNotFound:
+            return []
+        default:
+            throw KeychainError.osError(status)
+        }
+    }
+
+    static func normalizedIfLikelyOpenAIKey(_ raw: String) -> String? {
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard key.hasPrefix("sk-"), key.count >= 20 else { return nil }
+        return key
+    }
+
     /// Reads API key from the default location, falling back to legacy service names.
     /// If a legacy entry is found, it is migrated into the default VoxClaw keychain item.
     static func readPersistedAPIKey() throws -> String {
@@ -88,11 +136,24 @@ enum KeychainHelper {
             return key
         }
 
-        for service in legacyServiceCandidates {
-            if let key = try? readFromKeychain(service: service, account: nil) {
+        for candidate in legacyServiceCandidates {
+            for account in candidate.preferredAccounts {
+                if let key = try? readFromKeychain(service: candidate.service, account: account),
+                   let normalized = normalizedIfLikelyOpenAIKey(key) {
+                    try? saveAPIKey(normalized)
+                    Log.keychain.info("Migrated API key from legacy keychain service \(candidate.service, privacy: .public) with account \(account, privacy: .public)")
+                    return normalized
+                }
+            }
+
+            let uniqueKeys = Set((try? readAllFromKeychain(service: candidate.service)) ?? [])
+            if uniqueKeys.count == 1, let key = uniqueKeys.first {
                 try? saveAPIKey(key)
-                Log.keychain.info("Migrated API key from legacy keychain service: \(service, privacy: .public)")
+                Log.keychain.info("Migrated unique API key from legacy keychain service: \(candidate.service, privacy: .public)")
                 return key
+            }
+            if uniqueKeys.count > 1 {
+                Log.keychain.warning("Skipped legacy key migration for \(candidate.service, privacy: .public): multiple candidate keys found")
             }
         }
 

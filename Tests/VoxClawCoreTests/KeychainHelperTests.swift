@@ -41,4 +41,15 @@ struct KeychainHelperTests {
             try KeychainHelper.readFromKeychain(service: service, account: account)
         }
     }
+
+    @Test func normalizeAcceptsLikelyOpenAIKey() {
+        let key = "  sk-test-roundtrip-\(UUID().uuidString)  "
+        let normalized = KeychainHelper.normalizedIfLikelyOpenAIKey(key)
+        #expect(normalized == key.trimmingCharacters(in: .whitespaces))
+    }
+
+    @Test func normalizeRejectsNonOpenAIKey() {
+        #expect(KeychainHelper.normalizedIfLikelyOpenAIKey("not-a-key") == nil)
+        #expect(KeychainHelper.normalizedIfLikelyOpenAIKey("sk-short") == nil)
+    }
 }
