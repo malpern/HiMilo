@@ -70,6 +70,7 @@ struct OnboardingView: View {
                 step: currentStep,
                 isPaused: $isPaused,
                 isFirstStep: stepIndex == 0,
+                isRemoteDoneStep: currentStep == .done && agentLocation == .remoteMachine,
                 onBack: goBack,
                 onNext: goNext,
                 onDone: handleComplete
@@ -157,6 +158,12 @@ struct OnboardingView: View {
     private func handleComplete() {
         stopAllAudio()
 
+        if agentLocation == .remoteMachine {
+            let handoff = makeAgentHandoffText(port: port)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(handoff, forType: .string)
+        }
+
         if !apiKey.isEmpty {
             settings.openAIAPIKey = apiKey
             settings.voiceEngine = .openai
@@ -172,6 +179,27 @@ struct OnboardingView: View {
 
         Log.onboarding.info("Onboarding completed")
         NSApp.keyWindow?.close()
+    }
+
+    private func makeAgentHandoffText(port: String) -> String {
+        let lanIP = NetworkListener.localIPAddress()
+        let baseURL = lanIP.map { "http://\($0):\(port)" }
+            ?? "http://<lan-ip>:\(port)"
+        let healthURL = "\(baseURL)/status"
+        let speakURL = "\(baseURL)/read"
+        return """
+        🦞 VoxClaw setup pointer:
+        health_url: \(healthURL)
+        speak_url: \(speakURL)
+
+        Agent rules:
+        1) GET health_url first.
+        2) If status is ok, POST text to speak_url.
+        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
+
+        Website: https://voxclaw.com/
+        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
+        """
     }
 
     private func handleStepChange(_ step: OnboardingStep) {
@@ -221,13 +249,14 @@ private struct NavBar: View {
     let step: OnboardingStep
     @Binding var isPaused: Bool
     let isFirstStep: Bool
+    let isRemoteDoneStep: Bool
     let onBack: () -> Void
     let onNext: () -> Void
     let onDone: () -> Void
 
     var body: some View {
         HStack {
-            if !isFirstStep {
+            if !isFirstStep && step != .done {
 #if compiler(>=6.2)
                 if #available(macOS 26, *) {
                     Button("Back") { onBack() }
@@ -243,7 +272,7 @@ private struct NavBar: View {
             Spacer()
 
             // Play/pause button — only on steps with audio
-            if step == .welcome || step == .done {
+            if step == .welcome {
                 Image(systemName: isPaused ? "play.fill" : "pause.fill")
                     .font(.title3)
                     .foregroundStyle(Color.accentColor)
@@ -255,7 +284,10 @@ private struct NavBar: View {
             if isFirstStep {
                 prominentActionButton(title: "Get Started", action: onNext)
             } else if step == .done {
-                prominentActionButton(title: "Done", action: onDone)
+                prominentActionButton(
+                    title: isRemoteDoneStep ? "Copy Setup & Finish" : "Done",
+                    action: onDone
+                )
             } else {
                 prominentActionButton(title: "Continue", action: onNext)
             }
@@ -517,7 +549,6 @@ private struct AgentLocationStep: View {
 private struct SuccessStep: View {
     let isRemote: Bool
     let port: String
-    @State private var copiedAgentHandoff = false
 
     private var agentHandoffText: String {
         let lanIP = NetworkListener.localIPAddress()
@@ -579,22 +610,6 @@ private struct SuccessStep: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(.quaternary.opacity(0.3))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    HStack {
-                        Button(copiedAgentHandoff ? "Copied" : "Copy Agent Setup") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(agentHandoffText, forType: .string)
-                            copiedAgentHandoff = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                copiedAgentHandoff = false
-                            }
-                        }
-                        .buttonStyle(.borderedProminent)
-
-                        Text("Single paste with website, docs, and live URLs.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
                 }
                 .padding(.top, 4)
             }
