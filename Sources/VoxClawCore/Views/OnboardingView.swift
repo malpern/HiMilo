@@ -84,7 +84,7 @@ struct OnboardingView: View {
             narrator.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
 
             // Short flow when a key is already saved in keychain.
-            let existingKey = (try? KeychainHelper.readFromKeychain()) ?? settings.openAIAPIKey
+            let existingKey = (try? KeychainHelper.readPersistedAPIKey()) ?? settings.openAIAPIKey
             let isPersistedKey = !existingKey.isEmpty
 
             if isPersistedKey {

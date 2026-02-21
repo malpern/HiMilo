@@ -5,6 +5,10 @@ import Security
 enum KeychainHelper {
     private static let defaultService = "openai-voice-api-key"
     private static let defaultAccount = "openai"
+    private static let legacyServiceCandidates = [
+        "openclaw.OPENAI_API_KEY",
+        "OPENAI_API_KEY",
+    ]
 
     enum KeychainError: Error, CustomStringConvertible {
         case notFound
@@ -36,16 +40,24 @@ enum KeychainHelper {
 
     /// Reads API key directly from the keychain, bypassing the env var check.
     static func readFromKeychain(service: String = defaultService, account: String = defaultAccount) throws -> String {
+        try readFromKeychain(service: service, account: Optional(account))
+    }
+
+    /// Reads API key directly from keychain with optional account filtering.
+    static func readFromKeychain(service: String, account: String?) throws -> String {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: account,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
+        var queryWithAccount = query
+        if let account {
+            queryWithAccount[kSecAttrAccount as String] = account
+        }
 
         var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        let status = SecItemCopyMatching(queryWithAccount as CFDictionary, &result)
 
         switch status {
         case errSecSuccess:
@@ -67,6 +79,24 @@ enum KeychainHelper {
             Log.keychain.error("Keychain error: status=\(status, privacy: .public)")
             throw KeychainError.osError(status)
         }
+    }
+
+    /// Reads API key from the default location, falling back to legacy service names.
+    /// If a legacy entry is found, it is migrated into the default VoxClaw keychain item.
+    static func readPersistedAPIKey() throws -> String {
+        if let key = try? readFromKeychain() {
+            return key
+        }
+
+        for service in legacyServiceCandidates {
+            if let key = try? readFromKeychain(service: service, account: nil) {
+                try? saveAPIKey(key)
+                Log.keychain.info("Migrated API key from legacy keychain service: \(service, privacy: .public)")
+                return key
+            }
+        }
+
+        throw KeychainError.notFound
     }
 
     static func saveAPIKey(_ key: String, service: String = defaultService, account: String = defaultAccount) throws {
