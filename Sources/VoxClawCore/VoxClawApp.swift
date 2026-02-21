@@ -36,6 +36,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if SharedApp.settings.networkListenerEnabled {
+            SharedApp.coordinator.startListening(
+                appState: SharedApp.appState,
+                settings: SharedApp.settings,
+                port: SharedApp.settings.networkListenerPort
+            )
+        }
+
         guard !SharedApp.settings.hasCompletedOnboarding else { return }
 
         let window = NSWindow(
@@ -151,6 +159,7 @@ final class AppCoordinator {
     private var activeSession: ReadingSession?
 
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
+        stopListening()
         let port = port ?? CLIContext.shared?.port ?? 4140
         let listener = NetworkListener(port: port, appState: appState)
         do {
