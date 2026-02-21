@@ -54,6 +54,9 @@ struct CLIParser: ParsableCommand {
     @Option(name: .long, help: "Speech speed multiplier, 0.25–4.0 (default: 1.0)")
     var rate: Float = 1.0
 
+    @Option(name: .long, help: "Prosody instructions for OpenAI TTS (e.g. \"Read with excitement\")")
+    var instructions: String? = nil
+
     @Option(name: .long, help: "Save audio to file instead of playing (OpenAI only, saves as MP3)")
     var output: String? = nil
 
@@ -111,7 +114,7 @@ struct CLIParser: ParsableCommand {
         if listen {
             let listenPort = port
             Log.cli.info("Starting in listener mode on port \(listenPort, privacy: .public)")
-            let cliContext = CLIContext(text: nil, audioOnly: audioOnly, voice: voice, rate: rate, listen: true, port: port, verbose: verbose)
+            let cliContext = CLIContext(text: nil, audioOnly: audioOnly, voice: voice, rate: rate, listen: true, port: port, verbose: verbose, instructions: instructions)
             MainActor.assumeIsolated {
                 CLIContext.shared = cliContext
                 VoxClawApp.main()
@@ -125,7 +128,7 @@ struct CLIParser: ParsableCommand {
 
         let selectedVoice = voice
         Log.cli.info("Reading \(resolvedText.count, privacy: .public) chars, voice=\(selectedVoice, privacy: .public)")
-        let cliContext = CLIContext(text: resolvedText, audioOnly: audioOnly, voice: voice, rate: rate, verbose: verbose)
+        let cliContext = CLIContext(text: resolvedText, audioOnly: audioOnly, voice: voice, rate: rate, verbose: verbose, instructions: instructions)
         MainActor.assumeIsolated {
             CLIContext.shared = cliContext
             VoxClawApp.main()
@@ -147,13 +150,16 @@ struct CLIParser: ParsableCommand {
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": "gpt-4o-mini-tts",
             "input": text,
             "voice": voice,
             "response_format": "mp3",
             "speed": Double(rate),
         ]
+        if let instructions, !instructions.isEmpty {
+            body["instructions"] = instructions
+        }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         // Launch the network request on a background queue so URLSession can also
@@ -208,7 +214,11 @@ struct CLIParser: ParsableCommand {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text])
+        var payload: [String: Any] = ["text": text]
+        if let instructions, !instructions.isEmpty {
+            payload["instructions"] = instructions
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         let result = Self.syncHTTP(request)
         print(result)
     }
@@ -249,8 +259,9 @@ final class CLIContext: Sendable {
     let listen: Bool
     let port: UInt16
     let verbose: Bool
+    let instructions: String?
 
-    init(text: String?, audioOnly: Bool, voice: String, rate: Float = 1.0, listen: Bool = false, port: UInt16 = 4140, verbose: Bool = false) {
+    init(text: String?, audioOnly: Bool, voice: String, rate: Float = 1.0, listen: Bool = false, port: UInt16 = 4140, verbose: Bool = false, instructions: String? = nil) {
         self.text = text
         self.audioOnly = audioOnly
         self.voice = voice
@@ -258,5 +269,6 @@ final class CLIContext: Sendable {
         self.listen = listen
         self.port = port
         self.verbose = verbose
+        self.instructions = instructions
     }
 }

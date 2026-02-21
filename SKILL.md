@@ -45,11 +45,12 @@ curl -X POST http://<mac-ip>:4140/read \
 
 **Parameters (JSON body):**
 
-| Field   | Type   | Required | Description                                      |
-|---------|--------|----------|--------------------------------------------------|
-| `text`  | string | yes      | The text to speak (max 50,000 characters)        |
-| `voice` | string | no       | OpenAI voice name: alloy, echo, fable, onyx, nova, shimmer |
-| `rate`  | number | no       | Speech rate multiplier (e.g. 1.5 for faster)     |
+| Field          | Type   | Required | Description                                      |
+|----------------|--------|----------|--------------------------------------------------|
+| `text`         | string | yes      | The text to speak (max 50,000 characters)        |
+| `voice`        | string | no       | OpenAI voice name: alloy, echo, fable, onyx, nova, shimmer |
+| `rate`         | number | no       | Speech rate multiplier (e.g. 1.5 for faster)     |
+| `instructions` | string | no       | Natural language speaking style (e.g. "Read warmly", "Sound excited"). Only works with OpenAI voices. |
 
 **Plain text** also works:
 
@@ -133,6 +134,14 @@ curl -X POST http://192.168.1.50:4140/read \
 curl -X POST http://192.168.1.50:4140/read \
   -H 'Content-Type: application/json' \
   -d '{"text": "Heads up — the build failed on CI.", "voice": "nova", "rate": 1.3}'
+```
+
+**Control speaking style with instructions:**
+
+```bash
+curl -X POST http://192.168.1.50:4140/read \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Welcome back! Your deploy succeeded.", "instructions": "Read warmly and conversationally"}'
 ```
 
 **Check if VoxClaw is available before sending:**

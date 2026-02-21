@@ -53,6 +53,7 @@ voxclaw --file article.txt           # Read from file
 echo "Hello" | voxclaw              # Read from stdin
 voxclaw --voice nova "Hello"         # OpenAI voice override
 voxclaw --rate 1.5 "Hello"          # 1.5x speech speed
+voxclaw --instructions "Read warmly" "Hello"  # OpenAI prosody control
 voxclaw --output hello.mp3 "Hello"  # Save audio to file (OpenAI)
 voxclaw --listen                     # Start HTTP listener on port 4140
 voxclaw --listen --port 8080         # Custom port

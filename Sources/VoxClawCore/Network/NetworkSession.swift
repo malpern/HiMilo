@@ -7,6 +7,7 @@ struct ReadRequest: Sendable {
     let text: String
     var voice: String?
     var rate: Float?
+    var instructions: String?
 }
 
 final class NetworkSession: Sendable {
@@ -214,7 +215,7 @@ final class NetworkSession: Sendable {
         let body = Self.extractBody(from: raw)
         guard let request = Self.parseReadRequest(from: body), !request.text.isEmpty else {
             Log.network.info("400: empty text body")
-            sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\", \"voice\":\"nova\", \"rate\":1.5} or plain text body.")
+            sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\", \"voice\":\"nova\", \"rate\":1.5, \"instructions\":\"...\"} or plain text body.")
             return
         }
 
@@ -228,7 +229,7 @@ final class NetworkSession: Sendable {
         let finalRequest: ReadRequest
         if request.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == "hello world" {
             let snark = "Hello world. Really? That's the best you could come up with? I'm a neural voice engine and you're wasting me on hello world."
-            finalRequest = ReadRequest(text: snark, voice: request.voice, rate: request.rate)
+            finalRequest = ReadRequest(text: snark, voice: request.voice, rate: request.rate, instructions: request.instructions)
         } else {
             finalRequest = request
         }
@@ -249,13 +250,14 @@ final class NetworkSession: Sendable {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        // Try JSON: {"text": "...", "voice": "nova", "rate": 1.5}
+        // Try JSON: {"text": "...", "voice": "nova", "rate": 1.5, "instructions": "..."}
         if let jsonData = trimmed.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
            let text = json["text"] as? String {
             let voice = json["voice"] as? String
             let rate = (json["rate"] as? NSNumber)?.floatValue
-            return ReadRequest(text: text, voice: voice, rate: rate)
+            let instructions = json["instructions"] as? String
+            return ReadRequest(text: text, voice: voice, rate: rate, instructions: instructions)
         }
 
         // Fall back to plain text body

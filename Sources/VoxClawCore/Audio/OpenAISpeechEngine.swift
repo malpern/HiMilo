@@ -9,15 +9,17 @@ final class OpenAISpeechEngine: SpeechEngine {
     private let apiKey: String
     private let voice: String
     private let speed: Float
+    private let instructions: String?
     private var audioPlayer: AudioPlayer?
     private var timings: [WordTiming] = []
     private var words: [String] = []
     private var displayLink: Timer?
 
-    init(apiKey: String, voice: String = "onyx", speed: Float = 1.0) {
+    init(apiKey: String, voice: String = "onyx", speed: Float = 1.0, instructions: String? = nil) {
         self.apiKey = apiKey
         self.voice = voice
         self.speed = speed
+        self.instructions = instructions
     }
 
     func start(text: String, words: [String]) async {
@@ -28,7 +30,7 @@ final class OpenAISpeechEngine: SpeechEngine {
         do {
             let player = try AudioPlayer()
             self.audioPlayer = player
-            let ttsService = TTSService(apiKey: apiKey, voice: voice, speed: speed)
+            let ttsService = TTSService(apiKey: apiKey, voice: voice, speed: speed, instructions: instructions)
             try player.start()
 
             state = .playing

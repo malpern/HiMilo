@@ -27,6 +27,7 @@ enum AccessibilityID {
         static let apiKeyField = "settings.apiKeyField"
         static let pasteAPIKey = "settings.pasteAPIKey"
         static let getAPIKeyLink = "settings.getAPIKeyLink"
+        static let readingStyleField = "settings.readingStyleField"
         static let removeAPIKey = "settings.removeAPIKey"
         static let networkListenerToggle = "settings.networkListenerToggle"
         static let pauseOtherAudioToggle = "settings.pauseOtherAudioToggle"

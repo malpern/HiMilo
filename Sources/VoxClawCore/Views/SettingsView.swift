@@ -109,6 +109,15 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier(AccessibilityID.Settings.openAIVoicePicker)
 
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Reading Style", text: $settings.readingStyle, prompt: Text("e.g. Read warmly and conversationally"))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier(AccessibilityID.Settings.readingStyleField)
+                    Text("Natural language instructions for OpenAI voice style. Leave empty for default.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 DisclosureGroup("OpenAI Setup", isExpanded: $showOpenAISetup) {
                     VStack(alignment: .leading, spacing: 10) {
                         if settings.isOpenAIConfigured {
@@ -176,18 +185,28 @@ struct SettingsView: View {
 
     private var readOnlyDataSection: some View {
         Section("Read-Only Data") {
-            LabeledContent("Status URL") {
-                Text("\(networkBaseURL)/status")
+            copiableRow("Status URL", value: "\(networkBaseURL)/status")
+            copiableRow("Speak URL", value: "\(networkBaseURL)/read")
+        }
+    }
+
+    private func copiableRow(_ label: String, value: String) -> some View {
+        LabeledContent(label) {
+            HStack(spacing: 6) {
+                Text(value)
                     .font(.system(.caption, design: .monospaced))
                     .textSelection(.enabled)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(value, forType: .string)
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Copy to clipboard")
             }
-
-            LabeledContent("Speak URL") {
-                Text("\(networkBaseURL)/read")
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-            }
-
         }
     }
 

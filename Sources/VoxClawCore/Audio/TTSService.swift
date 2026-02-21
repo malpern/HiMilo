@@ -5,12 +5,14 @@ actor TTSService {
     private let apiKey: String
     private let voice: String
     private let speed: Float
+    private let instructions: String?
     private let model = "gpt-4o-mini-tts"
 
-    init(apiKey: String, voice: String = "onyx", speed: Float = 1.0) {
+    init(apiKey: String, voice: String = "onyx", speed: Float = 1.0, instructions: String? = nil) {
         self.apiKey = apiKey
         self.voice = voice
         self.speed = speed
+        self.instructions = instructions
     }
 
     struct TTSError: Error, CustomStringConvertible {
@@ -110,13 +112,16 @@ actor TTSService {
         request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "input": text,
             "voice": voice,
             "response_format": "pcm",
             "speed": Double(speed),
         ]
+        if let instructions, !instructions.isEmpty {
+            body["instructions"] = instructions
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request

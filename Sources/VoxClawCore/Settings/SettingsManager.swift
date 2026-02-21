@@ -35,6 +35,10 @@ final class SettingsManager {
         didSet { UserDefaults.standard.set(appleVoiceIdentifier, forKey: "appleVoiceIdentifier") }
     }
 
+    var readingStyle: String {
+        didSet { UserDefaults.standard.set(readingStyle, forKey: "readingStyle") }
+    }
+
     var audioOnly: Bool {
         didSet { UserDefaults.standard.set(audioOnly, forKey: "audioOnly") }
     }
@@ -89,6 +93,7 @@ final class SettingsManager {
         self.openAIAPIKey = (try? KeychainHelper.readPersistedAPIKey()) ?? ""
         self.openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx"
         self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
+        self.readingStyle = UserDefaults.standard.string(forKey: "readingStyle") ?? ""
         self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
         if UserDefaults.standard.object(forKey: "pauseOtherAudioDuringSpeech") == nil {
             self.pauseOtherAudioDuringSpeech = true
@@ -109,7 +114,8 @@ final class SettingsManager {
         }
     }
 
-    func createEngine() -> any SpeechEngine {
+    func createEngine(instructionsOverride: String? = nil) -> any SpeechEngine {
+        let instructions = instructionsOverride ?? (readingStyle.isEmpty ? nil : readingStyle)
         switch voiceEngine {
         case .apple:
             return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
@@ -118,7 +124,7 @@ final class SettingsManager {
                 Log.settings.info("OpenAI selected but no API key — falling back to Apple")
                 return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
             }
-            let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice)
+            let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice, instructions: instructions)
             let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
             return FallbackSpeechEngine(primary: primary, fallback: fallback)
         }

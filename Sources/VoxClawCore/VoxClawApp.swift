@@ -55,6 +55,7 @@ enum SharedApp {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingWindow: NSWindow?
+    private var splashWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var authFailureObserver: NSObjectProtocol?
     private var hasShownOpenAIAuthAlert = false
@@ -79,7 +80,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        guard !SharedApp.settings.hasCompletedOnboarding else { return }
+        if SharedApp.settings.hasCompletedOnboarding {
+            showSplash()
+            return
+        }
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
@@ -96,6 +100,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         Log.onboarding.info("Onboarding window shown")
+    }
+
+    private func showSplash() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 260),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = true
+        window.level = .floating
+        window.contentView = NSHostingView(rootView:
+            SplashView()
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        )
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        splashWindow = window
+
+        // Fade in
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.3
+            window.animator().alphaValue = 1
+        }
+
+        // Dismiss after 1.5s
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            self?.dismissSplash()
+        }
+        Log.app.info("Splash shown")
+    }
+
+    private func dismissSplash() {
+        guard let window = splashWindow else { return }
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            window.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            Task { @MainActor in
+                self?.splashWindow?.close()
+                self?.splashWindow = nil
+            }
+        })
     }
 
     private func showOpenAIAuthAlert(errorMessage: String?) {
@@ -262,9 +314,10 @@ final class AppCoordinator {
         // Build engine with request overrides, falling back to settings defaults
         let voice = request.voice ?? settings.openAIVoice
         let rate = request.rate ?? 1.0
+        let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
         var engine: (any SpeechEngine)?
         if !settings.openAIAPIKey.isEmpty {
-            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate)
+            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate, instructions: instructions)
             let fallback = AppleSpeechEngine(voiceIdentifier: settings.appleVoiceIdentifier, rate: rate)
             engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
         } else if request.rate != nil {
@@ -285,8 +338,11 @@ final class AppCoordinator {
         audioOnlyOverride: Bool? = nil,
         engineOverride: (any SpeechEngine)? = nil
     ) async {
+        let hadPrior = activeSession != nil
+        Log.session.info("readText called: \(text.count, privacy: .public) chars, hadPriorSession=\(hadPrior, privacy: .public), audioOnly=\(settings.audioOnly, privacy: .public), state=\(String(describing: appState.sessionState), privacy: .public)")
         activeSession?.stopForReplacement()
         appState.audioOnly = audioOnlyOverride ?? settings.audioOnly
+        Log.session.info("readText: appState.audioOnly=\(appState.audioOnly, privacy: .public)")
         let engine = engineOverride ?? settings.createEngine()
         let session = ReadingSession(
             appState: appState,
@@ -296,6 +352,7 @@ final class AppCoordinator {
         )
         activeSession = session
         await session.start(text: text)
+        Log.session.info("readText: session.start returned")
     }
 
     func togglePause() {
@@ -316,9 +373,10 @@ final class AppCoordinator {
         if context.listen {
             startListening(appState: appState, settings: settings, port: context.port)
         } else if let text = context.text {
+            let instructions = context.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
             let engine: any SpeechEngine
             if let apiKey = try? KeychainHelper.readAPIKey() {
-                engine = OpenAISpeechEngine(apiKey: apiKey, voice: context.voice, speed: context.rate)
+                engine = OpenAISpeechEngine(apiKey: apiKey, voice: context.voice, speed: context.rate, instructions: instructions)
             } else {
                 engine = AppleSpeechEngine(rate: context.rate)
             }
