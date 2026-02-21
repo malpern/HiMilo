@@ -83,11 +83,9 @@ struct OnboardingView: View {
             demoPlayer.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
             narrator.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
 
-            // Only use short flow if key is persisted in keychain (not just an env var)
-            let existingKey = settings.openAIAPIKey
-            let envVarSet = ProcessInfo.processInfo.environment["OPENAI_API_KEY"]?
-                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-            let isPersistedKey = !existingKey.isEmpty && !envVarSet
+            // Short flow when a key is already saved in keychain.
+            let existingKey = (try? KeychainHelper.readFromKeychain()) ?? settings.openAIAPIKey
+            let isPersistedKey = !existingKey.isEmpty
 
             if isPersistedKey {
                 apiKey = existingKey
