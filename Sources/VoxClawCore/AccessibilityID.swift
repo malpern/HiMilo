@@ -62,6 +62,7 @@ enum AccessibilityID {
         static let textColorPicker = "quickSettings.textColorPicker"
         static let highlightColorPicker = "quickSettings.highlightColorPicker"
         static let resetButton = "quickSettings.resetButton"
+        static let customToggle = "quickSettings.customToggle"
     }
 
     enum Onboarding {

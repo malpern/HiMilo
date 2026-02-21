@@ -35,26 +35,37 @@ final class ReadingSession: SpeechEngineDelegate {
 
         let words = text.split(separator: " ").map(String.init)
         let isAudioOnly = appState.audioOnly
-        Log.session.info("Session start: \(words.count, privacy: .public) words, audioOnly=\(isAudioOnly, privacy: .public)")
+        let wordCount = words.count
+        let preview = String(text.prefix(80))
+        Log.session.info("Session.start: \(wordCount, privacy: .public) words, audioOnly=\(isAudioOnly, privacy: .public), text=\"\(preview, privacy: .public)\"")
 
         appState.sessionState = .loading
         appState.words = words
         appState.currentWordIndex = 0
+        let wordsSet = appState.words.count
+        Log.session.info("Session.start: appState.words.count=\(wordsSet, privacy: .public)")
 
         // Show panel unless audio-only
         if !appState.audioOnly {
             let effectiveSettings = settings ?? SettingsManager()
             panelController = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
                 self?.togglePause()
+            }, onStop: { [weak self] in
+                self?.stop()
             })
+            Log.panel.info("Session.start: calling panelController.show()")
             panelController?.show()
+        } else {
+            Log.panel.info("Session.start: skipping panel (audioOnly=true)")
         }
 
         if pauseExternalAudioDuringSpeech {
             pausedExternalAudio = playbackController.pauseIfPlaying()
         }
 
+        Log.session.info("Session.start: calling engine.start")
         await engine.start(text: text, words: words)
+        Log.session.info("Session.start: engine.start returned")
     }
 
     func togglePause() {
@@ -81,8 +92,20 @@ final class ReadingSession: SpeechEngineDelegate {
     /// Stop this session because a new one is replacing it.
     /// Do not mutate shared app state, otherwise stale callbacks can clear the new session UI.
     func stopForReplacement() {
+        let finalized = isFinalized
+        let hadFinishTask = finishTask != nil
+        let hadPanel = panelController != nil
+        Log.session.info("stopForReplacement: isFinalized=\(finalized, privacy: .public), hadFinishTask=\(hadFinishTask, privacy: .public), hadPanel=\(hadPanel, privacy: .public)")
         engine.stop()
-        finish(mutatingAppState: false, delayedReset: false)
+        finishTask?.cancel()
+        finishTask = nil
+        panelController?.dismiss()
+        panelController = nil
+        isFinalized = true
+        if pausedExternalAudio {
+            playbackController.resumePaused()
+            pausedExternalAudio = false
+        }
     }
 
     // MARK: - SpeechEngineDelegate
@@ -94,10 +117,14 @@ final class ReadingSession: SpeechEngineDelegate {
     }
 
     func speechEngineDidFinish(_ engine: any SpeechEngine) {
+        let finalized = isFinalized
+        Log.session.info("speechEngineDidFinish: isFinalized=\(finalized, privacy: .public)")
         finish(mutatingAppState: true, delayedReset: true)
     }
 
     func speechEngine(_ engine: any SpeechEngine, didChangeState state: SpeechEngineState) {
+        let desc = String(describing: state)
+        Log.session.info("Engine state → \(desc, privacy: .public)")
         switch state {
         case .playing:
             appState.sessionState = .playing
@@ -118,15 +145,18 @@ final class ReadingSession: SpeechEngineDelegate {
     // MARK: - Private
 
     private func finish(mutatingAppState: Bool, delayedReset: Bool) {
-        // Always cancel any pending delayed reset first, even if this session
-        // was already finalized, to prevent stale tasks from clearing a newer session.
+        let finalized = isFinalized
+        let hadFinishTask = finishTask != nil
+        Log.session.info("finish: mutating=\(mutatingAppState, privacy: .public), delayed=\(delayedReset, privacy: .public), isFinalized=\(finalized, privacy: .public), hadFinishTask=\(hadFinishTask, privacy: .public)")
         finishTask?.cancel()
         finishTask = nil
 
-        guard !isFinalized else { return }
+        guard !isFinalized else {
+            Log.session.info("finish: already finalized, returning early")
+            return
+        }
         isFinalized = true
 
-        Log.session.info("Session finished")
         if mutatingAppState {
             appState.sessionState = .finished
         }
@@ -136,22 +166,31 @@ final class ReadingSession: SpeechEngineDelegate {
         }
 
         if delayedReset && mutatingAppState {
+            Log.session.info("finish: scheduling delayed reset (500ms)")
             finishTask = Task { @MainActor [weak self] in
                 do {
                     try await Task.sleep(for: .milliseconds(500))
                 } catch {
+                    Log.session.info("finish: delayed reset cancelled during sleep")
                     return
                 }
                 if Task.isCancelled {
+                    Log.session.info("finish: delayed reset cancelled after sleep")
                     return
                 }
+                Log.session.info("finish: delayed reset firing — dismissing panel and resetting appState")
                 self?.panelController?.dismiss()
                 self?.appState.reset()
+                let wc = self?.appState.words.count ?? -1
+                Log.session.info("finish: delayed reset complete, words=\(wc, privacy: .public)")
             }
         } else {
+            Log.session.info("finish: immediate cleanup, dismissing panel")
             panelController?.dismiss()
             if mutatingAppState {
                 appState.reset()
+                let wc = appState.words.count
+                Log.session.info("finish: appState reset, words=\(wc, privacy: .public)")
             }
         }
     }

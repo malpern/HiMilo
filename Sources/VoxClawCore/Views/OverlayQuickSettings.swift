@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OverlayQuickSettings: View {
     @Bindable var settings: SettingsManager
+    @State private var showCustom = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -10,44 +11,62 @@ struct OverlayQuickSettings: View {
 
             OverlayPresetGallery(settings: settings, compact: true)
 
-            Group {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Font Size: \(Int(settings.overlayAppearance.fontSize))pt")
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showCustom.toggle()
+                    }
+                } label: {
+                    Text("Custom")
                         .font(.caption)
-                    Slider(value: fontSizeBinding, in: 16...64, step: 1)
-                        .accessibilityIdentifier(AccessibilityID.QuickSettings.fontSizeSlider)
+                        .underline()
+                        .foregroundStyle(.primary)
                 }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Background Opacity: \(Int(settings.overlayAppearance.backgroundColor.opacity * 100))%")
-                        .font(.caption)
-                    Slider(value: bgOpacityBinding, in: 0.1...1.0, step: 0.05)
-                        .accessibilityIdentifier(AccessibilityID.QuickSettings.bgOpacitySlider)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Line Spacing: \(Int(settings.overlayAppearance.lineSpacing))pt")
-                        .font(.caption)
-                    Slider(value: lineSpacingBinding, in: 0...20, step: 1)
-                        .accessibilityIdentifier(AccessibilityID.QuickSettings.lineSpacingSlider)
-                }
-
-                ColorPicker("Text Color", selection: textColorBinding)
-                    .font(.caption)
-                    .accessibilityIdentifier(AccessibilityID.QuickSettings.textColorPicker)
-
-                ColorPicker("Highlight Color", selection: highlightColorBinding)
-                    .font(.caption)
-                    .accessibilityIdentifier(AccessibilityID.QuickSettings.highlightColorPicker)
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(AccessibilityID.QuickSettings.customToggle)
             }
 
-            Divider()
+            if showCustom {
+                Group {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Font Size: \(Int(settings.overlayAppearance.fontSize))pt")
+                            .font(.caption)
+                        Slider(value: fontSizeBinding, in: 16...64, step: 1)
+                            .accessibilityIdentifier(AccessibilityID.QuickSettings.fontSizeSlider)
+                    }
 
-            Button("Reset to Defaults") {
-                settings.overlayAppearance = .resetToDefaults()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Background Opacity: \(Int(settings.overlayAppearance.backgroundColor.opacity * 100))%")
+                            .font(.caption)
+                        Slider(value: bgOpacityBinding, in: 0.1...1.0, step: 0.05)
+                            .accessibilityIdentifier(AccessibilityID.QuickSettings.bgOpacitySlider)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Line Spacing: \(Int(settings.overlayAppearance.lineSpacing))pt")
+                            .font(.caption)
+                        Slider(value: lineSpacingBinding, in: 0...20, step: 1)
+                            .accessibilityIdentifier(AccessibilityID.QuickSettings.lineSpacingSlider)
+                    }
+
+                    ColorPicker("Text Color", selection: textColorBinding)
+                        .font(.caption)
+                        .accessibilityIdentifier(AccessibilityID.QuickSettings.textColorPicker)
+
+                    ColorPicker("Highlight Color", selection: highlightColorBinding)
+                        .font(.caption)
+                        .accessibilityIdentifier(AccessibilityID.QuickSettings.highlightColorPicker)
+                }
+
+                Divider()
+
+                Button("Reset to Defaults") {
+                    settings.overlayAppearance = .resetToDefaults()
+                }
+                .font(.caption)
+                .accessibilityIdentifier(AccessibilityID.QuickSettings.resetButton)
             }
-            .font(.caption)
-            .accessibilityIdentifier(AccessibilityID.QuickSettings.resetButton)
         }
         .padding()
         .frame(width: 260)

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct FloatingPanelView: View {
     let appState: AppState
-    let appearance: OverlayAppearance
+    let settings: SettingsManager
     var onTogglePause: () -> Void = {}
     var onOpenSettings: (() -> Void)?
+
+    private var appearance: OverlayAppearance { settings.overlayAppearance }
 
     var body: some View {
         ZStack {
@@ -49,7 +51,6 @@ struct FloatingPanelView: View {
 
     private var overlayControls: some View {
         VStack {
-            Spacer()
             HStack {
                 Spacer()
                 if let onOpenSettings {
@@ -76,7 +77,8 @@ struct FloatingPanelView: View {
                 .accessibilityIdentifier(AccessibilityID.Overlay.pauseButton)
             }
             .padding(.trailing, 12)
-            .padding(.bottom, 10)
+            .padding(.top, 10)
+            Spacer()
         }
     }
 }
