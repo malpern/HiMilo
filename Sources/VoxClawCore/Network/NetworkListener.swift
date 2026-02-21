@@ -79,11 +79,11 @@ final class NetworkListener {
     private func handleNewConnection(_ connection: NWConnection) {
         Log.network.debug("New connection from \(String(describing: connection.endpoint), privacy: .public)")
         let state = appState
+        let listenPort = port
         let session = NetworkSession(
             connection: connection,
             statusProvider: { @Sendable in
-                // AppState is @MainActor — capture current values synchronously from main
-                MainActor.assumeIsolated {
+                await MainActor.run {
                     let reading = state.isActive
                     let sessionState: String
                     switch state.sessionState {
@@ -97,8 +97,8 @@ final class NetworkListener {
                         reading: reading,
                         state: sessionState,
                         wordCount: state.words.count,
-                        port: self.port,
-                        lanIP: Self.localIPAddress(),
+                        port: listenPort,
+                        lanIP: NetworkListener.localIPAddress(),
                         autoClosedInstancesOnLaunch: state.autoClosedInstancesOnLaunch
                     )
                 }

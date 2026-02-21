@@ -114,10 +114,13 @@ final class ReadingSession: SpeechEngineDelegate {
     // MARK: - Private
 
     private func finish(mutatingAppState: Bool, delayedReset: Bool) {
-        guard !isFinalized else { return }
-        isFinalized = true
+        // Always cancel any pending delayed reset first, even if this session
+        // was already finalized, to prevent stale tasks from clearing a newer session.
         finishTask?.cancel()
         finishTask = nil
+
+        guard !isFinalized else { return }
+        isFinalized = true
 
         Log.session.info("Session finished")
         if mutatingAppState {
@@ -130,7 +133,14 @@ final class ReadingSession: SpeechEngineDelegate {
 
         if delayedReset && mutatingAppState {
             finishTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(500))
+                do {
+                    try await Task.sleep(for: .milliseconds(500))
+                } catch {
+                    return
+                }
+                if Task.isCancelled {
+                    return
+                }
                 self?.panelController?.dismiss()
                 self?.appState.reset()
             }

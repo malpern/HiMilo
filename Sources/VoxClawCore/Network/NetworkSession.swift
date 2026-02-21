@@ -17,11 +17,11 @@ final class NetworkSession: Sendable {
 
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
-    private let statusProvider: @Sendable () -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int)
+    private let statusProvider: @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int)
 
     init(
         connection: NWConnection,
-        statusProvider: @escaping @Sendable () -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int),
+        statusProvider: @escaping @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int),
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
     ) {
         self.connection = connection
@@ -68,7 +68,7 @@ final class NetworkSession: Sendable {
             // Route the request
             switch (method, path) {
             case ("GET", "/status"):
-                handleStatus()
+                Task { await self.handleStatus() }
             case ("POST", "/read"):
                 handleRead(raw: raw, initialData: data)
             case ("GET", "/claw"):
@@ -85,8 +85,8 @@ final class NetworkSession: Sendable {
 
     // MARK: - Route Handlers
 
-    private func handleStatus() {
-        let info = statusProvider()
+    private func handleStatus() async {
+        let info = await statusProvider()
         let ip = info.lanIP ?? "<lan-ip>"
         let baseURL = "http://\(ip):\(info.port)"
         let payload: [String: Any] = [
@@ -234,9 +234,9 @@ final class NetworkSession: Sendable {
         }
 
         Log.network.info("Received text: \(request.text.count, privacy: .public) chars, voice=\(request.voice ?? "default", privacy: .public), rate=\(request.rate.map { String($0) } ?? "default", privacy: .public)")
+        sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
         Task {
             await onReadRequest(finalRequest)
-            sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
         }
     }
 

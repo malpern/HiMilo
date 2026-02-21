@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import Synchronization
 import os
 
 struct CLIParser: ParsableCommand {
@@ -111,8 +112,8 @@ struct CLIParser: ParsableCommand {
             let listenPort = port
             Log.cli.info("Starting in listener mode on port \(listenPort, privacy: .public)")
             let cliContext = CLIContext(text: nil, audioOnly: audioOnly, voice: voice, rate: rate, listen: true, port: port, verbose: verbose)
-            CLIContext.shared = cliContext
             MainActor.assumeIsolated {
+                CLIContext.shared = cliContext
                 VoxClawApp.main()
             }
             return
@@ -125,8 +126,8 @@ struct CLIParser: ParsableCommand {
         let selectedVoice = voice
         Log.cli.info("Reading \(resolvedText.count, privacy: .public) chars, voice=\(selectedVoice, privacy: .public)")
         let cliContext = CLIContext(text: resolvedText, audioOnly: audioOnly, voice: voice, rate: rate, verbose: verbose)
-        CLIContext.shared = cliContext
         MainActor.assumeIsolated {
+            CLIContext.shared = cliContext
             VoxClawApp.main()
         }
     }
@@ -214,36 +215,32 @@ struct CLIParser: ParsableCommand {
 
     private static func syncHTTP(_ request: URLRequest) -> String {
         let semaphore = DispatchSemaphore(value: 0)
-        let box = ResultBox()
+        let result = Mutex<String?>(nil)
 
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             defer { semaphore.signal() }
             if let error {
-                box.value = "Error: \(error.localizedDescription)"
+                result.withLock { $0 = "Error: \(error.localizedDescription)" }
                 return
             }
             guard let http = response as? HTTPURLResponse else {
-                box.value = "Error: invalid response"
+                result.withLock { $0 = "Error: invalid response" }
                 return
             }
             if let data, let body = String(data: data, encoding: .utf8) {
-                box.value = "[\(http.statusCode)] \(body)"
+                result.withLock { $0 = "[\(http.statusCode)] \(body)" }
             } else {
-                box.value = "[\(http.statusCode)] (no body)"
+                result.withLock { $0 = "[\(http.statusCode)] (no body)" }
             }
         }
         task.resume()
         _ = semaphore.wait(timeout: .now() + 5)
-        return box.value ?? "Error: request timed out"
+        return result.withLock { $0 } ?? "Error: request timed out"
     }
 }
 
-private final class ResultBox: @unchecked Sendable {
-    var value: String?
-}
-
 final class CLIContext: Sendable {
-    nonisolated(unsafe) static var shared: CLIContext?
+    @MainActor static var shared: CLIContext?
 
     let text: String?
     let audioOnly: Bool

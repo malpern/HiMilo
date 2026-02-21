@@ -20,63 +20,65 @@ actor TTSService {
     }
 
     func streamPCM(text: String) -> AsyncThrowingStream<Data, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                do {
-                    Log.tts.info("TTS request: voice=\(self.voice, privacy: .public), model=\(self.model, privacy: .public), textLength=\(text.count, privacy: .public)")
-                    let request = try buildRequest(text: text)
-                    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (stream, continuation) = AsyncThrowingStream.makeStream(of: Data.self)
+        let task = Task {
+            do {
+                Log.tts.info("TTS request: voice=\(self.voice, privacy: .public), model=\(self.model, privacy: .public), textLength=\(text.count, privacy: .public)")
+                let request = try buildRequest(text: text)
+                let (bytes, response) = try await URLSession.shared.bytes(for: request)
 
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        throw TTSError(message: "Invalid response type", statusCode: nil)
-                    }
-
-                    Log.tts.info("TTS response: status=\(httpResponse.statusCode, privacy: .public)")
-
-                    guard httpResponse.statusCode == 200 else {
-                        var errorBody = ""
-                        for try await byte in bytes {
-                            errorBody.append(Character(UnicodeScalar(byte)))
-                            if errorBody.count > 1000 { break } // Don't accumulate huge error bodies
-                        }
-                        Log.tts.error("TTS API error: status=\(httpResponse.statusCode, privacy: .public)")
-                        throw Self.httpError(status: httpResponse.statusCode, body: errorBody)
-                    }
-
-                    // Stream in chunks of 4800 bytes (~100ms of 24kHz 16-bit mono)
-                    let chunkSize = 4800
-                    var buffer = Data()
-                    var chunkCount = 0
-                    var totalBytes = 0
-
-                    for try await byte in bytes {
-                        buffer.append(byte)
-                        if buffer.count >= chunkSize {
-                            let chunk = buffer.prefix(chunkSize)
-                            continuation.yield(Data(chunk))
-                            buffer = Data(buffer.dropFirst(chunkSize))
-                            chunkCount += 1
-                            totalBytes += chunkSize
-                            if chunkCount % 20 == 0 {
-                                Log.tts.debug("TTS streaming: \(chunkCount, privacy: .public) chunks, \(totalBytes, privacy: .public) bytes")
-                            }
-                        }
-                    }
-
-                    // Yield remaining bytes
-                    if !buffer.isEmpty {
-                        totalBytes += buffer.count
-                        continuation.yield(buffer)
-                    }
-
-                    Log.tts.info("TTS complete: \(chunkCount, privacy: .public) chunks, \(totalBytes, privacy: .public) total bytes")
-                    continuation.finish()
-                } catch {
-                    Log.tts.error("TTS stream error: \(error)")
-                    continuation.finish(throwing: error)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw TTSError(message: "Invalid response type", statusCode: nil)
                 }
+
+                Log.tts.info("TTS response: status=\(httpResponse.statusCode, privacy: .public)")
+
+                guard httpResponse.statusCode == 200 else {
+                    var errorBody = ""
+                    for try await byte in bytes {
+                        errorBody.append(Character(UnicodeScalar(byte)))
+                        if errorBody.count > 1000 { break } // Don't accumulate huge error bodies
+                    }
+                    Log.tts.error("TTS API error: status=\(httpResponse.statusCode, privacy: .public)")
+                    throw Self.httpError(status: httpResponse.statusCode, body: errorBody)
+                }
+
+                // Stream in chunks of 4800 bytes (~100ms of 24kHz 16-bit mono)
+                let chunkSize = 4800
+                var buffer = Data()
+                var chunkCount = 0
+                var totalBytes = 0
+
+                for try await byte in bytes {
+                    try Task.checkCancellation()
+                    buffer.append(byte)
+                    if buffer.count >= chunkSize {
+                        let chunk = buffer.prefix(chunkSize)
+                        continuation.yield(Data(chunk))
+                        buffer = Data(buffer.dropFirst(chunkSize))
+                        chunkCount += 1
+                        totalBytes += chunkSize
+                        if chunkCount % 20 == 0 {
+                            Log.tts.debug("TTS streaming: \(chunkCount, privacy: .public) chunks, \(totalBytes, privacy: .public) bytes")
+                        }
+                    }
+                }
+
+                // Yield remaining bytes
+                if !buffer.isEmpty {
+                    totalBytes += buffer.count
+                    continuation.yield(buffer)
+                }
+
+                Log.tts.info("TTS complete: \(chunkCount, privacy: .public) chunks, \(totalBytes, privacy: .public) total bytes")
+                continuation.finish()
+            } catch {
+                Log.tts.error("TTS stream error: \(error)")
+                continuation.finish(throwing: error)
             }
         }
+        continuation.onTermination = { _ in task.cancel() }
+        return stream
     }
 
     private static func friendlyError(status: Int, body: String) -> String {

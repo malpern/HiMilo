@@ -89,7 +89,7 @@ final class OpenAISpeechEngine: SpeechEngine {
     private func startDisplayLink() {
         stopDisplayLink()
         displayLink = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            MainActor.assumeIsolated {
                 self?.updateWordHighlight()
             }
         }

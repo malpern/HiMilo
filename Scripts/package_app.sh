@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONF=${1:-release}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
@@ -11,6 +10,25 @@ MACOS_MIN_VERSION="26.0"
 MENU_BAR_APP=1
 SIGNING_MODE=${SIGNING_MODE:-}
 APP_IDENTITY=${APP_IDENTITY:-}
+
+CONF="release"
+DEPLOY_LOCAL=0
+for arg in "$@"; do
+  case "$arg" in
+    debug|release) CONF="$arg" ;;
+    --deploy-local) DEPLOY_LOCAL=1 ;;
+    --help|-h)
+      cat <<EOF
+Usage: $(basename "$0") [debug|release] [--deploy-local]
+EOF
+      exit 0
+      ;;
+    *)
+      echo "ERROR: Unknown argument: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
 
 source "$ROOT/version.env"
 
@@ -175,3 +193,7 @@ codesign "${CODESIGN_ARGS[@]}" \
   "$APP"
 
 echo "Created $APP (${MARKETING_VERSION} build ${BUILD_NUMBER}, ${GIT_COMMIT})"
+
+if [[ "${DEPLOY_LOCAL}" == "1" ]]; then
+  "${ROOT}/Scripts/deploy_local_app.sh"
+fi

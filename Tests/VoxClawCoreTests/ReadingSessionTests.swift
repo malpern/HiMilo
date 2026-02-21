@@ -123,4 +123,24 @@ struct ReadingSessionTests {
         #expect(engine.stopCalled)
         #expect(!appState.words.isEmpty) // replacement path must not wipe current UI state
     }
+
+    @Test func stopForReplacementCancelsPendingDelayedReset() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+
+        await session.start(text: "hello world")
+        #expect(!appState.words.isEmpty)
+
+        // Simulate natural finish, which schedules delayed reset.
+        engine.simulateFinish()
+        #expect(appState.sessionState == .finished)
+
+        // Replacement should cancel any pending delayed reset task.
+        session.stopForReplacement()
+        try? await Task.sleep(for: .milliseconds(700))
+
+        #expect(!appState.words.isEmpty)
+    }
 }
