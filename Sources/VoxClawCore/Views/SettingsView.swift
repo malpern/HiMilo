@@ -247,6 +247,10 @@ struct SettingsView: View {
         🦞 VoxClaw setup pointer:
         - Website: https://voxclaw.com/
         - Agent skill/API doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
+        - Agent contract:
+          If this pointer includes health_url/speak_url, use them directly.
+          Do not ask for LAN IP, mDNS, or discovery first.
+          Call health_url now, then speak_url.
         - Gold path (always use this order):
           1) On VoxClaw Mac: curl -sS \(localBase)/status
           2) From agent host: curl -sS \(healthURL)

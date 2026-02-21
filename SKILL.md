@@ -25,6 +25,7 @@ If the human shares a `🦞 VoxClaw setup pointer`, use it directly. It includes
 
 Prefer those provided URLs over guessed hostnames when both are available.
 Never auto-switch to `.local` hostnames. Use numeric LAN IP URLs unless a human explicitly provides a `.local` target.
+If `health_url` and `speak_url` are present in the pointer, do not ask for LAN IP or run discovery first; call `health_url` immediately, then use `speak_url`.
 
 Reliable connect order:
 1. Confirm on VoxClaw Mac: `curl -sS http://localhost:4140/status`
