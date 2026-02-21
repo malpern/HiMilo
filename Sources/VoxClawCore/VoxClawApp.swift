@@ -178,7 +178,9 @@ final class AppCoordinator {
         let rate = request.rate ?? 1.0
         var engine: (any SpeechEngine)?
         if !settings.openAIAPIKey.isEmpty {
-            engine = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate)
+            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate)
+            let fallback = AppleSpeechEngine(voiceIdentifier: settings.appleVoiceIdentifier, rate: rate)
+            engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
         } else if request.rate != nil {
             engine = AppleSpeechEngine(rate: rate)
         }

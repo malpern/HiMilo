@@ -92,7 +92,9 @@ final class SettingsManager {
                 Log.settings.info("OpenAI selected but no API key — falling back to Apple")
                 return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
             }
-            return OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice)
+            let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
+            return FallbackSpeechEngine(primary: primary, fallback: fallback)
         }
     }
 }
