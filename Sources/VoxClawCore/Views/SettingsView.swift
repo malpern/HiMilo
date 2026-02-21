@@ -22,6 +22,9 @@ struct SettingsView: View {
     private var agentSetupSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
+                Text("Tell your agent how to use VoxClaw to get a voice.")
+                    .font(.headline)
+
                 HStack(alignment: .center, spacing: 12) {
                     Button {
                         if !settings.networkListenerEnabled {
@@ -63,16 +66,13 @@ struct SettingsView: View {
                 }
 
                 if showInstructions {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Tell your agent how to use VoxClaw to get a voice.")
-                            .font(.headline)
-                        Text("1. Click the red button to copy setup text.")
-                        Text("2. Paste it into your OpenClaw chat.")
-                        Text("3. Ask the agent to call Status URL first, then Speak URL.")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 2)
+                    Text(agentHandoffText)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.quaternary.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
         }
