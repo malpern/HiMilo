@@ -3,6 +3,7 @@ import SwiftUI
 
 extension Notification.Name {
     static let voxClawOpenAIAuthFailed = Notification.Name("voxclaw.openaiAuthFailed")
+    static let voxClawOpenAIKeyMissing = Notification.Name("voxclaw.openaiKeyMissing")
 }
 
 enum VoxClawNotificationUserInfo {

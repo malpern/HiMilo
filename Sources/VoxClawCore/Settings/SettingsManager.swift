@@ -122,6 +122,7 @@ final class SettingsManager {
         case .openai:
             guard isOpenAIConfigured else {
                 Log.settings.info("OpenAI selected but no API key — falling back to Apple")
+                NotificationCenter.default.post(name: .voxClawOpenAIKeyMissing, object: nil)
                 return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
             }
             let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice, instructions: instructions)

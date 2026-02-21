@@ -58,7 +58,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var splashWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var authFailureObserver: NSObjectProtocol?
+    private var keyMissingObserver: NSObjectProtocol?
     private var hasShownOpenAIAuthAlert = false
+    private var hasShownOpenAIKeyMissingAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         authFailureObserver = NotificationCenter.default.addObserver(
@@ -69,6 +71,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let message = note.userInfo?[VoxClawNotificationUserInfo.openAIAuthErrorMessage] as? String
             MainActor.assumeIsolated {
                 self?.showOpenAIAuthAlert(errorMessage: message)
+            }
+        }
+
+        keyMissingObserver = NotificationCenter.default.addObserver(
+            forName: .voxClawOpenAIKeyMissing,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.showOpenAIKeyMissingAlert()
             }
         }
 
@@ -174,6 +186,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             presentSettingsWindow()
         } else if response == .alertSecondButtonReturn {
+            presentSettingsWindow()
+        }
+    }
+
+    private func showOpenAIKeyMissingAlert() {
+        guard !hasShownOpenAIKeyMissingAlert else { return }
+        hasShownOpenAIKeyMissingAlert = true
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "No OpenAI API key"
+        alert.informativeText = """
+        OpenAI is selected as your voice engine, but no API key is configured. \
+        VoxClaw used Apple voice for this read.
+
+        Add your OpenAI API key in Settings to use neural voices.
+        """
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "OK")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
             presentSettingsWindow()
         }
     }
