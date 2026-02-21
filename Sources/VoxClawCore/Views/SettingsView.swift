@@ -42,7 +42,7 @@ struct SettingsView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(websiteRed)
 
-                    Button(showInstructions ? "hide intrunctions" : "show intrunctions") {
+                    Button(showInstructions ? "hide instructions" : "show instructions") {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showInstructions.toggle()
                         }
@@ -166,9 +166,6 @@ struct SettingsView: View {
                     .textSelection(.enabled)
             }
 
-            LabeledContent("Network Listener") {
-                Text(settings.networkListenerEnabled ? "Enabled" : "Disabled")
-            }
         }
     }
 

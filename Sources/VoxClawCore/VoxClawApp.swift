@@ -139,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Settings"
+        window.title = "VoxClaw Settings"
         window.contentView = NSHostingView(rootView: SettingsView(settings: SharedApp.settings))
         window.center()
         window.isReleasedWhenClosed = false
@@ -194,7 +194,7 @@ struct VoxClawApp: App {
             }
         }
 
-        Window("Settings", id: "settings") {
+        Window("VoxClaw Settings", id: "settings") {
             SettingsView(settings: settings)
         }
         .defaultSize(width: 440, height: 420)
