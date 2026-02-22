@@ -47,9 +47,15 @@ final class AudioPlayer {
         engine.connect(playerNode, to: engine.mainMixerNode, format: format)
     }
 
-    func start() throws {
-        Log.audio.info("Audio engine starting")
+    /// Start the audio engine without playing. Call `play()` after buffering initial chunks.
+    func prepare() throws {
+        Log.audio.info("Audio engine preparing")
         try engine.start()
+    }
+
+    /// Begin playback. Call after scheduling initial buffered chunks.
+    func play() {
+        Log.audio.info("Audio playback starting")
         playerNode.play()
         isPlaying = true
     }

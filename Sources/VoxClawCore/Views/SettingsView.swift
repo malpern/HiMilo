@@ -75,12 +75,26 @@ struct SettingsView: View {
                 }
 
                 if showInstructions {
-                    Text(agentHandoffText)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
+                    ZStack(alignment: .topTrailing) {
+                        Text(agentHandoffText)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .glassEffect(.regular, in: .rect(cornerRadius: 6))
+
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(agentHandoffText, forType: .string)
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy to clipboard")
                         .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 6))
+                    }
                 }
             }
         }

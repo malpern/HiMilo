@@ -31,22 +31,38 @@ public final class OpenAISpeechEngine: SpeechEngine {
             let player = try AudioPlayer()
             self.audioPlayer = player
             let ttsService = TTSService(apiKey: apiKey, voice: voice, speed: speed, instructions: instructions)
-            try player.start()
-
-            state = .playing
-            delegate?.speechEngine(self, didChangeState: .playing)
+            try player.prepare()
 
             // Heuristic timing until real duration known
             let heuristicDuration = WordTimingEstimator.heuristicDuration(for: text)
             timings = WordTimingEstimator.estimate(words: words, totalDuration: heuristicDuration)
-            startDisplayLink()
 
-            // Stream audio, feeding chunks to both player and speech aligner
+            // Buffer initial chunks before starting playback to prevent stutter.
+            // Each chunk is ~100ms (4800 bytes), so 5 chunks ≈ 500ms of lead-in.
+            let prebufferCount = 5
             let aligner = SpeechAligner(words: words)
             let stream = await ttsService.streamPCM(text: text)
+            var chunksBuffered = 0
+
             for try await chunk in stream {
                 player.scheduleChunk(chunk)
                 aligner?.appendChunk(chunk)
+                chunksBuffered += 1
+
+                if chunksBuffered == prebufferCount {
+                    player.play()
+                    state = .playing
+                    delegate?.speechEngine(self, didChangeState: .playing)
+                    startDisplayLink()
+                }
+            }
+
+            // Short text may finish before prebuffer threshold — start if not yet playing.
+            if chunksBuffered < prebufferCount {
+                player.play()
+                state = .playing
+                delegate?.speechEngine(self, didChangeState: .playing)
+                startDisplayLink()
             }
             aligner?.finishAudio()
 
