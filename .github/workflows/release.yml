@@ -10,7 +10,10 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   release:
@@ -21,11 +24,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Import signing certificate
-        if: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 != '' }}
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
         run: |
+          if [[ -z "${BUILD_CERTIFICATE_BASE64:-}" ]]; then
+            echo "No signing certificate secret configured. Using ad-hoc signing."
+            exit 0
+          fi
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
