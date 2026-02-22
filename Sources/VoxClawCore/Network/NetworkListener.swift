@@ -18,7 +18,7 @@ public final class NetworkListener {
 
     public init(port: UInt16 = 4140, serviceName: String? = nil, appState: AppState) {
         self.port = port
-        self.serviceName = serviceName ?? Self.localVoxServiceName()
+        self.serviceName = serviceName ?? Self.localComputerName()
         self.appState = appState
     }
 
@@ -34,8 +34,12 @@ public final class NetworkListener {
         }
         listener = try NWListener(using: params, on: nwPort)
 
-        // Advertise via Bonjour for LAN discovery
-        listener?.service = NWListener.Service(name: serviceName, type: "_voxclaw._tcp")
+        // Advertise via Bonjour for LAN discovery with IP+port in TXT record
+        let txtRecord = Self.makeTXTRecord([
+            "ip": Self.localIPAddress() ?? "",
+            "port": String(port),
+        ])
+        listener?.service = NWListener.Service(name: serviceName, type: "_voxclaw._tcp", txtRecord: txtRecord)
 
         listener?.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
@@ -204,6 +208,20 @@ public final class NetworkListener {
         return "Mac"
     }
     #endif
+
+    /// Constructs an NWTXTRecord from key-value pairs.
+    static func makeTXTRecord(_ entries: [String: String]) -> NWTXTRecord {
+        var record = NWTXTRecord()
+        for (key, value) in entries {
+            record[key] = value
+        }
+        return record
+    }
+
+    /// Reads a value from an NWTXTRecord by key.
+    public static func readTXTValue(_ record: NWTXTRecord, key: String) -> String? {
+        record[key]
+    }
 
     public static func localIPAddress() -> String? {
         var ifaddr: UnsafeMutablePointer<ifaddrs>?

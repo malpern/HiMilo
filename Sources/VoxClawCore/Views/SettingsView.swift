@@ -22,7 +22,6 @@ struct SettingsView: View {
                 overlayAppearanceSection
                 voiceSection
                 controlsSection
-                readOnlyDataSection
                 peersSection
                 testSection
             }
@@ -356,12 +355,36 @@ struct SettingsView: View {
                     HStack {
                         Text("\(peer.displayEmoji)  \(peer.name)")
                         Spacer()
+                        if peer.app == .voxclaw, peer.baseURL != nil {
+                            Button {
+                                speakToPeer(peer)
+                            } label: {
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Send test text to \(peer.name)")
+                        }
                         Text(peer.app == .voxclaw ? "VoxClaw" : "OpenClaw")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
+        }
+    }
+
+    private func speakToPeer(_ peer: DiscoveredPeer) {
+        guard let baseURL = peer.baseURL,
+              let url = URL(string: "\(baseURL)/read") else { return }
+        let quote = douglasAdamsQuotes.randomElement()!
+        Task {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
+            _ = try? await URLSession.shared.data(for: request)
         }
     }
 
@@ -394,36 +417,6 @@ struct SettingsView: View {
         }
     }
 
-    private var readOnlyDataSection: some View {
-        Section {
-            HStack {
-                Text("\u{1F5A5}\u{FE0F}  \(NetworkListener.localComputerName())")
-                    .font(.callout)
-                Spacer()
-                copyURLButton("Status", path: "/status")
-                copyURLButton("Speak", path: "/read")
-            }
-        }
-    }
-
-    private func copyURLButton(_ label: String, path: String) -> some View {
-        Button {
-            let url = "\(networkIPBaseURL)\(path)"
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(url, forType: .string)
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "doc.on.doc")
-                    .font(.caption2)
-                Text(label)
-                    .font(.caption)
-            }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .help("\(networkIPBaseURL)\(path)")
-    }
-
     private var appleVoiceBinding: Binding<String> {
         Binding(
             get: { settings.appleVoiceIdentifier ?? "" },
@@ -439,11 +432,6 @@ struct SettingsView: View {
 
     private var networkBaseURL: String {
         "http://\(NetworkListener.localHostname()):\(settings.networkListenerPort)"
-    }
-
-    private var networkIPBaseURL: String {
-        let ip = NetworkListener.localIPAddress() ?? "localhost"
-        return "http://\(ip):\(settings.networkListenerPort)"
     }
 
     private var primaryAgentActionTitle: String {

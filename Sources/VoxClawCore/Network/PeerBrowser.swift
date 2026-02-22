@@ -12,6 +12,8 @@ public struct DiscoveredPeer: Identifiable, Hashable {
     public let id: String
     public let name: String
     public let app: PeerApp
+    public let host: String?
+    public let port: UInt16?
 
     public var displayEmoji: String {
         switch app {
@@ -24,6 +26,12 @@ public struct DiscoveredPeer: Identifiable, Hashable {
             }
             return "\u{1F5A5}\u{FE0F}"
         }
+    }
+
+    /// Base URL for this peer's HTTP API, if resolvable.
+    public var baseURL: String? {
+        guard let host, let port else { return nil }
+        return "http://\(host):\(port)"
     }
 }
 
@@ -103,15 +111,24 @@ public final class PeerBrowser {
 
         for result in voxclawResults {
             guard case .service(let name, _, _, _) = result.endpoint else { continue }
-            newPeers.append(DiscoveredPeer(id: "voxclaw.\(name)", name: name, app: .voxclaw))
+            let (host, port) = extractTXTMetadata(from: result)
+            newPeers.append(DiscoveredPeer(id: "voxclaw.\(name)", name: name, app: .voxclaw, host: host, port: port))
         }
 
         for result in openclawResults {
             guard case .service(let name, _, _, _) = result.endpoint else { continue }
-            newPeers.append(DiscoveredPeer(id: "openclaw.\(name)", name: name, app: .openclaw))
+            newPeers.append(DiscoveredPeer(id: "openclaw.\(name)", name: name, app: .openclaw, host: nil, port: nil))
         }
 
         peers = newPeers.sorted { $0.name < $1.name }
         Log.network.info("Peer browser found \(newPeers.count) peers")
+    }
+
+    private func extractTXTMetadata(from result: NWBrowser.Result) -> (host: String?, port: UInt16?) {
+        guard case .bonjour(let txtRecord) = result.metadata else { return (nil, nil) }
+        let host = NetworkListener.readTXTValue(txtRecord, key: "ip")
+        let portStr = NetworkListener.readTXTValue(txtRecord, key: "port")
+        let port = portStr.flatMap { UInt16($0) }
+        return (host, port)
     }
 }
