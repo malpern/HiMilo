@@ -22,6 +22,8 @@
 
 Run VoxClaw on your Mac and hear OpenClaw speak to you. When OpenClaw runs on another computer — a server, a headless box, or a different machine — send text to your Mac over the network and VoxClaw speaks it aloud with high-quality text-to-speech. Apple's built-in voices work out of the box; add your own OpenAI or ElevenLabs API key for neural voices when you want that extra polish. Paste text, pipe from the CLI, or stream from any device on your LAN — and listen.
 
+VoxClaw also includes an iPhone app in this repo (`VoxClawIOS/`) with the same core listener + teleprompter flow for iOS.
+
 ---
 
 A macOS menu bar app + CLI tool that reads text aloud using Apple TTS (default), OpenAI TTS (BYOK), or ElevenLabs TTS (BYOK), with an optional teleprompter-style floating overlay and synchronized word highlighting.
@@ -45,6 +47,7 @@ A macOS menu bar app + CLI tool that reads text aloud using Apple TTS (default),
 - **Network API for Agents** — `POST /read`, `GET /status`, and `GET /claw`, with request validation and structured status payloads
 - **Bonjour Discovery** — Advertises `_voxclaw._tcp` on LAN for peer/device discovery
 - **Menu Bar App + CLI** — Lightweight menu bar controls plus full terminal control via `voxclaw`
+- **iPhone Companion App** — iOS app target included in this repo (`VoxClawIOS/`) using the shared core engine/settings stack
 - **macOS Services Integration** — Read selected text from other apps via Services
 - **Keyboard Controls While Reading** — Space (pause/resume), Escape (stop), Arrow keys (skip ±3s)
 
@@ -75,6 +78,12 @@ swift build -c release
 ./Scripts/package_app.sh
 ./Scripts/install-cli.sh
 ```
+
+### iPhone App (iOS)
+
+The repo includes an iPhone app target.
+
+Open `/Users/malpern/local-code/VoxClaw/VoxClawIOS/VoxClawIOS.xcodeproj` in Xcode and run the `VoxClawIOS` scheme on iOS 26+.
 
 ## Usage
 
