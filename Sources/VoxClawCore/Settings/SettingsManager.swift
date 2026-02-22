@@ -45,6 +45,10 @@ public final class SettingsManager {
         didSet { UserDefaults.standard.set(readingStyle, forKey: "readingStyle") }
     }
 
+    public var voiceSpeed: Float {
+        didSet { UserDefaults.standard.set(voiceSpeed, forKey: "voiceSpeed") }
+    }
+
     public var audioOnly: Bool {
         didSet { UserDefaults.standard.set(audioOnly, forKey: "audioOnly") }
     }
@@ -112,6 +116,8 @@ public final class SettingsManager {
         self.openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx"
         self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
         self.readingStyle = UserDefaults.standard.string(forKey: "readingStyle") ?? ""
+        let storedSpeed = UserDefaults.standard.float(forKey: "voiceSpeed")
+        self.voiceSpeed = storedSpeed > 0 ? storedSpeed : 1.0
         self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
         if UserDefaults.standard.object(forKey: "pauseOtherAudioDuringSpeech") == nil {
             self.pauseOtherAudioDuringSpeech = true
@@ -182,16 +188,16 @@ public final class SettingsManager {
         let instructions = instructionsOverride ?? (readingStyle.isEmpty ? nil : readingStyle)
         switch voiceEngine {
         case .apple:
-            return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
+            return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
         case .openai:
             guard isOpenAIConfigured else {
                 Log.settings.info("OpenAI selected but no API key — falling back to Apple")
                 voiceEngine = .apple
                 NotificationCenter.default.post(name: .voxClawOpenAIKeyMissing, object: nil)
-                return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
+                return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
             }
-            let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice, instructions: instructions)
-            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier)
+            let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice, speed: voiceSpeed, instructions: instructions)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
             return FallbackSpeechEngine(primary: primary, fallback: fallback)
         }
     }

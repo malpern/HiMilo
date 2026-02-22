@@ -45,4 +45,10 @@ struct SettingsManagerTests {
         let settings = SettingsManager()
         #expect(settings.pauseOtherAudioDuringSpeech == true)
     }
+
+    @Test func voiceSpeedDefaultsToOne() {
+        UserDefaults.standard.removeObject(forKey: "voiceSpeed")
+        let settings = SettingsManager()
+        #expect(settings.voiceSpeed == 1.0)
+    }
 }

@@ -94,6 +94,10 @@ public final class ReadingSession: SpeechEngineDelegate {
         finish(mutatingAppState: true, delayedReset: false)
     }
 
+    public func setSpeed(_ speed: Float) {
+        engine.setSpeed(speed)
+    }
+
     /// Stop this session because a new one is replacing it.
     /// Do not mutate shared app state, otherwise stale callbacks can clear the new session UI.
     public func stopForReplacement() {

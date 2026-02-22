@@ -37,6 +37,8 @@ final class MockSpeechEngine: SpeechEngine {
         delegate?.speechEngine(self, didChangeState: .idle)
     }
 
+    func setSpeed(_ speed: Float) {}
+
     /// Simulate a word index update from the engine.
     func simulateWordIndex(_ index: Int) {
         delegate?.speechEngine(self, didUpdateWordIndex: index)

@@ -115,6 +115,12 @@ struct SettingsView: View {
                 }
             }
 
+            HStack {
+                Text("Speed: \(settings.voiceSpeed, specifier: "%.1f")x")
+                Slider(value: $settings.voiceSpeed, in: 0.5...2.0, step: 0.1)
+            }
+            .accessibilityIdentifier(AccessibilityID.Settings.voiceEnginePicker + "Speed")
+
             if settings.voiceEngine == .apple {
                 Picker("Apple Voice", selection: appleVoiceBinding) {
                     Text("System Default").tag("" as String)

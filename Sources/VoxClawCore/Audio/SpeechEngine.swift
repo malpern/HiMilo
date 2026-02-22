@@ -32,4 +32,5 @@ public protocol SpeechEngine: AnyObject {
     func pause()
     func resume()
     func stop()
+    func setSpeed(_ speed: Float)
 }

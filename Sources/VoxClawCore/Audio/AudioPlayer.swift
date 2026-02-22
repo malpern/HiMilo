@@ -6,8 +6,14 @@ import os
 final class AudioPlayer {
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
+    private let timePitchNode = AVAudioUnitTimePitch()
     private let sampleRate: Double = 24000
     private let format: AVAudioFormat
+
+    var playbackRate: Float {
+        get { timePitchNode.rate }
+        set { timePitchNode.rate = newValue }
+    }
 
     private var totalBytesScheduled: Int = 0
     private var isPlaying = false
@@ -44,7 +50,9 @@ final class AudioPlayer {
         format = fmt
 
         engine.attach(playerNode)
-        engine.connect(playerNode, to: engine.mainMixerNode, format: format)
+        engine.attach(timePitchNode)
+        engine.connect(playerNode, to: timePitchNode, format: format)
+        engine.connect(timePitchNode, to: engine.mainMixerNode, format: format)
     }
 
     /// Start the audio engine without playing. Call `play()` after buffering initial chunks.

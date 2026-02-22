@@ -9,7 +9,9 @@ public final class AppleSpeechEngine: NSObject, SpeechEngine {
     private let synthesizer = AVSpeechSynthesizer()
     private var words: [String] = []
     private let voiceIdentifier: String?
-    private let rate: Float
+    private var rate: Float
+    private var currentWordIndex: Int = 0
+    private var wordIndexOffset: Int = 0
 
     /// Maps character offset ranges in the original text to word indices.
     private var charOffsetToWordIndex: [(range: Range<Int>, wordIndex: Int)] = []
@@ -23,6 +25,8 @@ public final class AppleSpeechEngine: NSObject, SpeechEngine {
 
     public func start(text: String, words: [String]) async {
         self.words = words
+        self.currentWordIndex = 0
+        self.wordIndexOffset = 0
         state = .loading
         delegate?.speechEngine(self, didChangeState: .loading)
 
@@ -61,6 +65,33 @@ public final class AppleSpeechEngine: NSObject, SpeechEngine {
         synthesizer.stopSpeaking(at: .immediate)
         state = .idle
         delegate?.speechEngine(self, didChangeState: .idle)
+    }
+
+    public func setSpeed(_ speed: Float) {
+        self.rate = speed
+        switch state {
+        case .playing, .paused: break
+        default: return
+        }
+        let resumeIndex = currentWordIndex
+        synthesizer.stopSpeaking(at: .immediate)
+        let remainingWords = Array(words[resumeIndex...])
+        guard !remainingWords.isEmpty else { return }
+        let remainingText = remainingWords.joined(separator: " ")
+        // Track offset so delegate callbacks map back to original word indices
+        wordIndexOffset = resumeIndex
+        charOffsetToWordIndex = Self.buildCharMap(text: remainingText, words: remainingWords)
+        let utterance = AVSpeechUtterance(string: remainingText)
+        if let id = voiceIdentifier, let voice = AVSpeechSynthesisVoice(identifier: id) {
+            utterance.voice = voice
+        } else {
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        }
+        let targetRate = AVSpeechUtteranceDefaultSpeechRate * speed
+        utterance.rate = min(max(targetRate, AVSpeechUtteranceMinimumSpeechRate), AVSpeechUtteranceMaximumSpeechRate)
+        synthesizer.speak(utterance)
+        state = .playing
+        delegate?.speechEngine(self, didChangeState: .playing)
     }
 
     // MARK: - Character range to word index mapping
@@ -104,7 +135,9 @@ extension AppleSpeechEngine: AVSpeechSynthesizerDelegate {
         let offset = characterRange.location
         Task { @MainActor in
             if let idx = self.wordIndex(forCharacterOffset: offset) {
-                self.delegate?.speechEngine(self, didUpdateWordIndex: idx)
+                let adjustedIdx = idx + self.wordIndexOffset
+                self.currentWordIndex = adjustedIdx
+                self.delegate?.speechEngine(self, didUpdateWordIndex: adjustedIdx)
             }
         }
     }

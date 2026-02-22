@@ -31,6 +31,7 @@ private final class TestSpeechEngine: SpeechEngine {
     func pause() {}
     func resume() {}
     func stop() {}
+    func setSpeed(_ speed: Float) {}
 }
 
 @MainActor

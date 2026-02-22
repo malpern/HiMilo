@@ -10,6 +10,7 @@ public final class OpenAISpeechEngine: SpeechEngine {
     private let voice: String
     private let speed: Float
     private let instructions: String?
+    private var originalSpeed: Float = 1.0
     private var audioPlayer: AudioPlayer?
     private var timings: [WordTiming] = []
     private var words: [String] = []
@@ -24,6 +25,7 @@ public final class OpenAISpeechEngine: SpeechEngine {
 
     public func start(text: String, words: [String]) async {
         self.words = words
+        self.originalSpeed = speed
         state = .loading
         delegate?.speechEngine(self, didChangeState: .loading)
 
@@ -110,6 +112,11 @@ public final class OpenAISpeechEngine: SpeechEngine {
         audioPlayer?.stop()
         state = .idle
         delegate?.speechEngine(self, didChangeState: .idle)
+    }
+
+    public func setSpeed(_ speed: Float) {
+        guard originalSpeed > 0 else { return }
+        audioPlayer?.playbackRate = speed / originalSpeed
     }
 
     // MARK: - Display link for word tracking

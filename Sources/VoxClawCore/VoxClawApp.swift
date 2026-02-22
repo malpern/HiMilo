@@ -280,6 +280,9 @@ struct VoxClawApp: App {
                 coordinator.stopListening()
                 coordinator.startListening(appState: appState, settings: settings, port: port)
             }
+            .onChange(of: settings.voiceSpeed) { _, newSpeed in
+                coordinator.setSpeed(newSpeed)
+            }
         }
 
         Window("VoxClaw Settings", id: "settings") {
@@ -349,7 +352,7 @@ final class AppCoordinator {
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
         // Build engine with request overrides, falling back to settings defaults
         let voice = request.voice ?? settings.openAIVoice
-        let rate = request.rate ?? 1.0
+        let rate = request.rate ?? settings.voiceSpeed
         let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
         var engine: (any SpeechEngine)?
         if !settings.openAIAPIKey.isEmpty {
@@ -398,6 +401,10 @@ final class AppCoordinator {
     func stop() {
         activeSession?.stop()
         activeSession = nil
+    }
+
+    func setSpeed(_ speed: Float) {
+        activeSession?.setSpeed(speed)
     }
 
     func handleCLILaunch(appState: AppState, settings: SettingsManager) async {

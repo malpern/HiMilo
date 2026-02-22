@@ -44,6 +44,10 @@ public final class FallbackSpeechEngine: SpeechEngine, SpeechEngineDelegate {
         active.stop()
     }
 
+    public func setSpeed(_ speed: Float) {
+        active.setSpeed(speed)
+    }
+
     // MARK: - SpeechEngineDelegate passthrough
 
     public func speechEngine(_ engine: any SpeechEngine, didUpdateWordIndex index: Int) {
