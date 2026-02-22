@@ -71,23 +71,9 @@ final class PanelController {
         panel.onSpeedUp = { [weak self] in self?.adjustSpeed(by: 0.1) }
         panel.onSpeedDown = { [weak self] in self?.adjustSpeed(by: -0.1) }
 
-        // Start scaled down and transparent for materialize animation
-        let scaleFactor: CGFloat = 0.92
-        let scaledWidth = panelWidth * scaleFactor
-        let scaledHeight = panelHeight * scaleFactor
-        let startX = panelX + (panelWidth - scaledWidth) / 2
-        let startY = panelY + (panelHeight - scaledHeight) / 2 + 12
-        panel.setFrame(NSRect(x: startX, y: startY, width: scaledWidth, height: scaledHeight), display: false)
-        panel.alphaValue = 0
+        panel.setFrame(NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight), display: true)
+        panel.alphaValue = 1
         panel.orderFrontRegardless()
-
-        // Scale up + fade in (materialize)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.35
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            panel.animator().setFrame(NSRect(x: panelX, y: panelY, width: panelWidth, height: panelHeight), display: true)
-            panel.animator().alphaValue = 1
-        }
 
         Log.panel.info("show: panel ordered front at (\(Int(panelX), privacy: .public), \(Int(panelY), privacy: .public)), windowNumber=\(panel.windowNumber, privacy: .public)")
         self.panel = panel

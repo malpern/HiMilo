@@ -19,9 +19,9 @@ enum WordTimingEstimator {
             if let lastChar = word.last {
                 switch lastChar {
                 case ".", "!", "?":
-                    weight += 4.0 // ~300ms pause equivalent
+                    weight += 6.0 // sentence boundary pause
                 case ",", ";", ":":
-                    weight += 2.0 // ~150ms pause equivalent
+                    weight += 3.0 // clause boundary pause
                 default:
                     break
                 }
@@ -93,8 +93,8 @@ enum WordTimingEstimator {
     static func estimateCadence(words: [String], rate: Float) -> [WordTiming] {
         guard !words.isEmpty else { return [] }
 
-        let basePerChar: Double = 0.060 / Double(max(rate, 0.5)) // ~60ms per char at 1x
-        let minWordDuration: Double = 0.15 / Double(max(rate, 0.5))
+        let basePerChar: Double = 0.075 / Double(max(rate, 0.5)) // ~75ms per char at 1x
+        let minWordDuration: Double = 0.18 / Double(max(rate, 0.5))
 
         var timings: [WordTiming] = []
         var currentTime: Double = 0
@@ -106,9 +106,9 @@ enum WordTimingEstimator {
             if let lastChar = word.last {
                 switch lastChar {
                 case ".", "!", "?":
-                    duration += 0.30 / Double(max(rate, 0.5))
+                    duration += 0.45 / Double(max(rate, 0.5))
                 case ",", ";", ":":
-                    duration += 0.15 / Double(max(rate, 0.5))
+                    duration += 0.20 / Double(max(rate, 0.5))
                 default:
                     break
                 }

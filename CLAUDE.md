@@ -61,6 +61,10 @@ voxclaw --send "Hello"              # Send text to running listener
 voxclaw --status                     # Check if listener is running
 ```
 
+## Design Principles
+
+- **Audio leads, visuals follow.** The voice sets the pace and tone of the experience. The overlay exists to support the audio, not the other way around. Never show the overlay before audio is ready to play. Don't let visual elements (loading states, animations, transitions) compete with or distract from the spoken word.
+
 ## Key Conventions
 
 - Tests use Swift Testing framework (`@Test`, `#expect`)

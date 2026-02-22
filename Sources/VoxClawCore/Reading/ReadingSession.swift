@@ -49,7 +49,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         let wordsSet = appState.words.count
         Log.session.info("Session.start: appState.words.count=\(wordsSet, privacy: .public)")
 
-        // Show panel unless audio-only
+        // Prepare panel but don't show yet — audio leads, visuals follow.
         #if os(macOS)
         if !appState.audioOnly {
             let effectiveSettings = settings ?? SettingsManager()
@@ -58,8 +58,7 @@ public final class ReadingSession: SpeechEngineDelegate {
             }, onStop: { [weak self] in
                 self?.stop()
             })
-            Log.panel.info("Session.start: calling panelController.show()")
-            panelController?.show()
+            Log.panel.info("Session.start: panel prepared, will show when audio begins")
         } else {
             Log.panel.info("Session.start: skipping panel (audioOnly=true)")
         }
@@ -69,7 +68,10 @@ public final class ReadingSession: SpeechEngineDelegate {
             pausedExternalAudio = playbackController.pauseIfPlaying()
         }
 
-        showSpeedIndicator(settings?.voiceSpeed ?? 1.0)
+        let currentSpeed = settings?.voiceSpeed ?? 1.0
+        if currentSpeed != 1.0 {
+            showSpeedIndicator(currentSpeed)
+        }
 
         Log.session.info("Session.start: calling engine.start")
         await engine.start(text: text, words: words)
@@ -151,6 +153,9 @@ public final class ReadingSession: SpeechEngineDelegate {
         switch state {
         case .playing:
             appState.sessionState = .playing
+            #if os(macOS)
+            panelController?.show()
+            #endif
         case .loading:
             appState.sessionState = .loading
         case .paused:
@@ -227,7 +232,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         appState.speedIndicatorText = text
         speedIndicatorTask?.cancel()
         speedIndicatorTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(5000))
+            try? await Task.sleep(for: .milliseconds(3250))
             if self?.appState.speedIndicatorText == text {
                 self?.appState.speedIndicatorText = nil
             }
