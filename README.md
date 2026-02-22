@@ -26,6 +26,16 @@ Run VoxClaw on your Mac and hear OpenClaw speak to you. When OpenClaw runs on an
 
 A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while displaying a teleprompter-style floating overlay with synchronized word highlighting.
 
+## Screenshots
+
+### Overlay panel
+
+![VoxClaw overlay panel showing live highlighted text](docs/overlay-panel.png)
+
+### Settings panel
+
+![VoxClaw settings panel with voice controls and style presets](docs/settings-panel.png)
+
 ## Features
 
 - **Onboarding Wizard** — First-run setup walks you through voice selection, API key, agent location, and launch at login

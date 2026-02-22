@@ -144,6 +144,32 @@
             font-style: italic;
         }
 
+        /* Screenshots */
+        .screenshots-section {
+            margin: 3em 0;
+        }
+        .shot-grid {
+            display: grid;
+            gap: 1em;
+        }
+        .shot-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 0.85em;
+        }
+        .shot-card img {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+            display: block;
+        }
+        .shot-card figcaption {
+            color: var(--text-muted);
+            font-size: 0.9em;
+            margin-top: 0.65em;
+        }
+
         /* Links */
         a { color: var(--accent); text-decoration: none; }
         a:hover { color: var(--accent-hover); }
@@ -322,6 +348,21 @@
             with OpenAI's neural voices that sound like a real person, or with your Mac's built-in text-to-speech if you prefer zero setup.
             Paste your API key in the onboarding wizard and you're done. And soon, it'll work on your iPhone too.
         </p>
+    </div>
+
+    <!-- Screenshots -->
+    <div class="section content-block screenshots-section">
+        <h2>See VoxClaw in action</h2>
+        <div class="shot-grid">
+            <figure class="shot-card">
+                <img src="overlay-panel.png" alt="VoxClaw floating overlay with highlighted words">
+                <figcaption>Overlay panel: real-time highlighted text while your agent speaks.</figcaption>
+            </figure>
+            <figure class="shot-card">
+                <img src="settings-panel.png" alt="VoxClaw settings panel with style presets and voice controls">
+                <figcaption>Settings panel: style presets, voice engine selection, speed, and controls.</figcaption>
+            </figure>
+        </div>
     </div>
 
     <!-- Audio demo -->
