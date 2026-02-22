@@ -11,7 +11,7 @@ struct SettingsView: View {
     @State private var showElevenLabsKeySheet = false
     @State private var pendingElevenLabsKey = ""
     @State private var showInstructions = false
-    @State private var testVoiceSending = false
+    @State private var copiedPeerSetup: String?
     @State private var voicePreview = VoicePreviewPlayer()
     @State private var peerBrowser = PeerBrowser()
 
@@ -23,7 +23,6 @@ struct SettingsView: View {
                 voiceSection
                 controlsSection
                 peersSection
-                testSection
             }
             .formStyle(.grouped)
         }
@@ -339,7 +338,7 @@ struct SettingsView: View {
     }
 
     private var peersSection: some View {
-        Section("On This Network") {
+        Section("VoxClaws On This Network") {
             if peerBrowser.peers.isEmpty {
                 HStack(spacing: 8) {
                     if peerBrowser.isSearching {
@@ -355,22 +354,34 @@ struct SettingsView: View {
                     HStack {
                         Text("\(peer.displayEmoji)  \(peer.name)")
                         Spacer()
-                        if peer.app == .voxclaw, peer.baseURL != nil {
-                            Button {
+                        if peer.app == .voxclaw, let baseURL = peer.baseURL {
+                            Button("Speak") {
                                 speakToPeer(peer)
-                            } label: {
-                                Image(systemName: "play.fill")
-                                    .font(.caption)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-                            .help("Send test text to \(peer.name)")
+                            .help("Send a random quote to \(peer.name)")
+
+                            Button("Setup") {
+                                copyPeerSetup(baseURL: baseURL, name: peer.name)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .help("Copy agent setup for \(peer.name)")
+                        } else {
+                            Text("OpenClaw")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        Text(peer.app == .voxclaw ? "VoxClaw" : "OpenClaw")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                 }
+            }
+
+            if let copiedName = copiedPeerSetup {
+                Label("Copied setup for \(copiedName). Paste into OpenClaw.", systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                    .transition(.opacity)
             }
         }
     }
@@ -388,32 +399,30 @@ struct SettingsView: View {
         }
     }
 
-    private var testSection: some View {
-        Section {
-            Button {
-                let quote = douglasAdamsQuotes.randomElement()!
-                testVoiceSending = true
-                Task {
-                    let url = URL(string: "http://localhost:\(settings.networkListenerPort)/read")!
-                    var request = URLRequest(url: url)
-                    request.httpMethod = "POST"
-                    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-                    request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
-                    _ = try? await URLSession.shared.data(for: request)
-                    try? await Task.sleep(for: .seconds(0.5))
-                    testVoiceSending = false
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    if testVoiceSending {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text("Test Voice")
-                }
+    private func copyPeerSetup(baseURL: String, name: String) {
+        let text = """
+        \u{1F9DE} VoxClaw setup pointer:
+        health_url: \(baseURL)/status
+        speak_url: \(baseURL)/read
+
+        Agent rules:
+        1) GET health_url first.
+        2) If status is ok, POST text to speak_url.
+        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
+
+        Website: https://voxclaw.com/
+        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
+        """
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        withAnimation {
+            copiedPeerSetup = name
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            withAnimation {
+                copiedPeerSetup = nil
             }
-            .disabled(!settings.networkListenerEnabled || testVoiceSending)
-            .help(settings.networkListenerEnabled ? "Send a random quote through the overlay" : "Enable Network Listener first")
         }
     }
 
