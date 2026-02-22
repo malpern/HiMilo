@@ -15,6 +15,7 @@ public final class ReadingSession: SpeechEngineDelegate {
     private var isFinalized = false
     private var finishTask: Task<Void, Never>?
     private var feedbackTask: Task<Void, Never>?
+    private var speedIndicatorTask: Task<Void, Never>?
 
     public init(
         appState: AppState,
@@ -71,6 +72,8 @@ public final class ReadingSession: SpeechEngineDelegate {
         Log.session.info("Session.start: calling engine.start")
         await engine.start(text: text, words: words)
         Log.session.info("Session.start: engine.start returned")
+
+        showSpeedIndicator(settings?.voiceSpeed ?? 1.0)
     }
 
     public func togglePause() {
@@ -91,11 +94,13 @@ public final class ReadingSession: SpeechEngineDelegate {
 
     public func stop() {
         engine.stop()
+        speedIndicatorTask?.cancel()
         finish(mutatingAppState: true, delayedReset: false)
     }
 
     public func setSpeed(_ speed: Float) {
         engine.setSpeed(speed)
+        showSpeedIndicator(speed)
     }
 
     /// Stop this session because a new one is replacing it.
@@ -112,6 +117,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         engine.stop()
         finishTask?.cancel()
         finishTask = nil
+        speedIndicatorTask?.cancel()
         #if os(macOS)
         panelController?.dismiss()
         panelController = nil
@@ -210,6 +216,18 @@ public final class ReadingSession: SpeechEngineDelegate {
                 appState.reset()
                 let wc = appState.words.count
                 Log.session.info("finish: appState reset, words=\(wc, privacy: .public)")
+            }
+        }
+    }
+
+    private func showSpeedIndicator(_ speed: Float) {
+        let text = String(format: "%.1fx", speed)
+        appState.speedIndicatorText = text
+        speedIndicatorTask?.cancel()
+        speedIndicatorTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1500))
+            if self?.appState.speedIndicatorText == text {
+                self?.appState.speedIndicatorText = nil
             }
         }
     }

@@ -46,6 +46,18 @@ struct FloatingPanelView: View {
                     .padding(.bottom, 12)
             }
 
+            // Speed indicator (bottom-right, fades in/out)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    FeedbackBadge(text: appState.speedIndicatorText)
+                        .animation(.easeInOut(duration: 0.2), value: appState.speedIndicatorText)
+                        .padding(.trailing, 12)
+                        .padding(.bottom, 12)
+                }
+            }
+
             if isHovering {
                 overlayControls
                     .transition(.opacity)

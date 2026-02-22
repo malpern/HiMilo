@@ -12,7 +12,6 @@ final class PanelController {
     private let onStop: () -> Void
     private var quickSettingsWindow: NSWindow?
     private var localKeyMonitor: Any?
-    private var globalKeyMonitor: Any?
 
     init(appState: AppState, settings: SettingsManager, onTogglePause: @escaping () -> Void, onStop: @escaping () -> Void) {
         self.appState = appState
@@ -57,6 +56,10 @@ final class PanelController {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         )
         panel.contentView = hostingView
+        panel.onEsc = { [weak self] in self?.onStop() }
+        panel.onSpace = { [weak self] in self?.onTogglePause() }
+        panel.onSpeedUp = { [weak self] in self?.adjustSpeed(by: 0.1) }
+        panel.onSpeedDown = { [weak self] in self?.adjustSpeed(by: -0.1) }
 
         // Start scaled down and transparent for materialize animation
         let scaleFactor: CGFloat = 0.92
@@ -78,6 +81,7 @@ final class PanelController {
 
         Log.panel.info("show: panel ordered front at (\(Int(panelX), privacy: .public), \(Int(panelY), privacy: .public)), windowNumber=\(panel.windowNumber, privacy: .public)")
         self.panel = panel
+        panel.makeKey()
         startKeyMonitoring()
     }
 
@@ -114,26 +118,16 @@ final class PanelController {
         })
     }
 
-    // MARK: - Key Monitoring (ESC to stop, Space to pause/resume)
+    // MARK: - Key Monitoring
 
     private func startKeyMonitoring() {
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { // ESC
-                self?.onStop()
-                return nil
-            }
-            if event.keyCode == 49 { // Space
-                self?.onTogglePause()
-                return nil
-            }
-            return event
-        }
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { // ESC
-                self?.onStop()
-            }
-            if event.keyCode == 49 { // Space
-                self?.onTogglePause()
+            switch event.keyCode {
+            case 53: self?.onStop(); return nil           // ESC
+            case 49: self?.onTogglePause(); return nil    // Space
+            case 24: self?.adjustSpeed(by: 0.1); return nil  // +
+            case 27: self?.adjustSpeed(by: -0.1); return nil // -
+            default: return event
             }
         }
     }
@@ -143,10 +137,11 @@ final class PanelController {
             NSEvent.removeMonitor(monitor)
             localKeyMonitor = nil
         }
-        if let monitor = globalKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-            globalKeyMonitor = nil
-        }
+    }
+
+    private func adjustSpeed(by delta: Float) {
+        let newSpeed = min(3.0, max(0.5, settings.voiceSpeed + delta))
+        settings.voiceSpeed = (newSpeed * 10).rounded() / 10
     }
 
     private func showQuickSettings() {

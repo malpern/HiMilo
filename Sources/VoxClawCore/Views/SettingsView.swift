@@ -117,7 +117,7 @@ struct SettingsView: View {
 
             HStack {
                 Text("Speed: \(settings.voiceSpeed, specifier: "%.1f")x")
-                Slider(value: $settings.voiceSpeed, in: 0.5...2.0, step: 0.1)
+                Slider(value: $settings.voiceSpeed, in: 0.5...3.0, step: 0.1)
             }
             .accessibilityIdentifier(AccessibilityID.Settings.voiceEnginePicker + "Speed")
 
@@ -147,7 +147,7 @@ struct SettingsView: View {
                 }
 
                 HStack {
-                    Text("API Key Saved (\(maskedAPIKeySuffix))")
+                    (Text("API Key Saved ") + Text(maskedAPIKeySuffix).foregroundColor(.secondary.opacity(0.7)))
                         .font(.system(.caption, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier(AccessibilityID.Settings.apiKeyDisplay)

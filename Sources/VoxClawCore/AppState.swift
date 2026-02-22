@@ -28,6 +28,7 @@ public final class AppState {
     public var audioOnly: Bool = false
     public var isListening: Bool = false
     public var feedbackText: String? = nil
+    public var speedIndicatorText: String? = nil
     public var inputText: String = ""
     public var autoClosedInstancesOnLaunch: Int = 0
 
@@ -48,6 +49,7 @@ public final class AppState {
         currentWordIndex = 0
         isPaused = false
         feedbackText = nil
+        speedIndicatorText = nil
         inputText = ""
     }
 }
