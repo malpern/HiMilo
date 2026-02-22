@@ -7,6 +7,9 @@ struct TeleprompterView: View {
     var onTogglePause: () -> Void = {}
     var onStop: () -> Void = {}
 
+    @State private var currentPresetIndex: Int = 0
+    @State private var presetNameToast: String?
+
     private var appearance: OverlayAppearance { settings.overlayAppearance }
 
     var body: some View {
@@ -43,6 +46,22 @@ struct TeleprompterView: View {
                 }
             }
 
+            // Preset name toast
+            if let toast = presetNameToast {
+                VStack {
+                    Spacer()
+                    Text(toast)
+                        .font(.system(.subheadline, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .transition(.opacity)
+                        .padding(.bottom, 70)
+                }
+                .allowsHitTesting(false)
+            }
+
             // Controls overlay
             VStack {
                 HStack {
@@ -72,6 +91,38 @@ struct TeleprompterView: View {
                 FeedbackBadge(text: appState.feedbackText)
                     .animation(.easeInOut(duration: 0.2), value: appState.feedbackText)
                     .padding(.bottom, 20)
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 30)
+                .onEnded { value in
+                    let presets = OverlayPreset.all
+                    guard presets.count > 1 else { return }
+                    let threshold: CGFloat = 60
+                    if value.translation.width > threshold {
+                        // Swipe right → previous preset
+                        currentPresetIndex = (currentPresetIndex - 1 + presets.count) % presets.count
+                    } else if value.translation.width < -threshold {
+                        // Swipe left → next preset
+                        currentPresetIndex = (currentPresetIndex + 1) % presets.count
+                    } else {
+                        return
+                    }
+                    let preset = presets[currentPresetIndex]
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        settings.overlayAppearance = preset.appearance
+                        presetNameToast = preset.name
+                    }
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        withAnimation { presetNameToast = nil }
+                    }
+                }
+        )
+        .onAppear {
+            let current = settings.overlayAppearance
+            if let index = OverlayPreset.all.firstIndex(where: { $0.appearance == current }) {
+                currentPresetIndex = index
             }
         }
         .statusBarHidden()

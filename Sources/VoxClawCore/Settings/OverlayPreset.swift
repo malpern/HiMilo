@@ -1,13 +1,13 @@
 import Foundation
 
 /// A named, hand-tuned overlay style that users can apply with one click.
-struct OverlayPreset: Identifiable, Sendable {
-    let id: String
-    let name: String
-    let appearance: OverlayAppearance
+public struct OverlayPreset: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let appearance: OverlayAppearance
 
     /// All built-in style presets, ordered for gallery display.
-    static let all: [OverlayPreset] = [
+    public static let all: [OverlayPreset] = [
         // MARK: - Legibility-focused
 
         OverlayPreset(

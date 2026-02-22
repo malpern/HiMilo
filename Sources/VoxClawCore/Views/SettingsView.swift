@@ -12,6 +12,9 @@ struct SettingsView: View {
     @State private var pendingElevenLabsKey = ""
     @State private var showInstructions = false
     @State private var copiedPeerSetup: String?
+    @State private var peerSpeakStatusMessage: String?
+    @State private var peerSpeakStatusIsError = false
+    @State private var peerSpeakStatusToken = UUID()
     @State private var voicePreview = VoicePreviewPlayer()
     @State private var peerBrowser = PeerBrowser()
 
@@ -354,7 +357,7 @@ struct SettingsView: View {
                     HStack {
                         Text("\(peer.displayEmoji)  \(peer.name)")
                         Spacer()
-                        if peer.app == .voxclaw, let baseURL = peer.baseURL {
+                        if let baseURL = peer.baseURL {
                             Button("Speak") {
                                 speakToPeer(peer)
                             }
@@ -383,19 +386,71 @@ struct SettingsView: View {
                     .foregroundStyle(.green)
                     .transition(.opacity)
             }
+
+            if let message = peerSpeakStatusMessage {
+                Label(message, systemImage: peerSpeakStatusIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(peerSpeakStatusIsError ? .orange : .green)
+                    .transition(.opacity)
+            }
         }
     }
 
     private func speakToPeer(_ peer: DiscoveredPeer) {
-        guard let baseURL = peer.baseURL,
-              let url = URL(string: "\(baseURL)/read") else { return }
+        guard let baseURL = peer.baseURL else {
+            Log.network.warning("Speak skipped: peer has no base URL (\(peer.name, privacy: .public))")
+            showPeerSpeakStatus("Couldn’t contact \(peer.name): missing address.", isError: true)
+            return
+        }
+        guard let url = URL(string: "\(baseURL)/read") else {
+            Log.network.error("Speak skipped: invalid read URL for peer \(peer.name, privacy: .public): \(baseURL, privacy: .public)/read")
+            showPeerSpeakStatus("Couldn’t contact \(peer.name): invalid URL \(baseURL)/read", isError: true)
+            return
+        }
+
         let quote = douglasAdamsQuotes.randomElement()!
+        let peerName = peer.name
         Task {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
-            _ = try? await URLSession.shared.data(for: request)
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                    Log.network.warning("Speak request to \(peerName, privacy: .public) returned HTTP \(http.statusCode, privacy: .public)")
+                    await MainActor.run {
+                        showPeerSpeakStatus("Failed to speak on \(peerName): HTTP \(http.statusCode)", isError: true)
+                    }
+                } else {
+                    await MainActor.run {
+                        showPeerSpeakStatus("Sent speech to \(peerName).", isError: false)
+                    }
+                }
+            } catch {
+                Log.network.error("Speak request to \(peerName, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+                await MainActor.run {
+                    showPeerSpeakStatus("Failed to speak on \(peerName): \(error.localizedDescription)", isError: true)
+                }
+            }
+        }
+    }
+
+    private func showPeerSpeakStatus(_ message: String, isError: Bool) {
+        let token = UUID()
+        peerSpeakStatusToken = token
+        withAnimation {
+            peerSpeakStatusMessage = message
+            peerSpeakStatusIsError = isError
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            await MainActor.run {
+                guard peerSpeakStatusToken == token else { return }
+                withAnimation {
+                    peerSpeakStatusMessage = nil
+                }
+            }
         }
     }
 
