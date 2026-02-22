@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import os
 #if os(macOS)
 import Security
@@ -6,7 +7,11 @@ import Security
 
 public enum KeychainHelper {
     /// Override for testing — set to a temp directory to isolate from real storage.
-    nonisolated(unsafe) static var storageDirectoryOverride: URL?
+    private static let _storageDirectoryOverride = Mutex<URL?>(nil)
+    static var storageDirectoryOverride: URL? {
+        get { _storageDirectoryOverride.withLock { $0 } }
+        set { _storageDirectoryOverride.withLock { $0 = newValue } }
+    }
 
     private static let kvsKey = "openai-api-key"
 

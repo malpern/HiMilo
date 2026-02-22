@@ -46,13 +46,13 @@ public final class OpenAISpeechEngine: SpeechEngine {
             let stream = await ttsService.streamPCM(text: text)
             for try await chunk in stream {
                 player.scheduleChunk(chunk)
-                aligner.appendChunk(chunk)
+                aligner?.appendChunk(chunk)
             }
-            aligner.finishAudio()
+            aligner?.finishAudio()
 
             // Use recognizer timings if available, otherwise fall back to heuristic
             let realDuration = player.totalDuration
-            if aligner.isAvailable {
+            if let aligner, aligner.isAvailable {
                 await aligner.awaitCompletion(timeout: 3.0)
                 let alignedTimings = aligner.timings
                 if !alignedTimings.isEmpty {

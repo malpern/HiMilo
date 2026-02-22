@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Speech
+import Synchronization
 import os
 
 /// Uses on-device `SFSpeechRecognizer` to align recognized words with the original
@@ -9,6 +10,10 @@ import os
 /// Audio buffers (16-bit PCM, 24kHz mono) are fed directly to a speech recognition
 /// request — no microphone is used. Falls back gracefully when recognition is
 /// unavailable or the user denies permission.
+///
+/// Marked `@unchecked Sendable` because `SFSpeechRecognizer`,
+/// `SFSpeechAudioBufferRecognitionRequest`, and `SFSpeechRecognitionTask` are not
+/// Sendable. Mutable state (`_timings`, `_isFinished`) is protected by a `Mutex`.
 final class SpeechAligner: @unchecked Sendable {
     private let words: [String]
     private let recognizer: SFSpeechRecognizer?
@@ -16,13 +21,12 @@ final class SpeechAligner: @unchecked Sendable {
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioFormat: AVAudioFormat
 
-    private let lock = NSLock()
-    private var _timings: [WordTiming] = []
-    private var _isFinished = false
+    private let _timings = Mutex<[WordTiming]>([])
+    private let _isFinished = Mutex(false)
 
     /// Progressively updated word timings from speech recognition.
     var timings: [WordTiming] {
-        lock.withLock { _timings }
+        _timings.withLock { $0 }
     }
 
     /// Whether speech recognition is available and authorized.
@@ -31,8 +35,19 @@ final class SpeechAligner: @unchecked Sendable {
         return recognizer.isAvailable
     }
 
-    init(words: [String]) {
+    init?(words: [String]) {
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 24000,
+            channels: 1,
+            interleaved: false
+        ) else {
+            Log.tts.error("Failed to create audio format for speech alignment")
+            return nil
+        }
+
         self.words = words
+        self.audioFormat = format
 
         self.recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
         self.recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
@@ -40,13 +55,6 @@ final class SpeechAligner: @unchecked Sendable {
         self.recognitionRequest.requiresOnDeviceRecognition = true
         // addsPunctuation defaults to true which helps matching
         self.recognitionRequest.addsPunctuation = true
-
-        self.audioFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: 24000,
-            channels: 1,
-            interleaved: false
-        )!
 
         startRecognition()
     }
@@ -65,7 +73,7 @@ final class SpeechAligner: @unchecked Sendable {
     /// Wait until recognition produces a final result or times out.
     func awaitCompletion(timeout: TimeInterval = 5.0) async {
         let deadline = Date().addingTimeInterval(timeout)
-        while !lock.withLock({ _isFinished }) {
+        while !_isFinished.withLock({ $0 }) {
             if Date() >= deadline { break }
             try? await Task.sleep(for: .milliseconds(100))
         }
@@ -76,7 +84,7 @@ final class SpeechAligner: @unchecked Sendable {
     private func startRecognition() {
         guard let recognizer, recognizer.isAvailable else {
             Log.tts.info("Speech recognizer not available, will use heuristic timings")
-            lock.withLock { _isFinished = true }
+            _isFinished.withLock { $0 = true }
             return
         }
 
@@ -85,17 +93,17 @@ final class SpeechAligner: @unchecked Sendable {
 
             if let result {
                 let aligned = self.align(transcription: result.bestTranscription)
-                self.lock.withLock { self._timings = aligned }
+                self._timings.withLock { $0 = aligned }
 
                 if result.isFinal {
                     Log.tts.info("Speech alignment complete: \(aligned.count) words aligned")
-                    self.lock.withLock { self._isFinished = true }
+                    self._isFinished.withLock { $0 = true }
                 }
             }
 
             if let error {
                 Log.tts.warning("Speech recognition error: \(error.localizedDescription)")
-                self.lock.withLock { self._isFinished = true }
+                self._isFinished.withLock { $0 = true }
             }
         }
     }
@@ -183,7 +191,7 @@ final class SpeechAligner: @unchecked Sendable {
         }
 
         // Handle words after the last anchor by extrapolating
-        let lastAnchor = anchors.last!
+        guard let lastAnchor = anchors.last else { return result }
         let remainingStart = lastAnchor.wordIndex + 1
         if remainingStart < words.count {
             // Estimate duration per remaining word from average anchor duration
@@ -206,7 +214,7 @@ final class SpeechAligner: @unchecked Sendable {
     }
 
     /// Normalize a word for comparison: lowercase, strip punctuation.
-    private static func normalize(_ word: String) -> String {
+    static func normalize(_ word: String) -> String {
         word.lowercased()
             .trimmingCharacters(in: .punctuationCharacters)
             .trimmingCharacters(in: .whitespacesAndNewlines)

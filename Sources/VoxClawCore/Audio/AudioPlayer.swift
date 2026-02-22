@@ -63,7 +63,7 @@ final class AudioPlayer {
         }
         buffer.frameLength = AVAudioFrameCount(sampleCount)
 
-        let floatData = buffer.floatChannelData![0]
+        guard let floatData = buffer.floatChannelData?[0] else { return nil }
         pcmData.withUnsafeBytes { rawBuffer in
             let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
             for i in 0..<sampleCount {
@@ -74,7 +74,10 @@ final class AudioPlayer {
     }
 
     func scheduleChunk(_ pcmData: Data) {
-        guard let buffer = Self.pcmBuffer(from: pcmData, format: format) else { return }
+        guard let buffer = Self.pcmBuffer(from: pcmData, format: format) else {
+            Log.audio.warning("Failed to convert PCM chunk (\(pcmData.count) bytes) to audio buffer")
+            return
+        }
 
         totalBytesScheduled += pcmData.count
         Log.audio.debug("Scheduled chunk: \(buffer.frameLength, privacy: .public) samples, totalDuration=\(self.totalDuration, privacy: .public)s")

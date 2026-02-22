@@ -11,60 +11,33 @@ import AppKit
 
 @MainActor
 public final class ExternalPlaybackController: ExternalPlaybackControlling {
+    private static let mediaApps = ["Music", "Spotify"]
     private var pausedApps: Set<String> = []
     public init() {}
 
     public func pauseIfPlaying() -> Bool {
         pausedApps.removeAll()
-
-        if isMusicPlaying() {
-            runAppleScript("""
-            tell application "Music"
-                pause
-            end tell
-            """)
-            pausedApps.insert("Music")
+        for app in Self.mediaApps where isPlaying(app) {
+            sendCommand("pause", to: app)
+            pausedApps.insert(app)
         }
-
-        if isSpotifyPlaying() {
-            runAppleScript("""
-            tell application "Spotify"
-                pause
-            end tell
-            """)
-            pausedApps.insert("Spotify")
-        }
-
         return !pausedApps.isEmpty
     }
 
     public func resumePaused() {
         defer { pausedApps.removeAll() }
-
-        if pausedApps.contains("Music") {
-            runAppleScript("""
-            tell application "Music"
-                play
-            end tell
-            """)
-        }
-
-        if pausedApps.contains("Spotify") {
-            runAppleScript("""
-            tell application "Spotify"
-                play
-            end tell
-            """)
+        for app in pausedApps {
+            sendCommand("play", to: app)
         }
     }
 
-    private func isMusicPlaying() -> Bool {
+    private func isPlaying(_ appName: String) -> Bool {
         runAppleScript("""
         tell application "System Events"
-            set musicRunning to (name of processes) contains "Music"
+            set appRunning to (name of processes) contains "\(appName)"
         end tell
-        if musicRunning then
-            tell application "Music"
+        if appRunning then
+            tell application "\(appName)"
                 if player state is playing then
                     return "yes"
                 end if
@@ -74,20 +47,12 @@ public final class ExternalPlaybackController: ExternalPlaybackControlling {
         """) == "yes"
     }
 
-    private func isSpotifyPlaying() -> Bool {
+    private func sendCommand(_ command: String, to appName: String) {
         runAppleScript("""
-        tell application "System Events"
-            set spotifyRunning to (name of processes) contains "Spotify"
+        tell application "\(appName)"
+            \(command)
         end tell
-        if spotifyRunning then
-            tell application "Spotify"
-                if player state is playing then
-                    return "yes"
-                end if
-            end tell
-        end if
-        return "no"
-        """) == "yes"
+        """)
     }
 
     @discardableResult

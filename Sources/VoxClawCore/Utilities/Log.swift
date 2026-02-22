@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import os
 
 enum Log {
@@ -15,7 +16,11 @@ enum Log {
     static let settings    = Logger(subsystem: subsystem, category: "settings")
     static let onboarding  = Logger(subsystem: subsystem, category: "onboarding")
 
-    nonisolated(unsafe) static var isVerbose = false
+    private static let _isVerbose = Mutex(false)
+    static var isVerbose: Bool {
+        get { _isVerbose.withLock { $0 } }
+        set { _isVerbose.withLock { $0 = newValue } }
+    }
 
     /// Echo to stderr when --verbose is active
     static func verbose(_ message: String) {

@@ -63,7 +63,7 @@ struct NetworkListenerIntegrationTests {
         let body = String(data: data, encoding: .utf8) ?? ""
         #expect(body.contains("reading"))
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await waitForRequest(in: receivedRequests) { $0.text == "integration test" }
         #expect(receivedRequests.contains { $0.text == "integration test" })
     }
 
@@ -90,7 +90,7 @@ struct NetworkListenerIntegrationTests {
         let http = try #require(response as? HTTPURLResponse)
         #expect(http.statusCode == 200)
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await waitForRequest(in: receivedRequests) { $0.text == "hello" }
         let received = try #require(receivedRequests.first { $0.text == "hello" })
         #expect(received.voice == "nova")
         #expect(received.rate == 1.5)
@@ -119,7 +119,7 @@ struct NetworkListenerIntegrationTests {
 
         #expect(http.statusCode == 200)
 
-        try await Task.sleep(for: .milliseconds(100))
+        try await waitForRequest(in: receivedRequests) { $0.text == "plain text body" }
         #expect(receivedRequests.contains { $0.text == "plain text body" })
     }
 
@@ -157,5 +157,16 @@ struct NetworkListenerIntegrationTests {
             }
         }
         Issue.record("Listener did not become ready on port \(port)")
+    }
+
+    /// Poll until a matching request appears (max 2 seconds)
+    private func waitForRequest(
+        in requests: [ReadRequest],
+        matching predicate: (ReadRequest) -> Bool
+    ) async throws {
+        for _ in 0..<20 {
+            try await Task.sleep(for: .milliseconds(100))
+            if requests.contains(where: predicate) { return }
+        }
     }
 }

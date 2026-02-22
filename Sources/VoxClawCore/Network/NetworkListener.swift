@@ -24,7 +24,10 @@ public final class NetworkListener {
 
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        let nwPort = NWEndpoint.Port(rawValue: port)!
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            Log.network.error("Invalid port: \(self.port, privacy: .public)")
+            return
+        }
         listener = try NWListener(using: params, on: nwPort)
 
         // Advertise via Bonjour for LAN discovery

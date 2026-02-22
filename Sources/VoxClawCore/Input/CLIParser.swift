@@ -145,23 +145,13 @@ struct CLIParser: ParsableCommand {
             Foundation.exit(1)
         }
 
-        guard let url = URL(string: "https://api.openai.com/v1/audio/speech") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        var body: [String: Any] = [
-            "model": "gpt-4o-mini-tts",
-            "input": text,
-            "voice": voice,
-            "response_format": "mp3",
-            "speed": Double(rate),
-        ]
-        if let instructions, !instructions.isEmpty {
-            body["instructions"] = instructions
+        guard let request = try? TTSService.buildRequest(
+            text: text, apiKey: apiKey, voice: voice,
+            speed: rate, instructions: instructions, responseFormat: "mp3"
+        ) else {
+            print("Error: Failed to build TTS request.")
+            Foundation.exit(1)
         }
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         // Launch the network request on a background queue so URLSession can also
         // dispatch TLS/reachability work back to the main RunLoop without deadlocking.

@@ -103,6 +103,17 @@ actor TTSService {
     }
 
     private func buildRequest(text: String) throws -> URLRequest {
+        try Self.buildRequest(
+            text: text, apiKey: apiKey, voice: voice,
+            speed: speed, instructions: instructions, responseFormat: "pcm"
+        )
+    }
+
+    /// Build a URLRequest for the OpenAI TTS API. Shared between streaming playback and file export.
+    static func buildRequest(
+        text: String, apiKey: String, voice: String,
+        speed: Float = 1.0, instructions: String? = nil, responseFormat: String = "pcm"
+    ) throws -> URLRequest {
         guard let url = URL(string: "https://api.openai.com/v1/audio/speech") else {
             throw TTSError(message: "Invalid API URL", statusCode: nil)
         }
@@ -113,10 +124,10 @@ actor TTSService {
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = [
-            "model": model,
+            "model": "gpt-4o-mini-tts",
             "input": text,
             "voice": voice,
-            "response_format": "pcm",
+            "response_format": responseFormat,
             "speed": Double(speed),
         ]
         if let instructions, !instructions.isEmpty {
