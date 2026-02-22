@@ -88,7 +88,7 @@ struct WaitingView: View {
     private var statusText: String {
         switch appState.sessionState {
         case .idle:
-            return appState.isListening ? "Listening for text..." : "Starting listener..."
+            return appState.isListening ? "Listening for text" : "Starting listener..."
         case .loading:
             return "Receiving text..."
         case .playing:
