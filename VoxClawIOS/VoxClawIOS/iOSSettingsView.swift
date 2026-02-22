@@ -111,8 +111,7 @@ struct iOSSettingsView: View {
             }
 
             if appState.isListening {
-                let ip = NetworkListener.localIPAddress() ?? "<ip>"
-                Text("Listening on http://\(ip):\(settings.networkListenerPort)")
+                Text("\u{1F4F1}  \(NetworkListener.localComputerName()):\(settings.networkListenerPort)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -7,70 +7,63 @@ struct WaitingView: View {
     let appState: AppState
 
     @State private var showSettings = false
-    @State private var copiedText: String?
+    @State private var copiedAgentSetup = false
+    @State private var showInstructions = false
 
-    private var listenAddress: String {
-        let ip = VoxClawCore.NetworkListener.localIPAddress() ?? "<ip>"
-        return "http://\(ip):\(settings.networkListenerPort)"
+    private var networkBaseURL: String {
+        let hostname = VoxClawCore.NetworkListener.localHostname()
+        return "http://\(hostname):\(settings.networkListenerPort)"
     }
 
-    private var curlCommand: String {
-        "curl -X POST \(listenAddress)/read \\\n  -d '{\"text\": \"Hello world\"}'"
+    private var agentHandoffText: String {
+        let healthURL = "\(networkBaseURL)/status"
+        let speakURL = "\(networkBaseURL)/read"
+        return """
+        \u{1F9DE} VoxClaw setup pointer:
+        health_url: \(healthURL)
+        speak_url: \(speakURL)
+
+        Agent rules:
+        1) GET health_url first.
+        2) If status is ok, POST text to speak_url.
+        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
+
+        Website: https://voxclaw.com/
+        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
+        """
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                Spacer()
+            ZStack(alignment: .bottomTrailing) {
+                VStack(spacing: 24) {
+                    Spacer()
 
-                // App logo
-                Image("AppLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 120, height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 27))
+                    // App logo
+                    Image("AppLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 120, height: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 27))
 
-                Text("VoxClaw")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    Text("VoxClaw")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
 
-                // Status indicator
-                statusView
+                    // Status indicator
+                    statusView
 
-                // Connection info
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Send text from your Mac:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    // Agent setup
+                    agentSetupView
 
-                    Button {
-                        copyToClipboard(curlCommand)
-                    } label: {
-                        HStack {
-                            Text(curlCommand)
-                                .font(.system(.caption2, design: .monospaced))
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Image(systemName: copiedText == curlCommand ? "checkmark" : "doc.on.doc")
-                                .font(.caption2)
-                                .foregroundStyle(copiedText == curlCommand ? .green : .secondary)
-                        }
-                        .padding(10)
-                        .background(.quaternary.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-
-                    if copiedText == curlCommand {
-                        Text("Copied!")
-                            .font(.caption2)
-                            .foregroundStyle(.green)
-                            .transition(.opacity)
-                    }
+                    Spacer()
                 }
-                .padding(.horizontal, 32)
+                .frame(maxWidth: .infinity)
 
-                Spacer()
+                if appState.isListening {
+                    eyeButton
+                        .padding(20)
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -111,27 +104,61 @@ struct WaitingView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
 
+    // MARK: - Agent Setup
+
+    @ViewBuilder
+    private var agentSetupView: some View {
         if appState.isListening {
-            Button {
-                copyToClipboard(listenAddress)
-            } label: {
-                HStack(spacing: 4) {
-                    Text(listenAddress)
-                        .font(.system(.body, design: .monospaced))
-                    Image(systemName: copiedText == listenAddress ? "checkmark" : "doc.on.doc")
-                        .font(.caption)
-                        .foregroundStyle(copiedText == listenAddress ? .green : .secondary)
+            VStack(spacing: 12) {
+                Text("Tell your agent how to use VoxClaw to get a voice.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    UIPasteboard.general.string = agentHandoffText
+                    withAnimation {
+                        copiedAgentSetup = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        withAnimation {
+                            copiedAgentSetup = false
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("\u{1F9DE}")
+                        Text(copiedAgentSetup ? "Copied!" : "Copy Agent Setup")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(copiedAgentSetup ? .green : .gray)
+
+                if showInstructions {
+                    Text(agentHandoffText)
+                        .font(.system(.caption2, design: .monospaced))
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(.quaternary.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 32)
+        }
+    }
 
-            if copiedText == listenAddress {
-                Text("Copied!")
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-                    .transition(.opacity)
+    private var eyeButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showInstructions.toggle()
             }
+        } label: {
+            Image(systemName: showInstructions ? "eye" : "eye.slash")
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -165,17 +192,4 @@ struct WaitingView: View {
         }
     }
 
-    private func copyToClipboard(_ text: String) {
-        UIPasteboard.general.string = text
-        withAnimation {
-            copiedText = text
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                if copiedText == text {
-                    copiedText = nil
-                }
-            }
-        }
-    }
 }

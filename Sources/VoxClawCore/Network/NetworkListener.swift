@@ -1,20 +1,24 @@
 import Foundation
 import Network
+import SystemConfiguration
 import os
+#if canImport(UIKit)
+import UIKit
+#endif
 
 @MainActor
 public final class NetworkListener {
     private var listener: NWListener?
     private let port: UInt16
-    private let serviceName: String?
+    private let serviceName: String
     private let appState: AppState
     private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
 
     public var isListening: Bool { listener != nil }
 
-    public init(port: UInt16 = 4140, serviceName: String? = "VoxClaw", appState: AppState) {
+    public init(port: UInt16 = 4140, serviceName: String? = nil, appState: AppState) {
         self.port = port
-        self.serviceName = serviceName
+        self.serviceName = serviceName ?? Self.localVoxServiceName()
         self.appState = appState
     }
 
@@ -31,9 +35,7 @@ public final class NetworkListener {
         listener = try NWListener(using: params, on: nwPort)
 
         // Advertise via Bonjour for LAN discovery
-        if let serviceName {
-            listener?.service = NWListener.Service(name: serviceName, type: "_voxclaw._tcp")
-        }
+        listener?.service = NWListener.Service(name: serviceName, type: "_voxclaw._tcp")
 
         listener?.stateUpdateHandler = { [weak self] state in
             Task { @MainActor in
@@ -130,6 +132,78 @@ public final class NetworkListener {
         print("    curl http://\(ip):\(port)/status")
         print("")
     }
+
+    public static func localHostname() -> String {
+        ProcessInfo.processInfo.hostName
+    }
+
+    /// Human-readable computer name (e.g. "Mark's MacBook Pro").
+    public static func localComputerName() -> String {
+        #if os(macOS)
+        if let name = SCDynamicStoreCopyComputerName(nil, nil) as String? {
+            return name
+        }
+        #else
+        return UIDevice.current.name
+        #endif
+        // Fallback: strip .local and replace hyphens
+        let host = ProcessInfo.processInfo.hostName
+        return host.replacingOccurrences(of: ".local", with: "")
+            .replacingOccurrences(of: "-", with: " ")
+    }
+
+    /// Device-type-aware Bonjour service name (e.g. "VoxMacBook Pro", "VoxiPhone").
+    public static func localVoxServiceName() -> String {
+        let deviceType = Self.deviceModelName()
+        return "Vox\(deviceType)"
+    }
+
+    /// Returns a human-readable device model name (e.g. "MacBook Pro", "Mac mini", "iPhone").
+    static func deviceModelName() -> String {
+        #if canImport(UIKit) && !os(macOS)
+        return UIDevice.current.model // "iPhone", "iPad", "iPod touch"
+        #else
+        // Use sysctl to get the hardware model identifier
+        var size = 0
+        sysctlbyname("hw.model", nil, &size, nil, 0)
+        var model = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.model", &model, &size, nil, 0)
+        let nullIndex = model.firstIndex(of: 0) ?? model.endIndex
+        let identifier = String(decoding: model[..<nullIndex].map { UInt8(bitPattern: $0) }, as: UTF8.self)
+
+        // Intel Macs: identifier starts with product name (e.g. "MacBookPro18,1")
+        let lower = identifier.lowercased()
+        if lower.hasPrefix("macbookpro") { return "MacBook Pro" }
+        if lower.hasPrefix("macbookair") { return "MacBook Air" }
+        if lower.hasPrefix("macbook") { return "MacBook" }
+        if lower.hasPrefix("macmini") { return "Mac mini" }
+        if lower.hasPrefix("macpro") { return "Mac Pro" }
+        if lower.hasPrefix("imacpro") { return "iMac Pro" }
+        if lower.hasPrefix("imac") { return "iMac" }
+
+        // Apple Silicon Macs: identifier is "MacN,N" — infer from computer name
+        if lower.hasPrefix("mac") {
+            return deviceTypeFromComputerName()
+        }
+        return "Mac"
+        #endif
+    }
+
+    #if os(macOS)
+    /// Infers device type from the user's computer name (e.g. "Mark's MacBook Pro" → "MacBook Pro").
+    private static func deviceTypeFromComputerName() -> String {
+        let name = localComputerName().lowercased()
+        if name.contains("macbook pro") { return "MacBook Pro" }
+        if name.contains("macbook air") { return "MacBook Air" }
+        if name.contains("macbook") { return "MacBook" }
+        if name.contains("mac mini") { return "Mac mini" }
+        if name.contains("mac pro") { return "Mac Pro" }
+        if name.contains("mac studio") { return "Mac Studio" }
+        if name.contains("imac") { return "iMac" }
+        if name.contains("mac") { return "Mac" }
+        return "Mac"
+    }
+    #endif
 
     public static func localIPAddress() -> String? {
         var ifaddr: UnsafeMutablePointer<ifaddrs>?

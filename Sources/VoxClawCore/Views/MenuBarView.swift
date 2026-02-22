@@ -87,15 +87,9 @@ struct MenuBarView: View {
             .accessibilityIdentifier(AccessibilityID.MenuBar.settings)
 
             if appState.isListening {
-                if let ip = NetworkListener.localIPAddress() {
-                    Text("Listening on \(ip):\(settings.networkListenerPort)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Listening on port \(settings.networkListenerPort)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("\u{1F5A5}\u{FE0F}  \(NetworkListener.localComputerName()):\(settings.networkListenerPort)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if appState.autoClosedInstancesOnLaunch > 0 {

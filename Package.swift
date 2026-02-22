@@ -6,6 +6,7 @@ let package = Package(
     name: "VoxClaw",
     platforms: [
         .macOS(.v26),
+        .iOS(.v26),
     ],
     products: [
         .library(name: "VoxClawCore", targets: ["VoxClawCore"]),

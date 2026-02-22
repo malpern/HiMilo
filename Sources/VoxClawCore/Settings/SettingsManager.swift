@@ -96,7 +96,7 @@ public final class SettingsManager {
         didSet { UserDefaults.standard.set(rememberOverlayPosition, forKey: "rememberOverlayPosition") }
     }
 
-    public var savedOverlayOrigin: NSPoint? {
+    public var savedOverlayOrigin: CGPoint? {
         didSet {
             if let origin = savedOverlayOrigin {
                 UserDefaults.standard.set(origin.x, forKey: "savedOverlayOriginX")
@@ -183,7 +183,7 @@ public final class SettingsManager {
         if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
             let x = UserDefaults.standard.double(forKey: "savedOverlayOriginX")
             let y = UserDefaults.standard.double(forKey: "savedOverlayOriginY")
-            self.savedOverlayOrigin = NSPoint(x: x, y: y)
+            self.savedOverlayOrigin = CGPoint(x: x, y: y)
         } else {
             self.savedOverlayOrigin = nil
         }

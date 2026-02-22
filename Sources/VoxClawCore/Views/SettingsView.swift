@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var showInstructions = false
     @State private var testVoiceSending = false
     @State private var voicePreview = VoicePreviewPlayer()
+    @State private var peerBrowser = PeerBrowser()
 
     var body: some View {
         ScrollView {
@@ -22,11 +23,14 @@ struct SettingsView: View {
                 voiceSection
                 controlsSection
                 readOnlyDataSection
+                peersSection
                 testSection
             }
             .formStyle(.grouped)
         }
         .frame(width: 520, height: 720)
+        .onAppear { peerBrowser.start() }
+        .onDisappear { peerBrowser.stop() }
     }
 
     private var agentSetupSection: some View {
@@ -57,14 +61,16 @@ struct SettingsView: View {
                     .tint(websiteRed)
                     .accessibilityIdentifier(AccessibilityID.Settings.copyAgentSetup)
 
-                    Button(showInstructions ? "hide instructions" : "show instructions") {
+                    Button {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             showInstructions.toggle()
                         }
+                    } label: {
+                        Image(systemName: showInstructions ? "eye" : "eye.slash")
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .underline()
+                    .help(showInstructions ? "Hide instructions" : "Show instructions")
                     .accessibilityIdentifier(AccessibilityID.Settings.showInstructions)
                 }
 
@@ -320,8 +326,6 @@ struct SettingsView: View {
 
     private var controlsSection: some View {
         Section("Controls") {
-            Toggle("Audio only (hide teleprompter overlay)", isOn: $settings.audioOnly)
-                .accessibilityIdentifier(AccessibilityID.Settings.audioOnlyToggle)
             Toggle("Pause other audio while VoxClaw speaks", isOn: $settings.pauseOtherAudioDuringSpeech)
                 .accessibilityIdentifier(AccessibilityID.Settings.pauseOtherAudioToggle)
             Toggle("Enable Network Listener", isOn: $settings.networkListenerEnabled)
@@ -330,6 +334,34 @@ struct SettingsView: View {
                 .accessibilityIdentifier(AccessibilityID.Settings.launchAtLoginToggle)
             Toggle("Remember overlay position", isOn: $settings.rememberOverlayPosition)
                 .accessibilityIdentifier(AccessibilityID.Settings.rememberOverlayPositionToggle)
+            Toggle("Audio only (hide teleprompter overlay)", isOn: $settings.audioOnly)
+                .accessibilityIdentifier(AccessibilityID.Settings.audioOnlyToggle)
+        }
+    }
+
+    private var peersSection: some View {
+        Section("On This Network") {
+            if peerBrowser.peers.isEmpty {
+                HStack(spacing: 8) {
+                    if peerBrowser.isSearching {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text("Searching...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(peerBrowser.peers) { peer in
+                    HStack {
+                        Text("\(peer.displayEmoji)  \(peer.name)")
+                        Spacer()
+                        Text(peer.app == .voxclaw ? "VoxClaw" : "OpenClaw")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -363,30 +395,33 @@ struct SettingsView: View {
     }
 
     private var readOnlyDataSection: some View {
-        Section("Read-Only Data") {
-            copiableRow("Status URL", value: "\(networkBaseURL)/status")
-            copiableRow("Speak URL", value: "\(networkBaseURL)/read")
+        Section {
+            HStack {
+                Text("\u{1F5A5}\u{FE0F}  \(NetworkListener.localComputerName())")
+                    .font(.callout)
+                Spacer()
+                copyURLButton("Status", path: "/status")
+                copyURLButton("Speak", path: "/read")
+            }
         }
     }
 
-    private func copiableRow(_ label: String, value: String) -> some View {
-        LabeledContent(label) {
-            HStack(spacing: 6) {
-                Text(value)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(value, forType: .string)
-                } label: {
-                    Image(systemName: "doc.on.doc")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Copy to clipboard")
+    private func copyURLButton(_ label: String, path: String) -> some View {
+        Button {
+            let url = "\(networkIPBaseURL)\(path)"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(url, forType: .string)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "doc.on.doc")
+                    .font(.caption2)
+                Text(label)
+                    .font(.caption)
             }
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .help("\(networkIPBaseURL)\(path)")
     }
 
     private var appleVoiceBinding: Binding<String> {
@@ -403,9 +438,12 @@ struct SettingsView: View {
     }
 
     private var networkBaseURL: String {
-        let lanIP = NetworkListener.localIPAddress()
-        return lanIP.map { "http://\($0):\(settings.networkListenerPort)" }
-            ?? "http://<lan-ip>:\(settings.networkListenerPort)"
+        "http://\(NetworkListener.localHostname()):\(settings.networkListenerPort)"
+    }
+
+    private var networkIPBaseURL: String {
+        let ip = NetworkListener.localIPAddress() ?? "localhost"
+        return "http://\(ip):\(settings.networkListenerPort)"
     }
 
     private var primaryAgentActionTitle: String {
