@@ -5,7 +5,6 @@ enum AccessibilityID {
         static let pauseResume = "menuBar.pauseResume"
         static let stop = "menuBar.stop"
         static let readClipboard = "menuBar.readClipboard"
-        static let readFromFile = "menuBar.readFromFile"
         static let settings = "menuBar.settings"
         static let about = "menuBar.about"
         static let quit = "menuBar.quit"

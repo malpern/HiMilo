@@ -1,6 +1,5 @@
 #if os(macOS)
 import AppKit
-import os
 import SwiftUI
 
 struct MenuBarView: View {
@@ -70,13 +69,6 @@ struct MenuBarView: View {
                 .foregroundStyle(.tertiary)
             }
 
-            Button {
-                Task { await readFromFile() }
-            } label: {
-                Label("Read from File...", systemImage: "doc")
-            }
-            .accessibilityIdentifier(AccessibilityID.MenuBar.readFromFile)
-
             Divider()
 
             Button("Settings...") {
@@ -85,12 +77,6 @@ struct MenuBarView: View {
             }
             .keyboardShortcut(",", modifiers: .command)
             .accessibilityIdentifier(AccessibilityID.MenuBar.settings)
-
-            if appState.isListening {
-                Text("\u{1F5A5}\u{FE0F}  \(NetworkListener.localComputerName()):\(settings.networkListenerPort)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
 
             if appState.autoClosedInstancesOnLaunch > 0 {
                 let count = appState.autoClosedInstancesOnLaunch
@@ -123,20 +109,5 @@ struct MenuBarView: View {
         await onReadText(text)
     }
 
-    @MainActor
-    private func readFromFile() async {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.plainText]
-        panel.allowsMultipleSelection = false
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            let text = try String(contentsOf: url, encoding: .utf8)
-            await onReadText(text)
-        } catch {
-            Log.app.error("Error reading file: \(error)")
-        }
-    }
 }
 #endif

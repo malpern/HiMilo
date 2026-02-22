@@ -256,12 +256,6 @@ struct iOSSettingsView: View {
                     }
             }
 
-            if appState.isListening {
-                Text("\u{1F4F1}  \(NetworkListener.localComputerName()):\(settings.networkListenerPort)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
             Toggle("Keep alive in background", isOn: $settings.backgroundKeepAlive)
 
             if settings.backgroundKeepAlive {
