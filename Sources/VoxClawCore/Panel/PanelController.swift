@@ -114,7 +114,7 @@ final class PanelController {
         })
     }
 
-    // MARK: - ESC Key Monitoring
+    // MARK: - Key Monitoring (ESC to stop, Space to pause/resume)
 
     private func startKeyMonitoring() {
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -122,11 +122,18 @@ final class PanelController {
                 self?.onStop()
                 return nil
             }
+            if event.keyCode == 49 { // Space
+                self?.onTogglePause()
+                return nil
+            }
             return event
         }
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             if event.keyCode == 53 { // ESC
                 self?.onStop()
+            }
+            if event.keyCode == 49 { // Space
+                self?.onTogglePause()
             }
         }
     }
