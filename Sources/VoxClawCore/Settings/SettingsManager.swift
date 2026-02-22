@@ -13,13 +13,36 @@ public enum VoiceEngineType: String, CaseIterable, Sendable {
 @Observable
 @MainActor
 public final class SettingsManager {
+    private enum KVSKey {
+        static let voiceEngine = "voiceEngine"
+        static let openAIVoice = "openAIVoice"
+        static let elevenLabsVoiceID = "elevenLabsVoiceID"
+        static let elevenLabsTurbo = "elevenLabsTurbo"
+        static let appleVoiceIdentifier = "appleVoiceIdentifier"
+        static let readingStyle = "readingStyle"
+        static let voiceSpeed = "voiceSpeed"
+        static let audioOnly = "audioOnly"
+        static let pauseOtherAudioDuringSpeech = "pauseOtherAudioDuringSpeech"
+        static let networkListenerEnabled = "networkListenerEnabled"
+        static let networkListenerPort = "networkListenerPort"
+        static let backgroundKeepAlive = "backgroundKeepAlive"
+        static let rememberOverlayPosition = "rememberOverlayPosition"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let overlayAppearance = "overlayAppearance"
+    }
+
+    #if os(macOS)
+    private static let macSettingsMigrationVersion = 1
+    private static let macSettingsMigrationVersionDefaultsKey = "macSettingsToICloudMigrationVersion"
+    #endif
+
     // Stored properties so @Observable can track changes.
     // Each syncs to UserDefaults/Keychain on write and loads on init.
 
     public var voiceEngine: VoiceEngineType {
         didSet {
             UserDefaults.standard.set(voiceEngine.rawValue, forKey: "voiceEngine")
-            NSUbiquitousKeyValueStore.default.set(voiceEngine.rawValue, forKey: "voiceEngine")
+            NSUbiquitousKeyValueStore.default.set(voiceEngine.rawValue, forKey: KVSKey.voiceEngine)
         }
     }
 
@@ -40,7 +63,7 @@ public final class SettingsManager {
     public var openAIVoice: String {
         didSet {
             UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice")
-            NSUbiquitousKeyValueStore.default.set(openAIVoice, forKey: "openAIVoice")
+            NSUbiquitousKeyValueStore.default.set(openAIVoice, forKey: KVSKey.openAIVoice)
         }
     }
 
@@ -61,54 +84,82 @@ public final class SettingsManager {
     public var elevenLabsVoiceID: String {
         didSet {
             UserDefaults.standard.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID")
-            NSUbiquitousKeyValueStore.default.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID")
+            NSUbiquitousKeyValueStore.default.set(elevenLabsVoiceID, forKey: KVSKey.elevenLabsVoiceID)
         }
     }
 
     public var elevenLabsTurbo: Bool {
         didSet {
             UserDefaults.standard.set(elevenLabsTurbo, forKey: "elevenLabsTurbo")
-            NSUbiquitousKeyValueStore.default.set(elevenLabsTurbo, forKey: "elevenLabsTurbo")
+            NSUbiquitousKeyValueStore.default.set(elevenLabsTurbo, forKey: KVSKey.elevenLabsTurbo)
         }
     }
 
     public var appleVoiceIdentifier: String? {
-        didSet { UserDefaults.standard.set(appleVoiceIdentifier, forKey: "appleVoiceIdentifier") }
+        didSet {
+            UserDefaults.standard.set(appleVoiceIdentifier, forKey: "appleVoiceIdentifier")
+            if let appleVoiceIdentifier {
+                NSUbiquitousKeyValueStore.default.set(appleVoiceIdentifier, forKey: KVSKey.appleVoiceIdentifier)
+            } else {
+                NSUbiquitousKeyValueStore.default.removeObject(forKey: KVSKey.appleVoiceIdentifier)
+            }
+        }
     }
 
     public var readingStyle: String {
-        didSet { UserDefaults.standard.set(readingStyle, forKey: "readingStyle") }
+        didSet {
+            UserDefaults.standard.set(readingStyle, forKey: "readingStyle")
+            NSUbiquitousKeyValueStore.default.set(readingStyle, forKey: KVSKey.readingStyle)
+        }
     }
 
     public var voiceSpeed: Float {
         didSet {
             UserDefaults.standard.set(voiceSpeed, forKey: "voiceSpeed")
-            NSUbiquitousKeyValueStore.default.set(Double(voiceSpeed), forKey: "voiceSpeed")
+            NSUbiquitousKeyValueStore.default.set(Double(voiceSpeed), forKey: KVSKey.voiceSpeed)
         }
     }
 
     public var audioOnly: Bool {
-        didSet { UserDefaults.standard.set(audioOnly, forKey: "audioOnly") }
+        didSet {
+            UserDefaults.standard.set(audioOnly, forKey: "audioOnly")
+            NSUbiquitousKeyValueStore.default.set(audioOnly, forKey: KVSKey.audioOnly)
+        }
     }
 
     public var pauseOtherAudioDuringSpeech: Bool {
-        didSet { UserDefaults.standard.set(pauseOtherAudioDuringSpeech, forKey: "pauseOtherAudioDuringSpeech") }
+        didSet {
+            UserDefaults.standard.set(pauseOtherAudioDuringSpeech, forKey: "pauseOtherAudioDuringSpeech")
+            NSUbiquitousKeyValueStore.default.set(pauseOtherAudioDuringSpeech, forKey: KVSKey.pauseOtherAudioDuringSpeech)
+        }
     }
 
     public var networkListenerEnabled: Bool {
-        didSet { UserDefaults.standard.set(networkListenerEnabled, forKey: "networkListenerEnabled") }
+        didSet {
+            UserDefaults.standard.set(networkListenerEnabled, forKey: "networkListenerEnabled")
+            NSUbiquitousKeyValueStore.default.set(networkListenerEnabled, forKey: KVSKey.networkListenerEnabled)
+        }
     }
 
     public var networkListenerPort: UInt16 {
-        didSet { UserDefaults.standard.set(Int(networkListenerPort), forKey: "networkListenerPort") }
+        didSet {
+            UserDefaults.standard.set(Int(networkListenerPort), forKey: "networkListenerPort")
+            NSUbiquitousKeyValueStore.default.set(Int(networkListenerPort), forKey: KVSKey.networkListenerPort)
+        }
     }
 
     public var backgroundKeepAlive: Bool {
-        didSet { UserDefaults.standard.set(backgroundKeepAlive, forKey: "backgroundKeepAlive") }
+        didSet {
+            UserDefaults.standard.set(backgroundKeepAlive, forKey: "backgroundKeepAlive")
+            NSUbiquitousKeyValueStore.default.set(backgroundKeepAlive, forKey: KVSKey.backgroundKeepAlive)
+        }
     }
 
     public var rememberOverlayPosition: Bool {
-        didSet { UserDefaults.standard.set(rememberOverlayPosition, forKey: "rememberOverlayPosition") }
+        didSet {
+            UserDefaults.standard.set(rememberOverlayPosition, forKey: "rememberOverlayPosition")
+            NSUbiquitousKeyValueStore.default.set(rememberOverlayPosition, forKey: KVSKey.rememberOverlayPosition)
+        }
     }
 
     public var savedOverlayOrigin: CGPoint? {
@@ -124,7 +175,10 @@ public final class SettingsManager {
     }
 
     public var hasCompletedOnboarding: Bool {
-        didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
+        didSet {
+            UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding")
+            NSUbiquitousKeyValueStore.default.set(hasCompletedOnboarding, forKey: KVSKey.hasCompletedOnboarding)
+        }
     }
 
     public var overlayAppearance: OverlayAppearance {
@@ -132,7 +186,7 @@ public final class SettingsManager {
             do {
                 let data = try JSONEncoder().encode(overlayAppearance)
                 UserDefaults.standard.set(data, forKey: "overlayAppearance")
-                NSUbiquitousKeyValueStore.default.set(data, forKey: "overlayAppearance")
+                NSUbiquitousKeyValueStore.default.set(data, forKey: KVSKey.overlayAppearance)
             } catch {
                 Log.settings.error("Failed to encode overlay appearance: \(error)")
             }
@@ -165,13 +219,10 @@ public final class SettingsManager {
     }
 
     public init() {
-        // Pull latest from iCloud KVS before reading any settings.
         let kvs = NSUbiquitousKeyValueStore.default
         kvs.synchronize()
 
-        // Prefer KVS value for synced settings, falling back to UserDefaults.
-        if let kvsEngine = kvs.string(forKey: "voiceEngine"),
-           UserDefaults.standard.string(forKey: "voiceEngine") == nil {
+        if let kvsEngine = kvs.string(forKey: KVSKey.voiceEngine) {
             self.voiceEngine = VoiceEngineType(rawValue: kvsEngine) ?? .apple
         } else {
             self.voiceEngine = VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple
@@ -182,50 +233,90 @@ public final class SettingsManager {
         let loadedKey = (try? KeychainHelper.readPersistedAPIKey()) ?? ""
         self.openAIAPIKey = loadedKey
 
-        self.openAIVoice = kvs.string(forKey: "openAIVoice")
+        self.openAIVoice = kvs.string(forKey: KVSKey.openAIVoice)
             ?? UserDefaults.standard.string(forKey: "openAIVoice")
             ?? "onyx"
 
         let loadedElevenLabsKey = (try? KeychainHelper.readPersistedElevenLabsAPIKey()) ?? ""
         self.elevenLabsAPIKey = loadedElevenLabsKey
 
-        self.elevenLabsVoiceID = kvs.string(forKey: "elevenLabsVoiceID")
+        self.elevenLabsVoiceID = kvs.string(forKey: KVSKey.elevenLabsVoiceID)
             ?? UserDefaults.standard.string(forKey: "elevenLabsVoiceID")
             ?? "JBFqnCBsd6RMkjVDRZzb"
 
-        // KVS stores bools as numbers; check if key exists before using.
-        if kvs.object(forKey: "elevenLabsTurbo") != nil {
-            self.elevenLabsTurbo = kvs.bool(forKey: "elevenLabsTurbo")
+        if kvs.object(forKey: KVSKey.elevenLabsTurbo) != nil {
+            self.elevenLabsTurbo = kvs.bool(forKey: KVSKey.elevenLabsTurbo)
         } else {
             self.elevenLabsTurbo = UserDefaults.standard.bool(forKey: "elevenLabsTurbo")
         }
 
-        self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
-        self.readingStyle = UserDefaults.standard.string(forKey: "readingStyle") ?? ""
+        if kvs.object(forKey: KVSKey.appleVoiceIdentifier) != nil {
+            self.appleVoiceIdentifier = kvs.string(forKey: KVSKey.appleVoiceIdentifier)
+        } else {
+            self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
+        }
 
-        let kvsSpeed = kvs.double(forKey: "voiceSpeed")
+        self.readingStyle = kvs.string(forKey: KVSKey.readingStyle)
+            ?? UserDefaults.standard.string(forKey: "readingStyle")
+            ?? ""
+
+        let kvsSpeed = kvs.double(forKey: KVSKey.voiceSpeed)
         let storedSpeed = UserDefaults.standard.float(forKey: "voiceSpeed")
         if kvsSpeed > 0 {
             self.voiceSpeed = Float(kvsSpeed)
         } else {
             self.voiceSpeed = storedSpeed > 0 ? storedSpeed : 1.0
         }
-        self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
-        if UserDefaults.standard.object(forKey: "pauseOtherAudioDuringSpeech") == nil {
+
+        if kvs.object(forKey: KVSKey.audioOnly) != nil {
+            self.audioOnly = kvs.bool(forKey: KVSKey.audioOnly)
+        } else {
+            self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
+        }
+
+        if kvs.object(forKey: KVSKey.pauseOtherAudioDuringSpeech) != nil {
+            self.pauseOtherAudioDuringSpeech = kvs.bool(forKey: KVSKey.pauseOtherAudioDuringSpeech)
+        } else if UserDefaults.standard.object(forKey: "pauseOtherAudioDuringSpeech") == nil {
             self.pauseOtherAudioDuringSpeech = true
         } else {
             self.pauseOtherAudioDuringSpeech = UserDefaults.standard.bool(forKey: "pauseOtherAudioDuringSpeech")
         }
-        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
-        self.networkListenerEnabled = UserDefaults.standard.bool(forKey: "networkListenerEnabled")
+
+        if kvs.object(forKey: KVSKey.hasCompletedOnboarding) != nil {
+            self.hasCompletedOnboarding = kvs.bool(forKey: KVSKey.hasCompletedOnboarding)
+        } else {
+            self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        }
+
+        if kvs.object(forKey: KVSKey.networkListenerEnabled) != nil {
+            self.networkListenerEnabled = kvs.bool(forKey: KVSKey.networkListenerEnabled)
+        } else {
+            self.networkListenerEnabled = UserDefaults.standard.bool(forKey: "networkListenerEnabled")
+        }
+
         let storedPort = UserDefaults.standard.integer(forKey: "networkListenerPort")
-        self.networkListenerPort = storedPort > 0 ? UInt16(storedPort) : 4140
-        if UserDefaults.standard.object(forKey: "backgroundKeepAlive") == nil {
+        let selectedPort: Int
+        if kvs.object(forKey: KVSKey.networkListenerPort) != nil {
+            selectedPort = Int(kvs.longLong(forKey: KVSKey.networkListenerPort))
+        } else {
+            selectedPort = storedPort
+        }
+        self.networkListenerPort = selectedPort > 0 && selectedPort <= Int(UInt16.max) ? UInt16(selectedPort) : 4140
+
+        if kvs.object(forKey: KVSKey.backgroundKeepAlive) != nil {
+            self.backgroundKeepAlive = kvs.bool(forKey: KVSKey.backgroundKeepAlive)
+        } else if UserDefaults.standard.object(forKey: "backgroundKeepAlive") == nil {
             self.backgroundKeepAlive = true
         } else {
             self.backgroundKeepAlive = UserDefaults.standard.bool(forKey: "backgroundKeepAlive")
         }
-        self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
+
+        if kvs.object(forKey: KVSKey.rememberOverlayPosition) != nil {
+            self.rememberOverlayPosition = kvs.bool(forKey: KVSKey.rememberOverlayPosition)
+        } else {
+            self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
+        }
+
         if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
             let x = UserDefaults.standard.double(forKey: "savedOverlayOriginX")
             let y = UserDefaults.standard.double(forKey: "savedOverlayOriginY")
@@ -233,12 +324,12 @@ public final class SettingsManager {
         } else {
             self.savedOverlayOrigin = nil
         }
+
         #if os(macOS)
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         #endif
 
-        // Overlay appearance: prefer KVS data, then UserDefaults
-        if let data = kvs.data(forKey: "overlayAppearance"),
+        if let data = kvs.data(forKey: KVSKey.overlayAppearance),
            let decoded = try? JSONDecoder().decode(OverlayAppearance.self, from: data) {
             self.overlayAppearance = decoded
         } else if let data = UserDefaults.standard.data(forKey: "overlayAppearance"),
@@ -256,7 +347,49 @@ public final class SettingsManager {
             KeychainHelper.seedElevenLabsKVSIfNeeded(loadedElevenLabsKey)
         }
 
+        #if os(macOS)
+        migrateCurrentMacSettingsToICloudIfNeeded(kvs: kvs)
+        #endif
+
         observeICloudKVSChanges()
+    }
+
+    #if os(macOS)
+    /// One-time migration: publish this Mac's current settings to iCloud KVS so iOS/iPadOS
+    /// devices can adopt them on upgrade.
+    private func migrateCurrentMacSettingsToICloudIfNeeded(kvs: NSUbiquitousKeyValueStore) {
+        let currentVersion = UserDefaults.standard.integer(forKey: Self.macSettingsMigrationVersionDefaultsKey)
+        guard currentVersion < Self.macSettingsMigrationVersion else { return }
+
+        pushSyncableSettingsToICloud(kvs: kvs)
+        UserDefaults.standard.set(Self.macSettingsMigrationVersion, forKey: Self.macSettingsMigrationVersionDefaultsKey)
+        Log.settings.info("Migrated current macOS settings to iCloud KVS (v\(Self.macSettingsMigrationVersion, privacy: .public))")
+    }
+    #endif
+
+    private func pushSyncableSettingsToICloud(kvs: NSUbiquitousKeyValueStore = .default) {
+        kvs.set(voiceEngine.rawValue, forKey: KVSKey.voiceEngine)
+        kvs.set(openAIVoice, forKey: KVSKey.openAIVoice)
+        kvs.set(elevenLabsVoiceID, forKey: KVSKey.elevenLabsVoiceID)
+        kvs.set(elevenLabsTurbo, forKey: KVSKey.elevenLabsTurbo)
+        if let appleVoiceIdentifier {
+            kvs.set(appleVoiceIdentifier, forKey: KVSKey.appleVoiceIdentifier)
+        } else {
+            kvs.removeObject(forKey: KVSKey.appleVoiceIdentifier)
+        }
+        kvs.set(readingStyle, forKey: KVSKey.readingStyle)
+        kvs.set(Double(voiceSpeed), forKey: KVSKey.voiceSpeed)
+        kvs.set(audioOnly, forKey: KVSKey.audioOnly)
+        kvs.set(pauseOtherAudioDuringSpeech, forKey: KVSKey.pauseOtherAudioDuringSpeech)
+        kvs.set(networkListenerEnabled, forKey: KVSKey.networkListenerEnabled)
+        kvs.set(Int(networkListenerPort), forKey: KVSKey.networkListenerPort)
+        kvs.set(backgroundKeepAlive, forKey: KVSKey.backgroundKeepAlive)
+        kvs.set(rememberOverlayPosition, forKey: KVSKey.rememberOverlayPosition)
+        kvs.set(hasCompletedOnboarding, forKey: KVSKey.hasCompletedOnboarding)
+        if let data = try? JSONEncoder().encode(overlayAppearance) {
+            kvs.set(data, forKey: KVSKey.overlayAppearance)
+        }
+        kvs.synchronize()
     }
 
     // MARK: - iCloud KVS Observation
@@ -313,52 +446,123 @@ public final class SettingsManager {
                     }
                 }
 
-                // Voice engine
-                if changedKeys.contains("voiceEngine"),
-                   let raw = kvs.string(forKey: "voiceEngine"),
+                if changedKeys.contains(KVSKey.voiceEngine),
+                   let raw = kvs.string(forKey: KVSKey.voiceEngine),
                    let engine = VoiceEngineType(rawValue: raw),
                    engine != self.voiceEngine {
                     self.voiceEngine = engine
                     Log.settings.info("Voice engine updated from iCloud KVS: \(raw)")
                 }
 
-                // OpenAI voice
-                if changedKeys.contains("openAIVoice"),
-                   let voice = kvs.string(forKey: "openAIVoice"),
+                if changedKeys.contains(KVSKey.openAIVoice),
+                   let voice = kvs.string(forKey: KVSKey.openAIVoice),
                    voice != self.openAIVoice {
                     self.openAIVoice = voice
                     Log.settings.info("OpenAI voice updated from iCloud KVS")
                 }
 
-                // ElevenLabs voice ID
-                if changedKeys.contains("elevenLabsVoiceID"),
-                   let voiceID = kvs.string(forKey: "elevenLabsVoiceID"),
+                if changedKeys.contains(KVSKey.elevenLabsVoiceID),
+                   let voiceID = kvs.string(forKey: KVSKey.elevenLabsVoiceID),
                    voiceID != self.elevenLabsVoiceID {
                     self.elevenLabsVoiceID = voiceID
                     Log.settings.info("ElevenLabs voice updated from iCloud KVS")
                 }
 
-                // ElevenLabs turbo
-                if changedKeys.contains("elevenLabsTurbo") {
-                    let turbo = kvs.bool(forKey: "elevenLabsTurbo")
+                if changedKeys.contains(KVSKey.elevenLabsTurbo) {
+                    let turbo = kvs.bool(forKey: KVSKey.elevenLabsTurbo)
                     if turbo != self.elevenLabsTurbo {
                         self.elevenLabsTurbo = turbo
                         Log.settings.info("ElevenLabs turbo updated from iCloud KVS")
                     }
                 }
 
-                // Voice speed
-                if changedKeys.contains("voiceSpeed") {
-                    let speed = Float(kvs.double(forKey: "voiceSpeed"))
+                if changedKeys.contains(KVSKey.appleVoiceIdentifier) {
+                    let identifier = kvs.string(forKey: KVSKey.appleVoiceIdentifier)
+                    if identifier != self.appleVoiceIdentifier {
+                        self.appleVoiceIdentifier = identifier
+                        Log.settings.info("Apple voice updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.readingStyle) {
+                    let style = kvs.string(forKey: KVSKey.readingStyle) ?? ""
+                    if style != self.readingStyle {
+                        self.readingStyle = style
+                        Log.settings.info("Reading style updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.voiceSpeed) {
+                    let speed = Float(kvs.double(forKey: KVSKey.voiceSpeed))
                     if speed > 0, speed != self.voiceSpeed {
                         self.voiceSpeed = speed
                         Log.settings.info("Voice speed updated from iCloud KVS")
                     }
                 }
 
-                // Overlay appearance
-                if changedKeys.contains("overlayAppearance"),
-                   let data = kvs.data(forKey: "overlayAppearance"),
+                if changedKeys.contains(KVSKey.audioOnly) {
+                    let value = kvs.bool(forKey: KVSKey.audioOnly)
+                    if value != self.audioOnly {
+                        self.audioOnly = value
+                        Log.settings.info("Audio-only setting updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.pauseOtherAudioDuringSpeech) {
+                    let value = kvs.object(forKey: KVSKey.pauseOtherAudioDuringSpeech) != nil
+                        ? kvs.bool(forKey: KVSKey.pauseOtherAudioDuringSpeech)
+                        : true
+                    if value != self.pauseOtherAudioDuringSpeech {
+                        self.pauseOtherAudioDuringSpeech = value
+                        Log.settings.info("Pause-other-audio setting updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.networkListenerEnabled) {
+                    let value = kvs.bool(forKey: KVSKey.networkListenerEnabled)
+                    if value != self.networkListenerEnabled {
+                        self.networkListenerEnabled = value
+                        Log.settings.info("Network listener enabled setting updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.networkListenerPort) {
+                    let rawPort = Int(kvs.longLong(forKey: KVSKey.networkListenerPort))
+                    let port = rawPort > 0 && rawPort <= Int(UInt16.max) ? UInt16(rawPort) : 4140
+                    if port != self.networkListenerPort {
+                        self.networkListenerPort = port
+                        Log.settings.info("Network listener port updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.backgroundKeepAlive) {
+                    let value = kvs.object(forKey: KVSKey.backgroundKeepAlive) != nil
+                        ? kvs.bool(forKey: KVSKey.backgroundKeepAlive)
+                        : true
+                    if value != self.backgroundKeepAlive {
+                        self.backgroundKeepAlive = value
+                        Log.settings.info("Background keep-alive updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.rememberOverlayPosition) {
+                    let value = kvs.bool(forKey: KVSKey.rememberOverlayPosition)
+                    if value != self.rememberOverlayPosition {
+                        self.rememberOverlayPosition = value
+                        Log.settings.info("Remember-overlay-position setting updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.hasCompletedOnboarding) {
+                    let value = kvs.bool(forKey: KVSKey.hasCompletedOnboarding)
+                    if value != self.hasCompletedOnboarding {
+                        self.hasCompletedOnboarding = value
+                        Log.settings.info("Onboarding completion updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains(KVSKey.overlayAppearance),
+                   let data = kvs.data(forKey: KVSKey.overlayAppearance),
                    let decoded = try? JSONDecoder().decode(OverlayAppearance.self, from: data) {
                     self.overlayAppearance = decoded
                     Log.settings.info("Overlay appearance updated from iCloud KVS")
