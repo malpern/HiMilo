@@ -17,7 +17,10 @@ public final class SettingsManager {
     // Each syncs to UserDefaults/Keychain on write and loads on init.
 
     public var voiceEngine: VoiceEngineType {
-        didSet { UserDefaults.standard.set(voiceEngine.rawValue, forKey: "voiceEngine") }
+        didSet {
+            UserDefaults.standard.set(voiceEngine.rawValue, forKey: "voiceEngine")
+            NSUbiquitousKeyValueStore.default.set(voiceEngine.rawValue, forKey: "voiceEngine")
+        }
     }
 
     public var openAIAPIKey: String {
@@ -35,7 +38,10 @@ public final class SettingsManager {
     }
 
     public var openAIVoice: String {
-        didSet { UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice") }
+        didSet {
+            UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice")
+            NSUbiquitousKeyValueStore.default.set(openAIVoice, forKey: "openAIVoice")
+        }
     }
 
     public var elevenLabsAPIKey: String {
@@ -53,11 +59,17 @@ public final class SettingsManager {
     }
 
     public var elevenLabsVoiceID: String {
-        didSet { UserDefaults.standard.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID") }
+        didSet {
+            UserDefaults.standard.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID")
+            NSUbiquitousKeyValueStore.default.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID")
+        }
     }
 
     public var elevenLabsTurbo: Bool {
-        didSet { UserDefaults.standard.set(elevenLabsTurbo, forKey: "elevenLabsTurbo") }
+        didSet {
+            UserDefaults.standard.set(elevenLabsTurbo, forKey: "elevenLabsTurbo")
+            NSUbiquitousKeyValueStore.default.set(elevenLabsTurbo, forKey: "elevenLabsTurbo")
+        }
     }
 
     public var appleVoiceIdentifier: String? {
@@ -69,7 +81,10 @@ public final class SettingsManager {
     }
 
     public var voiceSpeed: Float {
-        didSet { UserDefaults.standard.set(voiceSpeed, forKey: "voiceSpeed") }
+        didSet {
+            UserDefaults.standard.set(voiceSpeed, forKey: "voiceSpeed")
+            NSUbiquitousKeyValueStore.default.set(Double(voiceSpeed), forKey: "voiceSpeed")
+        }
     }
 
     public var audioOnly: Bool {
@@ -117,6 +132,7 @@ public final class SettingsManager {
             do {
                 let data = try JSONEncoder().encode(overlayAppearance)
                 UserDefaults.standard.set(data, forKey: "overlayAppearance")
+                NSUbiquitousKeyValueStore.default.set(data, forKey: "overlayAppearance")
             } catch {
                 Log.settings.error("Failed to encode overlay appearance: \(error)")
             }
@@ -149,21 +165,51 @@ public final class SettingsManager {
     }
 
     public init() {
-        self.voiceEngine = VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple
-        // Pull latest from iCloud KVS before reading the key.
-        NSUbiquitousKeyValueStore.default.synchronize()
+        // Pull latest from iCloud KVS before reading any settings.
+        let kvs = NSUbiquitousKeyValueStore.default
+        kvs.synchronize()
+
+        // Prefer KVS value for synced settings, falling back to UserDefaults.
+        if let kvsEngine = kvs.string(forKey: "voiceEngine"),
+           UserDefaults.standard.string(forKey: "voiceEngine") == nil {
+            self.voiceEngine = VoiceEngineType(rawValue: kvsEngine) ?? .apple
+        } else {
+            self.voiceEngine = VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple
+        }
+
         // App settings should reflect the key explicitly saved in VoxClaw.
         // Avoid env-var override here so stale shell/launchd vars can't shadow Settings.
         let loadedKey = (try? KeychainHelper.readPersistedAPIKey()) ?? ""
         self.openAIAPIKey = loadedKey
-        self.openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx"
-        self.elevenLabsAPIKey = (try? KeychainHelper.readPersistedElevenLabsAPIKey()) ?? ""
-        self.elevenLabsVoiceID = UserDefaults.standard.string(forKey: "elevenLabsVoiceID") ?? "JBFqnCBsd6RMkjVDRZzb"
-        self.elevenLabsTurbo = UserDefaults.standard.bool(forKey: "elevenLabsTurbo")
+
+        self.openAIVoice = kvs.string(forKey: "openAIVoice")
+            ?? UserDefaults.standard.string(forKey: "openAIVoice")
+            ?? "onyx"
+
+        let loadedElevenLabsKey = (try? KeychainHelper.readPersistedElevenLabsAPIKey()) ?? ""
+        self.elevenLabsAPIKey = loadedElevenLabsKey
+
+        self.elevenLabsVoiceID = kvs.string(forKey: "elevenLabsVoiceID")
+            ?? UserDefaults.standard.string(forKey: "elevenLabsVoiceID")
+            ?? "JBFqnCBsd6RMkjVDRZzb"
+
+        // KVS stores bools as numbers; check if key exists before using.
+        if kvs.object(forKey: "elevenLabsTurbo") != nil {
+            self.elevenLabsTurbo = kvs.bool(forKey: "elevenLabsTurbo")
+        } else {
+            self.elevenLabsTurbo = UserDefaults.standard.bool(forKey: "elevenLabsTurbo")
+        }
+
         self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
         self.readingStyle = UserDefaults.standard.string(forKey: "readingStyle") ?? ""
+
+        let kvsSpeed = kvs.double(forKey: "voiceSpeed")
         let storedSpeed = UserDefaults.standard.float(forKey: "voiceSpeed")
-        self.voiceSpeed = storedSpeed > 0 ? storedSpeed : 1.0
+        if kvsSpeed > 0 {
+            self.voiceSpeed = Float(kvsSpeed)
+        } else {
+            self.voiceSpeed = storedSpeed > 0 ? storedSpeed : 1.0
+        }
         self.audioOnly = UserDefaults.standard.bool(forKey: "audioOnly")
         if UserDefaults.standard.object(forKey: "pauseOtherAudioDuringSpeech") == nil {
             self.pauseOtherAudioDuringSpeech = true
@@ -191,8 +237,12 @@ public final class SettingsManager {
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
         #endif
 
-        if let data = UserDefaults.standard.data(forKey: "overlayAppearance"),
+        // Overlay appearance: prefer KVS data, then UserDefaults
+        if let data = kvs.data(forKey: "overlayAppearance"),
            let decoded = try? JSONDecoder().decode(OverlayAppearance.self, from: data) {
+            self.overlayAppearance = decoded
+        } else if let data = UserDefaults.standard.data(forKey: "overlayAppearance"),
+                  let decoded = try? JSONDecoder().decode(OverlayAppearance.self, from: data) {
             self.overlayAppearance = decoded
         } else {
             self.overlayAppearance = OverlayAppearance()
@@ -201,6 +251,9 @@ public final class SettingsManager {
         // Seed KVS if we have a local key but KVS is empty (e.g. first launch after upgrade).
         if !loadedKey.isEmpty {
             KeychainHelper.seedKVSIfNeeded(loadedKey)
+        }
+        if !loadedElevenLabsKey.isEmpty {
+            KeychainHelper.seedElevenLabsKVSIfNeeded(loadedElevenLabsKey)
         }
 
         observeICloudKVSChanges()
@@ -214,26 +267,102 @@ public final class SettingsManager {
             object: NSUbiquitousKeyValueStore.default,
             queue: .main
         ) { [weak self] notification in
-            guard let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String],
-                  changedKeys.contains("openai-api-key") else {
+            guard let changedKeys = notification.userInfo?[NSUbiquitousKeyValueStoreChangedKeysKey] as? [String] else {
                 return
             }
-            let newKey = NSUbiquitousKeyValueStore.default.string(forKey: "openai-api-key")?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let kvs = NSUbiquitousKeyValueStore.default
+
             Task { @MainActor [weak self] in
-                guard let self, newKey != self.openAIAPIKey else { return }
-                // Save locally without triggering didSet's KVS write (already in KVS)
-                do {
-                    if newKey.isEmpty {
-                        try KeychainHelper.deleteAPIKey()
-                    } else {
-                        try KeychainHelper.saveAPIKey(newKey)
+                guard let self else { return }
+
+                // OpenAI API key
+                if changedKeys.contains("openai-api-key") {
+                    let newKey = kvs.string(forKey: "openai-api-key")?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if newKey != self.openAIAPIKey {
+                        do {
+                            if newKey.isEmpty {
+                                try KeychainHelper.deleteAPIKey()
+                            } else {
+                                try KeychainHelper.saveAPIKey(newKey)
+                            }
+                        } catch {
+                            Log.settings.error("Failed to persist iCloud KVS OpenAI key locally: \(error)")
+                        }
+                        self.openAIAPIKey = newKey
+                        Log.settings.info("OpenAI API key updated from iCloud KVS")
                     }
-                } catch {
-                    Log.settings.error("Failed to persist iCloud KVS key locally: \(error)")
                 }
-                self.openAIAPIKey = newKey
-                Log.settings.info("API key updated from iCloud KVS")
+
+                // ElevenLabs API key
+                if changedKeys.contains("elevenlabs-api-key") {
+                    let newKey = kvs.string(forKey: "elevenlabs-api-key")?
+                        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if newKey != self.elevenLabsAPIKey {
+                        do {
+                            if newKey.isEmpty {
+                                try KeychainHelper.deleteElevenLabsAPIKey()
+                            } else {
+                                try KeychainHelper.saveElevenLabsAPIKey(newKey)
+                            }
+                        } catch {
+                            Log.settings.error("Failed to persist iCloud KVS ElevenLabs key locally: \(error)")
+                        }
+                        self.elevenLabsAPIKey = newKey
+                        Log.settings.info("ElevenLabs API key updated from iCloud KVS")
+                    }
+                }
+
+                // Voice engine
+                if changedKeys.contains("voiceEngine"),
+                   let raw = kvs.string(forKey: "voiceEngine"),
+                   let engine = VoiceEngineType(rawValue: raw),
+                   engine != self.voiceEngine {
+                    self.voiceEngine = engine
+                    Log.settings.info("Voice engine updated from iCloud KVS: \(raw)")
+                }
+
+                // OpenAI voice
+                if changedKeys.contains("openAIVoice"),
+                   let voice = kvs.string(forKey: "openAIVoice"),
+                   voice != self.openAIVoice {
+                    self.openAIVoice = voice
+                    Log.settings.info("OpenAI voice updated from iCloud KVS")
+                }
+
+                // ElevenLabs voice ID
+                if changedKeys.contains("elevenLabsVoiceID"),
+                   let voiceID = kvs.string(forKey: "elevenLabsVoiceID"),
+                   voiceID != self.elevenLabsVoiceID {
+                    self.elevenLabsVoiceID = voiceID
+                    Log.settings.info("ElevenLabs voice updated from iCloud KVS")
+                }
+
+                // ElevenLabs turbo
+                if changedKeys.contains("elevenLabsTurbo") {
+                    let turbo = kvs.bool(forKey: "elevenLabsTurbo")
+                    if turbo != self.elevenLabsTurbo {
+                        self.elevenLabsTurbo = turbo
+                        Log.settings.info("ElevenLabs turbo updated from iCloud KVS")
+                    }
+                }
+
+                // Voice speed
+                if changedKeys.contains("voiceSpeed") {
+                    let speed = Float(kvs.double(forKey: "voiceSpeed"))
+                    if speed > 0, speed != self.voiceSpeed {
+                        self.voiceSpeed = speed
+                        Log.settings.info("Voice speed updated from iCloud KVS")
+                    }
+                }
+
+                // Overlay appearance
+                if changedKeys.contains("overlayAppearance"),
+                   let data = kvs.data(forKey: "overlayAppearance"),
+                   let decoded = try? JSONDecoder().decode(OverlayAppearance.self, from: data) {
+                    self.overlayAppearance = decoded
+                    Log.settings.info("Overlay appearance updated from iCloud KVS")
+                }
             }
         }
     }

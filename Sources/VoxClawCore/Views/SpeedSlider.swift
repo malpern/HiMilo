@@ -5,8 +5,12 @@ import AppKit
 
 /// A custom speed slider (0.5x–3.0x) with divots at 1x/2x/3x, snap detents, and haptic feedback.
 /// Built from scratch to guarantee label alignment with the track.
-struct SpeedSlider: View {
+public struct SpeedSlider: View {
     @Binding var speed: Float
+
+    public init(speed: Binding<Float>) {
+        self._speed = speed
+    }
 
     private let minVal: Float = 0.5
     private let maxVal: Float = 3.0
@@ -27,7 +31,7 @@ struct SpeedSlider: View {
         return (raw / step).rounded() * step
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(spacing: 6) {
             GeometryReader { geo in
                 let trackWidth = geo.size.width

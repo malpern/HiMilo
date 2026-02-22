@@ -13,6 +13,16 @@ struct iOSSettingsView: View {
     @State private var showInstructions = false
 
     private let openAIVoices = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]
+    private let elevenLabsVoices: [(id: String, name: String)] = [
+        ("JBFqnCBsd6RMkjVDRZzb", "George"),
+        ("21m00Tcm4TlvDq8ikWAM", "Rachel"),
+        ("pNInz6obpgDQGcFmaJgB", "Adam"),
+        ("ThT5KcBeYPX3keUQqHPh", "Dorothy"),
+        ("2EiwWnXFnvU5JabPnv8n", "Clyde"),
+        ("CYw3kZ02Hs0563khs1Fj", "Dave"),
+        ("D38z5RcWu1voky8WS1ja", "Fin"),
+        ("z9fAnlkpzviPz146aGWa", "Glinda"),
+    ]
 
     var body: some View {
         Form {
@@ -110,8 +120,25 @@ struct iOSSettingsView: View {
             Picker("Engine", selection: $settings.voiceEngine) {
                 Text("Apple").tag(VoiceEngineType.apple)
                 Text("OpenAI").tag(VoiceEngineType.openai)
+                Text("ElevenLabs").tag(VoiceEngineType.elevenlabs)
             }
             .pickerStyle(.segmented)
+            .onChange(of: settings.voiceEngine) { _, newValue in
+                if newValue == .openai && !settings.isOpenAIConfigured {
+                    // Stay on engine; user will enter key inline
+                }
+                if newValue == .elevenlabs && !settings.isElevenLabsConfigured {
+                    // Stay on engine; user will enter key inline
+                }
+            }
+
+            HStack {
+                Text("Speed: \(settings.voiceSpeed, specifier: "%.1f")x")
+                Spacer()
+                SpeedSlider(speed: $settings.voiceSpeed)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: 200)
+            }
 
             if settings.voiceEngine == .openai {
                 Picker("Voice", selection: $settings.openAIVoice) {
@@ -128,12 +155,22 @@ struct iOSSettingsView: View {
                     )
                 }
 
-                apiKeySection
+                openAIKeySection
+            } else if settings.voiceEngine == .elevenlabs {
+                Picker("Voice", selection: $settings.elevenLabsVoiceID) {
+                    ForEach(elevenLabsVoices, id: \.id) { voice in
+                        Text(voice.name).tag(voice.id)
+                    }
+                }
+
+                Toggle("Turbo (faster, cheaper, lower quality)", isOn: $settings.elevenLabsTurbo)
+
+                elevenLabsKeySection
             }
         }
     }
 
-    private var apiKeySection: some View {
+    private var openAIKeySection: some View {
         Group {
             if settings.isOpenAIConfigured {
                 HStack {
@@ -157,6 +194,35 @@ struct iOSSettingsView: View {
                 }
 
                 Link("Get an API key", destination: URL(string: "https://platform.openai.com/api-keys")!)
+                    .font(.caption)
+            }
+        }
+    }
+
+    private var elevenLabsKeySection: some View {
+        Group {
+            if settings.isElevenLabsConfigured {
+                HStack {
+                    Label("API key saved", systemImage: "checkmark.circle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.green)
+                    Spacer()
+                    Button("Remove", role: .destructive) {
+                        settings.elevenLabsAPIKey = ""
+                    }
+                    .font(.caption)
+                }
+            } else {
+                HStack {
+                    SecureField("API key...", text: $settings.elevenLabsAPIKey)
+                    Button("Paste") {
+                        if let clip = UIPasteboard.general.string {
+                            settings.elevenLabsAPIKey = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    }
+                }
+
+                Link("Get an API key", destination: URL(string: "https://elevenlabs.io")!)
                     .font(.caption)
             }
         }

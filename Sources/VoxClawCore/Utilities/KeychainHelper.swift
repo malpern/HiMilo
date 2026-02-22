@@ -224,6 +224,15 @@ public enum KeychainHelper {
         }
     }
 
+    /// Push a local ElevenLabs key to KVS if KVS is currently empty.
+    public static func seedElevenLabsKVSIfNeeded(_ key: String) {
+        guard storageDirectoryOverride == nil else { return }
+        if readElevenLabsFromKVS() == nil {
+            saveElevenLabsToKVS(key)
+            Log.keychain.info("Seeded iCloud KVS with existing local ElevenLabs API key")
+        }
+    }
+
     // MARK: - iCloud KVS
 
     private static func saveToKVS(_ key: String) {
