@@ -7,6 +7,7 @@ import ServiceManagement
 public enum VoiceEngineType: String, CaseIterable, Sendable {
     case apple = "apple"
     case openai = "openai"
+    case elevenlabs = "elevenlabs"
 }
 
 @Observable
@@ -35,6 +36,28 @@ public final class SettingsManager {
 
     public var openAIVoice: String {
         didSet { UserDefaults.standard.set(openAIVoice, forKey: "openAIVoice") }
+    }
+
+    public var elevenLabsAPIKey: String {
+        didSet {
+            do {
+                if elevenLabsAPIKey.isEmpty {
+                    try KeychainHelper.deleteElevenLabsAPIKey()
+                } else {
+                    try KeychainHelper.saveElevenLabsAPIKey(elevenLabsAPIKey)
+                }
+            } catch {
+                Log.settings.error("Failed to persist ElevenLabs API key: \(error)")
+            }
+        }
+    }
+
+    public var elevenLabsVoiceID: String {
+        didSet { UserDefaults.standard.set(elevenLabsVoiceID, forKey: "elevenLabsVoiceID") }
+    }
+
+    public var elevenLabsTurbo: Bool {
+        didSet { UserDefaults.standard.set(elevenLabsTurbo, forKey: "elevenLabsTurbo") }
     }
 
     public var appleVoiceIdentifier: String? {
@@ -121,6 +144,10 @@ public final class SettingsManager {
         !openAIAPIKey.isEmpty
     }
 
+    public var isElevenLabsConfigured: Bool {
+        !elevenLabsAPIKey.isEmpty
+    }
+
     public init() {
         self.voiceEngine = VoiceEngineType(rawValue: UserDefaults.standard.string(forKey: "voiceEngine") ?? "apple") ?? .apple
         // Pull latest from iCloud KVS before reading the key.
@@ -130,6 +157,9 @@ public final class SettingsManager {
         let loadedKey = (try? KeychainHelper.readPersistedAPIKey()) ?? ""
         self.openAIAPIKey = loadedKey
         self.openAIVoice = UserDefaults.standard.string(forKey: "openAIVoice") ?? "onyx"
+        self.elevenLabsAPIKey = (try? KeychainHelper.readPersistedElevenLabsAPIKey()) ?? ""
+        self.elevenLabsVoiceID = UserDefaults.standard.string(forKey: "elevenLabsVoiceID") ?? "JBFqnCBsd6RMkjVDRZzb"
+        self.elevenLabsTurbo = UserDefaults.standard.bool(forKey: "elevenLabsTurbo")
         self.appleVoiceIdentifier = UserDefaults.standard.string(forKey: "appleVoiceIdentifier")
         self.readingStyle = UserDefaults.standard.string(forKey: "readingStyle") ?? ""
         let storedSpeed = UserDefaults.standard.float(forKey: "voiceSpeed")
@@ -221,6 +251,15 @@ public final class SettingsManager {
                 return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
             }
             let primary = OpenAISpeechEngine(apiKey: openAIAPIKey, voice: openAIVoice, speed: voiceSpeed, instructions: instructions)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
+            return FallbackSpeechEngine(primary: primary, fallback: fallback)
+        case .elevenlabs:
+            guard isElevenLabsConfigured else {
+                Log.settings.info("ElevenLabs selected but no API key — falling back to Apple")
+                voiceEngine = .apple
+                return AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
+            }
+            let primary = ElevenLabsSpeechEngine(apiKey: elevenLabsAPIKey, voiceID: elevenLabsVoiceID, speed: voiceSpeed, turbo: elevenLabsTurbo)
             let fallback = AppleSpeechEngine(voiceIdentifier: appleVoiceIdentifier, rate: voiceSpeed)
             return FallbackSpeechEngine(primary: primary, fallback: fallback)
         }

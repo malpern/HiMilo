@@ -60,8 +60,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var authFailureObserver: NSObjectProtocol?
     private var keyMissingObserver: NSObjectProtocol?
+    private var elevenLabsAuthFailureObserver: NSObjectProtocol?
     private var hasShownOpenAIAuthAlert = false
     private var hasShownOpenAIKeyMissingAlert = false
+    private var hasShownElevenLabsAuthAlert = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         authFailureObserver = NotificationCenter.default.addObserver(
@@ -82,6 +84,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.showOpenAIKeyMissingAlert()
+            }
+        }
+
+        elevenLabsAuthFailureObserver = NotificationCenter.default.addObserver(
+            forName: .voxClawElevenLabsAuthFailed,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let message = note.userInfo?[VoxClawNotificationUserInfo.elevenLabsAuthErrorMessage] as? String
+            MainActor.assumeIsolated {
+                self?.showElevenLabsAuthAlert(errorMessage: message)
             }
         }
 
@@ -214,6 +227,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func showElevenLabsAuthAlert(errorMessage: String?) {
+        guard !hasShownElevenLabsAuthAlert else { return }
+        hasShownElevenLabsAuthAlert = true
+
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "ElevenLabs key rejected (HTTP 401)"
+        alert.informativeText = """
+        ElevenLabs rejected your API key, so VoxClaw switched to Apple voice for this read.
+
+        \(errorMessage ?? "Generate a new key at elevenlabs.io, then paste it in VoxClaw Settings.")
+        """
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "OK")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            presentSettingsWindow()
+        }
+    }
+
     private func presentSettingsWindow() {
         if let window = settingsWindow {
             NSApp.activate(ignoringOtherApps: true)
@@ -240,6 +275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 struct VoxClawApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
 
     private var appState: AppState { SharedApp.appState }
     private var coordinator: AppCoordinator { SharedApp.coordinator }
@@ -312,6 +348,10 @@ struct VoxClawApp: App {
                     await coordinator.readText(text, appState: appState, settings: settings)
                 }
             }
+        case "settings":
+            Log.app.info("Opening settings via URL scheme")
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: "settings")
         default:
             Log.app.warning("Unknown URL action: \(components.host ?? "nil")")
         }

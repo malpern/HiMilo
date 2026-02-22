@@ -4,10 +4,12 @@ import SwiftUI
 extension Notification.Name {
     public static let voxClawOpenAIAuthFailed = Notification.Name("voxclaw.openaiAuthFailed")
     public static let voxClawOpenAIKeyMissing = Notification.Name("voxclaw.openaiKeyMissing")
+    public static let voxClawElevenLabsAuthFailed = Notification.Name("voxclaw.elevenLabsAuthFailed")
 }
 
 public enum VoxClawNotificationUserInfo {
     public static let openAIAuthErrorMessage = "openaiAuthErrorMessage"
+    public static let elevenLabsAuthErrorMessage = "elevenLabsAuthErrorMessage"
 }
 
 public enum SessionState: Sendable {

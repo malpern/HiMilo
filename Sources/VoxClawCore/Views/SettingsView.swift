@@ -8,7 +8,10 @@ struct SettingsView: View {
     @State private var copiedAgentHandoff = false
     @State private var showAPIKeySheet = false
     @State private var pendingAPIKey = ""
+    @State private var showElevenLabsKeySheet = false
+    @State private var pendingElevenLabsKey = ""
     @State private var showInstructions = false
+    @State private var testVoiceSending = false
     @State private var voicePreview = VoicePreviewPlayer()
 
     var body: some View {
@@ -19,6 +22,7 @@ struct SettingsView: View {
                 voiceSection
                 controlsSection
                 readOnlyDataSection
+                testSection
             }
             .formStyle(.grouped)
         }
@@ -104,14 +108,20 @@ struct SettingsView: View {
         Section("Voice") {
             Picker("Engine", selection: $settings.voiceEngine) {
                 Text("Apple").tag(VoiceEngineType.apple)
-                Text("OpenAI").tag(VoiceEngineType.openai)
+                Text("OpenAI  $").tag(VoiceEngineType.openai)
+                Text("ElevenLabs  $$").tag(VoiceEngineType.elevenlabs)
             }
             .pickerStyle(.segmented)
             .accessibilityIdentifier(AccessibilityID.Settings.voiceEnginePicker)
+            .help(engineCostTooltip)
             .onChange(of: settings.voiceEngine) { _, newValue in
                 if newValue == .openai && !settings.isOpenAIConfigured {
                     pendingAPIKey = ""
                     showAPIKeySheet = true
+                }
+                if newValue == .elevenlabs && !settings.isElevenLabsConfigured {
+                    pendingElevenLabsKey = ""
+                    showElevenLabsKeySheet = true
                 }
             }
 
@@ -133,7 +143,7 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier(AccessibilityID.Settings.appleVoicePicker)
-            } else {
+            } else if settings.voiceEngine == .openai {
                 Picker("OpenAI Voice", selection: $settings.openAIVoice) {
                     ForEach(openAIVoices, id: \.self) { voice in
                         Text(voice.capitalized).tag(voice)
@@ -166,6 +176,32 @@ struct SettingsView: View {
                     .help("Remove API Key")
                     .accessibilityIdentifier(AccessibilityID.Settings.removeAPIKey)
                 }
+            } else if settings.voiceEngine == .elevenlabs {
+                Picker("ElevenLabs Voice", selection: $settings.elevenLabsVoiceID) {
+                    ForEach(elevenLabsVoices, id: \.id) { voice in
+                        Text(voice.name).tag(voice.id)
+                    }
+                }
+                .accessibilityIdentifier(AccessibilityID.Settings.elevenLabsVoicePicker)
+
+                Toggle("Turbo (2x faster, 3x cheaper, lower quality)", isOn: $settings.elevenLabsTurbo)
+
+                HStack {
+                    (Text("API Key Saved ") + Text(maskedElevenLabsKeySuffix).foregroundColor(.secondary.opacity(0.7)))
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        settings.elevenLabsAPIKey = ""
+                        settings.voiceEngine = .apple
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove API Key")
+                    .accessibilityIdentifier(AccessibilityID.Settings.removeElevenLabsAPIKey)
+                }
             }
         }
         .sheet(isPresented: $showAPIKeySheet, onDismiss: {
@@ -174,6 +210,13 @@ struct SettingsView: View {
             }
         }) {
             apiKeySheet
+        }
+        .sheet(isPresented: $showElevenLabsKeySheet, onDismiss: {
+            if !settings.isElevenLabsConfigured {
+                settings.voiceEngine = .apple
+            }
+        }) {
+            elevenLabsKeySheet
         }
     }
 
@@ -219,8 +262,52 @@ struct SettingsView: View {
         .frame(width: 400)
     }
 
+    private var elevenLabsKeySheet: some View {
+        VStack(spacing: 16) {
+            Text("Enter ElevenLabs API Key")
+                .font(.headline)
+
+            HStack {
+                SecureField("API key...", text: $pendingElevenLabsKey)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier(AccessibilityID.Settings.elevenLabsApiKeyField)
+
+                Button("Paste") {
+                    if let clip = NSPasteboard.general.string(forType: .string) {
+                        pendingElevenLabsKey = clip.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                }
+            }
+
+            Link("Get API key at elevenlabs.io", destination: URL(string: "https://elevenlabs.io")!)
+                .font(.caption)
+
+            HStack(spacing: 12) {
+                Button("Cancel") {
+                    showElevenLabsKeySheet = false
+                }
+                .keyboardShortcut(.cancelAction)
+
+                Button("Save") {
+                    settings.elevenLabsAPIKey = pendingElevenLabsKey
+                    showElevenLabsKeySheet = false
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(pendingElevenLabsKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 400)
+    }
+
     private var maskedAPIKeySuffix: String {
         let key = settings.openAIAPIKey
+        guard key.count >= 4 else { return "..." }
+        return String(key.suffix(4))
+    }
+
+    private var maskedElevenLabsKeySuffix: String {
+        let key = settings.elevenLabsAPIKey
         guard key.count >= 4 else { return "..." }
         return String(key.suffix(4))
     }
@@ -243,6 +330,35 @@ struct SettingsView: View {
                 .accessibilityIdentifier(AccessibilityID.Settings.launchAtLoginToggle)
             Toggle("Remember overlay position", isOn: $settings.rememberOverlayPosition)
                 .accessibilityIdentifier(AccessibilityID.Settings.rememberOverlayPositionToggle)
+        }
+    }
+
+    private var testSection: some View {
+        Section {
+            Button {
+                let quote = douglasAdamsQuotes.randomElement()!
+                testVoiceSending = true
+                Task {
+                    let url = URL(string: "http://localhost:\(settings.networkListenerPort)/read")!
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
+                    _ = try? await URLSession.shared.data(for: request)
+                    try? await Task.sleep(for: .seconds(0.5))
+                    testVoiceSending = false
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if testVoiceSending {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text("Test Voice")
+                }
+            }
+            .disabled(!settings.networkListenerEnabled || testVoiceSending)
+            .help(settings.networkListenerEnabled ? "Send a random quote through the overlay" : "Enable Network Listener first")
         }
     }
 
@@ -318,6 +434,45 @@ struct SettingsView: View {
         """
     }
 
+    private var engineCostTooltip: String {
+        switch settings.voiceEngine {
+        case .apple:
+            return "Free on-device voice"
+        case .openai:
+            return "gpt-4o-mini-tts \u{00b7} ~$0.15 per 10K characters"
+        case .elevenlabs:
+            return settings.elevenLabsTurbo
+                ? "eleven_turbo_v2_5 \u{00b7} ~$0.60 per 10K characters (varies by plan)"
+                : "eleven_multilingual_v2 \u{00b7} ~$1.80 per 10K characters (varies by plan)"
+        }
+    }
+
+    private let douglasAdamsQuotes = [
+        "The ships hung in the sky in much the same way that bricks don't.",
+        "Time is an illusion. Lunchtime doubly so.",
+        "I love deadlines. I love the whooshing noise they make as they go by.",
+        "Don't Panic.",
+        "A common mistake that people make when trying to design something completely foolproof is to underestimate the ingenuity of complete fools.",
+        "In the beginning the Universe was created. This has made a lot of people very angry and been widely regarded as a bad move.",
+        "I may not have gone where I intended to go, but I think I have ended up where I needed to be.",
+        "The answer to the ultimate question of life, the universe and everything is 42.",
+        "For a moment, nothing happened. Then, after a second or so, nothing continued to happen.",
+        "Anyone who is capable of getting themselves made President should on no account be allowed to do the job.",
+        "He felt that his whole life was some kind of dream and he sometimes wondered whose it was and whether they were enjoying it.",
+        "Flying is learning how to throw yourself at the ground and miss.",
+    ]
+
     private let openAIVoices = ["alloy", "ash", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer"]
+
+    private let elevenLabsVoices: [(id: String, name: String)] = [
+        ("JBFqnCBsd6RMkjVDRZzb", "George"),
+        ("21m00Tcm4TlvDq8ikWAM", "Rachel"),
+        ("pNInz6obpgDQGcFmaJgB", "Adam"),
+        ("ThT5KcBeYPX3keUQqHPh", "Dorothy"),
+        ("2EiwWnXFnvU5JabPnv8n", "Clyde"),
+        ("CYw3kZ02Hs0563khs1Fj", "Dave"),
+        ("D38z5RcWu1voky8WS1ja", "Fin"),
+        ("z9fAnlkpzviPz146aGWa", "Glinda"),
+    ]
 }
 #endif

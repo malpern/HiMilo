@@ -14,6 +14,7 @@ public enum KeychainHelper {
     }
 
     private static let kvsKey = "openai-api-key"
+    private static let elevenLabsKvsKey = "elevenlabs-api-key"
 
     private static var storageDirectory: URL {
         if let override = storageDirectoryOverride { return override }
@@ -23,6 +24,10 @@ public enum KeychainHelper {
 
     private static var apiKeyFileURL: URL {
         storageDirectory.appendingPathComponent("api-key")
+    }
+
+    private static var elevenLabsKeyFileURL: URL {
+        storageDirectory.appendingPathComponent("elevenlabs-api-key")
     }
 
     enum KeychainError: Error, CustomStringConvertible {
@@ -91,6 +96,97 @@ public enum KeychainHelper {
             Log.keychain.info("API key deleted from file storage")
         }
         removeFromKVS()
+    }
+
+    // MARK: - ElevenLabs API Key
+
+    /// Reads ElevenLabs API key, checking the `ELEVENLABS_API_KEY` env var first, then file storage.
+    public static func readElevenLabsAPIKey() throws -> String {
+        if let envKey = ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"]
+            .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }),
+           !envKey.isEmpty {
+            Log.keychain.info("ElevenLabs API key sourced from ELEVENLABS_API_KEY env var")
+            return envKey
+        }
+        return try readPersistedElevenLabsAPIKey()
+    }
+
+    public static func readPersistedElevenLabsAPIKey() throws -> String {
+        // 1. Try file storage
+        if let key = readElevenLabsFromFile() {
+            return key
+        }
+
+        // 2. Try iCloud KVS as fallback (skip in test mode)
+        if storageDirectoryOverride == nil, let key = readElevenLabsFromKVS() {
+            try? saveElevenLabsToFile(key)
+            Log.keychain.info("ElevenLabs API key restored from iCloud KVS")
+            return key
+        }
+
+        throw KeychainError.notFound
+    }
+
+    public static func saveElevenLabsAPIKey(_ key: String) throws {
+        try saveElevenLabsToFile(key)
+        saveElevenLabsToKVS(key)
+    }
+
+    public static func deleteElevenLabsAPIKey() throws {
+        let fileURL = elevenLabsKeyFileURL
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+            Log.keychain.info("ElevenLabs API key deleted from file storage")
+        }
+        removeElevenLabsFromKVS()
+    }
+
+    private static func saveElevenLabsToFile(_ key: String) throws {
+        let dir = storageDirectory
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fileURL = elevenLabsKeyFileURL
+        try key.write(to: fileURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
+        Log.keychain.info("ElevenLabs API key saved to file storage")
+    }
+
+    private static func readElevenLabsFromFile() -> String? {
+        let fileURL = elevenLabsKeyFileURL
+        guard let data = FileManager.default.contents(atPath: fileURL.path),
+              let raw = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return nil }
+        Log.keychain.info("ElevenLabs API key sourced from file storage")
+        return key
+    }
+
+    private static func saveElevenLabsToKVS(_ key: String) {
+        guard storageDirectoryOverride == nil else { return }
+        NSUbiquitousKeyValueStore.default.set(key, forKey: elevenLabsKvsKey)
+        NSUbiquitousKeyValueStore.default.synchronize()
+        Log.keychain.info("ElevenLabs API key synced to iCloud KVS")
+    }
+
+    private static func readElevenLabsFromKVS() -> String? {
+        NSUbiquitousKeyValueStore.default.synchronize()
+        guard let raw = NSUbiquitousKeyValueStore.default.string(forKey: elevenLabsKvsKey) else {
+            return nil
+        }
+        let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return nil }
+        return key
+    }
+
+    private static func removeElevenLabsFromKVS() {
+        guard storageDirectoryOverride == nil else { return }
+        NSUbiquitousKeyValueStore.default.removeObject(forKey: elevenLabsKvsKey)
+        NSUbiquitousKeyValueStore.default.synchronize()
+        Log.keychain.info("ElevenLabs API key removed from iCloud KVS")
     }
 
     // MARK: - File Storage

@@ -31,10 +31,16 @@ struct FloatingPanelView: View {
                                 word: appState.words[index],
                                 isHighlighted: index == appState.currentWordIndex,
                                 isPast: index < appState.currentWordIndex,
-                                appearance: appearance,
-                                timingSource: appState.timingSource
+                                isPaused: appState.isPaused,
+                                appearance: appearance
                             )
                             .id(index)
+                        }
+                        if !appState.words.isEmpty {
+                            Text("🦀")
+                                .font(.custom(appearance.fontFamily, size: appearance.fontSize))
+                                .opacity(appearance.futureWordOpacity)
+                                .id("crab")
                         }
                     }
                     .padding(.horizontal, appearance.horizontalPadding)
@@ -57,6 +63,23 @@ struct FloatingPanelView: View {
                         .padding(.trailing, 12)
                         .padding(.bottom, 12)
                 }
+            }
+
+            // Timing source indicator — small dot visible during early heuristic, fades when better algo arrives
+            if appState.timingSource == .cadence || appState.timingSource == .aligner {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(.white.opacity(0.25))
+                            .frame(width: 5, height: 5)
+                            .padding(.trailing, 10)
+                            .padding(.bottom, 10)
+                    }
+                }
+                .transition(.opacity)
+                .animation(.easeOut(duration: 0.5), value: appState.timingSource)
             }
 
             // Subtle progress bar at the very bottom, respecting corner radius
@@ -153,8 +176,12 @@ private struct WordView: View {
     let word: String
     let isHighlighted: Bool
     let isPast: Bool
+    var isPaused: Bool = false
     let appearance: OverlayAppearance
-    var timingSource: TimingSource = .cadence
+
+    @State private var glowRadius: CGFloat = 3
+
+    private var highlightColor: Color { appearance.highlightColor.color }
 
     var body: some View {
         Text(word)
@@ -163,23 +190,37 @@ private struct WordView: View {
             .padding(.horizontal, 4)
             .padding(.vertical, 2)
             .background(
-                Group {
-                    if isHighlighted {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(debugHighlightColor)
-                    }
-                }
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(highlightColor)
+                    .opacity(isHighlighted ? 1 : 0)
+                    .shadow(color: highlightColor.opacity(isHighlighted ? 0.4 : 0), radius: glowRadius)
             )
+            .animation(.easeInOut(duration: 0.12), value: isHighlighted)
+            .onChange(of: isPaused) { _, paused in
+                if paused && isHighlighted {
+                    startBreathe()
+                } else {
+                    stopBreathe()
+                }
+            }
+            .onChange(of: isHighlighted) { _, highlighted in
+                if highlighted && isPaused {
+                    startBreathe()
+                } else if !highlighted {
+                    stopBreathe()
+                }
+            }
     }
 
-    /// Debug: different highlight colors per timing source.
-    /// Red = cadence heuristic, orange = aligner partial, green = proportional, blue = final aligned.
-    private var debugHighlightColor: Color {
-        switch timingSource {
-        case .cadence: return .red.opacity(0.7)
-        case .aligner: return .orange.opacity(0.7)
-        case .proportional: return .green.opacity(0.7)
-        case .aligned: return .blue.opacity(0.7)
+    private func startBreathe() {
+        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+            glowRadius = 8
+        }
+    }
+
+    private func stopBreathe() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            glowRadius = 3
         }
     }
 
