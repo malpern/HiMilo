@@ -241,6 +241,8 @@ struct SettingsView: View {
                 .accessibilityIdentifier(AccessibilityID.Settings.networkListenerToggle)
             Toggle("Launch at Login", isOn: $settings.launchAtLogin)
                 .accessibilityIdentifier(AccessibilityID.Settings.launchAtLoginToggle)
+            Toggle("Remember overlay position", isOn: $settings.rememberOverlayPosition)
+                .accessibilityIdentifier(AccessibilityID.Settings.rememberOverlayPositionToggle)
         }
     }
 

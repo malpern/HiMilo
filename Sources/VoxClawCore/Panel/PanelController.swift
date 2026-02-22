@@ -33,8 +33,18 @@ final class PanelController {
         let cornerRadius = appearance.cornerRadius
         let topPadding: CGFloat = 8
 
-        let panelX = screenFrame.midX - panelWidth / 2
-        let panelY = screenFrame.maxY - panelHeight - topPadding
+        let defaultX = screenFrame.midX - panelWidth / 2
+        let defaultY = screenFrame.maxY - panelHeight - topPadding
+
+        let panelX: CGFloat
+        let panelY: CGFloat
+        if settings.rememberOverlayPosition, let saved = settings.savedOverlayOrigin {
+            panelX = saved.x
+            panelY = saved.y
+        } else {
+            panelX = defaultX
+            panelY = defaultY
+        }
 
         let wordCount = appState.words.count
         let font = appearance.fontFamily
@@ -95,6 +105,10 @@ final class PanelController {
         guard let panel else {
             Log.panel.info("dismiss: no panel to dismiss")
             return
+        }
+
+        if settings.rememberOverlayPosition {
+            settings.savedOverlayOrigin = panel.frame.origin
         }
 
         let frame = panel.frame

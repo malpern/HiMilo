@@ -7,6 +7,9 @@ final class FloatingPanel: NSPanel {
     var onSpeedUp: (() -> Void)?
     var onSpeedDown: (() -> Void)?
 
+    private var initialMouseLocation: NSPoint = .zero
+    private var initialWindowOrigin: NSPoint = .zero
+
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -30,6 +33,19 @@ final class FloatingPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        makeKey()
+        initialMouseLocation = NSEvent.mouseLocation
+        initialWindowOrigin = frame.origin
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let current = NSEvent.mouseLocation
+        let dx = current.x - initialMouseLocation.x
+        let dy = current.y - initialMouseLocation.y
+        setFrameOrigin(NSPoint(x: initialWindowOrigin.x + dx, y: initialWindowOrigin.y + dy))
+    }
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {

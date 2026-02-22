@@ -36,6 +36,7 @@ enum AccessibilityID {
         static let pauseOtherAudioToggle = "settings.pauseOtherAudioToggle"
         static let audioOnlyToggle = "settings.audioOnlyToggle"
         static let launchAtLoginToggle = "settings.launchAtLoginToggle"
+        static let rememberOverlayPositionToggle = "settings.rememberOverlayPositionToggle"
     }
 
     enum Appearance {

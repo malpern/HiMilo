@@ -69,6 +69,22 @@ public final class SettingsManager {
         didSet { UserDefaults.standard.set(backgroundKeepAlive, forKey: "backgroundKeepAlive") }
     }
 
+    public var rememberOverlayPosition: Bool {
+        didSet { UserDefaults.standard.set(rememberOverlayPosition, forKey: "rememberOverlayPosition") }
+    }
+
+    public var savedOverlayOrigin: NSPoint? {
+        didSet {
+            if let origin = savedOverlayOrigin {
+                UserDefaults.standard.set(origin.x, forKey: "savedOverlayOriginX")
+                UserDefaults.standard.set(origin.y, forKey: "savedOverlayOriginY")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "savedOverlayOriginX")
+                UserDefaults.standard.removeObject(forKey: "savedOverlayOriginY")
+            }
+        }
+    }
+
     public var hasCompletedOnboarding: Bool {
         didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: "hasCompletedOnboarding") }
     }
@@ -132,6 +148,14 @@ public final class SettingsManager {
             self.backgroundKeepAlive = true
         } else {
             self.backgroundKeepAlive = UserDefaults.standard.bool(forKey: "backgroundKeepAlive")
+        }
+        self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
+        if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
+            let x = UserDefaults.standard.double(forKey: "savedOverlayOriginX")
+            let y = UserDefaults.standard.double(forKey: "savedOverlayOriginY")
+            self.savedOverlayOrigin = NSPoint(x: x, y: y)
+        } else {
+            self.savedOverlayOrigin = nil
         }
         #if os(macOS)
         self.launchAtLogin = SMAppService.mainApp.status == .enabled
