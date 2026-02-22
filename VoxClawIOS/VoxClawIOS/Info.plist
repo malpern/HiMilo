@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>VoxClaw listens for text-to-speech requests from your Mac over the local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_voxclaw._tcp</string>
+	</array>
+</dict>
+</plist>
