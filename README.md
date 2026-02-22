@@ -20,11 +20,11 @@
 
 [OpenClaw](https://github.com/openclaw/openclaw) is the open-source personal AI assistant that runs on your devices — your files, your shell, your messaging apps (WhatsApp, Telegram, Slack, Discord, and more). It lives where you work. **VoxClaw gives it a voice.**
 
-Run VoxClaw on your Mac and hear OpenClaw speak to you. When OpenClaw runs on another computer — a server, a headless box, or a different machine — send text to your Mac over the network and VoxClaw speaks it aloud with high-quality text-to-speech. Apple's built-in voices work out of the box; add your own OpenAI API key for neural voices when you want that extra polish. Paste text, pipe from the CLI, or stream from any device on your LAN — and listen.
+Run VoxClaw on your Mac and hear OpenClaw speak to you. When OpenClaw runs on another computer — a server, a headless box, or a different machine — send text to your Mac over the network and VoxClaw speaks it aloud with high-quality text-to-speech. Apple's built-in voices work out of the box; add your own OpenAI or ElevenLabs API key for neural voices when you want that extra polish. Paste text, pipe from the CLI, or stream from any device on your LAN — and listen.
 
 ---
 
-A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while displaying a teleprompter-style floating overlay with synchronized word highlighting.
+A macOS menu bar app + CLI tool that reads text aloud using Apple TTS (default), OpenAI TTS (BYOK), or ElevenLabs TTS (BYOK), with an optional teleprompter-style floating overlay and synchronized word highlighting.
 
 ## Screenshots
 
@@ -38,22 +38,23 @@ A macOS menu bar app + CLI tool that reads text aloud using OpenAI TTS while dis
 
 ## Features
 
-- **Onboarding Wizard** — First-run setup walks you through voice selection, API key, agent location, and launch at login
-- **Teleprompter Overlay** — Dynamic Island-style floating panel at the top of your screen with word-by-word highlighting synced to audio
-- **Two Voice Engines** — OpenAI neural voices (bring your own API key) or Apple's built-in TTS with zero setup
-- **Multiple Input Methods** — Text from arguments, stdin pipe, file, clipboard, or network
-- **Menu Bar App** — Lives in your menu bar, paste and read anytime
-- **CLI Tool** — Launch from terminal via `voxclaw`
-- **Network Mode** — Accept text from other devices on your local network via HTTP
-- **URL Scheme** — Trigger from any app with `voxclaw://read?text=...`
-- **Keyboard Controls** — Space (pause/resume), Escape (stop), Arrow keys (skip ±3s)
+- **Onboarding + Agent Handoff** — First-run setup configures voice, key, network mode, and launch at login, and can copy a `🦞 VoxClaw setup pointer` for your agent
+- **Teleprompter Overlay** — Floating overlay with word-by-word highlighting synced to speech; includes presets, deep appearance controls, and audio-only mode
+- **Three Voice Engines** — Apple (no setup), OpenAI (BYOK), or ElevenLabs (BYOK), with Apple fallback when cloud auth fails
+- **Multiple Input Methods** — Arguments, stdin pipe, file, clipboard, URL scheme, and LAN HTTP
+- **Network API for Agents** — `POST /read`, `GET /status`, and `GET /claw`, with request validation and structured status payloads
+- **Bonjour Discovery** — Advertises `_voxclaw._tcp` on LAN for peer/device discovery
+- **Menu Bar App + CLI** — Lightweight menu bar controls plus full terminal control via `voxclaw`
+- **macOS Services Integration** — Read selected text from other apps via Services
+- **Keyboard Controls While Reading** — Space (pause/resume), Escape (stop), Arrow keys (skip ±3s)
 
 ## Installation
 
 ### Prerequisites
 
 - macOS 26+
-- OpenAI API key (optional — Apple's built-in voices work without one)
+- OpenAI API key (optional)
+- ElevenLabs API key (optional)
 
 The onboarding wizard walks you through setup on first launch. To store an API key manually:
 
@@ -121,6 +122,9 @@ curl -X POST http://your-mac-ip:4140/read -d 'Hello from my phone'
 
 # Health check (returns reading state, session state, word count)
 curl http://your-mac-ip:4140/status
+
+# Easter egg / connectivity check
+curl http://your-mac-ip:4140/claw
 ```
 
 Cross-machine tip: use the Mac's numeric LAN IP only (for example `http://192.168.1.50:4140`) unless a human explicitly tells your agent to use a specific `.local` hostname.
@@ -139,6 +143,9 @@ Reliable bring-up order:
 # URL scheme — trigger from any app or script
 open "voxclaw://read?text=Hello%20world"
 
+# Open settings window
+open "voxclaw://settings"
+
 # Services menu — select text in any app, right-click > Services > Read with VoxClaw
 
 # Shortcuts / Siri
@@ -149,13 +156,11 @@ shortcuts run "Read with VoxClaw"
 
 When launched without arguments, VoxClaw runs as a menu bar app with:
 
-- **Paste & Read** (⌘⇧V) — Read text from clipboard
-- **Read from File...** — Open a text file to read
-- **Network Listener** — Toggle listening for text from LAN devices
-- **Audio Only Mode** — Toggle overlay on/off
+- **Read Clipboard** (⌘⇧V) — Read text from clipboard
 - **Pause/Resume** — When actively reading
 - **Stop** — Cancel current reading
-- **Settings** — Voice engine, API key, launch at login
+- **Settings...** (⌘,) — Configure voice, overlay, controls, and network listener
+- **About VoxClaw**
 - **Quit** (⌘Q)
 
 ### Keyboard Controls (while reading)
@@ -194,23 +199,25 @@ GitHub Actions runs on every push to `main` and on pull requests. See `.github/w
 Swift Package Manager with a library target (`VoxClawCore`) and thin executable (`VoxClaw`):
 
 ```
-Input (args/stdin/file/clipboard/network)
-  → InputResolver resolves to String
+Input (args/stdin/file/clipboard/url/network)
+  → InputResolver resolves text
   → ReadingSession orchestrator
-  → TTSService streams PCM from OpenAI API
+  → SpeechEngine (Apple | OpenAI | ElevenLabs, with fallback support)
   → AudioPlayer schedules AVAudioEngine buffers
-  → WordTimingEstimator maps playback position → word index
-  → FloatingPanelView highlights current word
-  → Panel collapses when done
+  → Timing pipeline (cadence/proportional/aligned) maps playback position → word index
+  → FloatingPanelView highlights current word (or audio-only mode)
+  → Session ends / panel collapses
 ```
 
 **Tech Stack:**
 - Swift 6.2 with strict concurrency
 - SwiftUI + NSPanel for floating overlay
 - AVAudioEngine for low-latency audio playback
-- OpenAI TTS API (`gpt-4o-mini-tts`, `onyx` voice, raw PCM streaming) + Apple AVSpeechSynthesizer fallback
+- Apple AVSpeechSynthesizer + OpenAI TTS API (`gpt-4o-mini-tts`) + ElevenLabs TTS API
+- Multi-stage word timing (cadence, proportional, and aligned timestamps when available)
 - Swift Argument Parser for CLI
 - NWListener (Network.framework) for LAN text input
+- Bonjour service advertisement (`_voxclaw._tcp`) for discovery
 - Keychain Services for secure API key storage
 
 ## For Agents
