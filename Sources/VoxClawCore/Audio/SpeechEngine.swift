@@ -14,9 +14,14 @@ public enum SpeechEngineState: Sendable {
 @MainActor
 public protocol SpeechEngineDelegate: AnyObject {
     func speechEngine(_ engine: any SpeechEngine, didUpdateWordIndex index: Int)
+    func speechEngine(_ engine: any SpeechEngine, didChangeTimingSource source: TimingSource)
     func speechEngineDidFinish(_ engine: any SpeechEngine)
     func speechEngine(_ engine: any SpeechEngine, didChangeState state: SpeechEngineState)
     func speechEngine(_ engine: any SpeechEngine, didEncounterError error: Error)
+}
+
+extension SpeechEngineDelegate {
+    public func speechEngine(_ engine: any SpeechEngine, didChangeTimingSource source: TimingSource) {}
 }
 
 /// Abstraction over any TTS backend (Apple Speech or OpenAI).

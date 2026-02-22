@@ -68,6 +68,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleSupportedPlatforms</key>
     <array><string>MacOSX</string></array>
     <key>NSHumanReadableCopyright</key><string>Copyright 2026 Michael Alpern. All rights reserved.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>VoxClaw uses on-device speech recognition to synchronize word highlighting with audio playback.</string>
     <key>BuildTimestamp</key><string>${BUILD_TIMESTAMP}</string>
     <key>GitCommit</key><string>${GIT_COMMIT}</string>
     <key>CFBundleURLTypes</key>

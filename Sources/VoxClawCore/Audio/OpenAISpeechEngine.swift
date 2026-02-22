@@ -17,6 +17,10 @@ public final class OpenAISpeechEngine: SpeechEngine {
     private var aligner: SpeechAligner?
     private var words: [String] = []
     private var displayLink: Timer?
+    private var playbackStartTime: ContinuousClock.Instant?
+    private var loggedAlignerSwitch = false
+    private var streamComplete = false
+    private var finalTimingsSource: TimingSource = .cadence
 
     public init(apiKey: String, voice: String = "onyx", speed: Float = 1.0, instructions: String? = nil) {
         self.apiKey = apiKey
@@ -29,6 +33,9 @@ public final class OpenAISpeechEngine: SpeechEngine {
         self.words = words
         self.originalSpeed = speed
         self.finalTimings = nil
+        self.loggedAlignerSwitch = false
+        self.playbackStartTime = nil
+        self.streamComplete = false
         state = .loading
         delegate?.speechEngine(self, didChangeState: .loading)
 
@@ -54,6 +61,7 @@ public final class OpenAISpeechEngine: SpeechEngine {
 
                 if chunksBuffered == prebufferCount {
                     player.play()
+                    playbackStartTime = .now
                     state = .playing
                     delegate?.speechEngine(self, didChangeState: .playing)
                     startDisplayLink()
@@ -62,27 +70,34 @@ public final class OpenAISpeechEngine: SpeechEngine {
 
             if chunksBuffered < prebufferCount {
                 player.play()
+                playbackStartTime = .now
                 state = .playing
                 delegate?.speechEngine(self, didChangeState: .playing)
                 startDisplayLink()
             }
+            streamComplete = true
             aligner?.finishAudio()
 
-            // Wait for final aligned timings, then lock them in.
+            // Stream is done — immediately set proportional timings based on known duration.
+            // This replaces the cadence heuristic even before aligner finishes.
             let realDuration = player.totalDuration
+            if realDuration > 0 {
+                let proportionalTimings = WordTimingEstimator.estimate(words: words, totalDuration: realDuration)
+                if finalTimings == nil {
+                    finalTimings = proportionalTimings
+                    finalTimingsSource = .proportional
+                    Log.tts.info("Set proportional timings from stream duration (\(realDuration, privacy: .public)s)")
+                }
+            }
+            // If aligner is available, wait for aligned timings to upgrade the estimate.
             if let aligner, aligner.isAvailable {
                 await aligner.awaitCompletion(timeout: 3.0)
                 let alignedTimings = aligner.timings
                 if !alignedTimings.isEmpty {
-                    Log.tts.info("Final aligned timings: \(alignedTimings.count) words")
+                    Log.tts.info("Upgraded to aligned timings: \(alignedTimings.count) words")
                     finalTimings = alignedTimings
-                } else if realDuration > 0 {
-                    Log.tts.info("Aligner empty, using duration heuristic (\(realDuration, privacy: .public)s)")
-                    finalTimings = WordTimingEstimator.estimate(words: words, totalDuration: realDuration)
+                    finalTimingsSource = .aligned
                 }
-            } else if realDuration > 0 {
-                Log.tts.info("Aligner unavailable, using duration heuristic (\(realDuration, privacy: .public)s)")
-                finalTimings = WordTimingEstimator.estimate(words: words, totalDuration: realDuration)
             }
 
             player.scheduleEnd { [weak self] in
@@ -138,18 +153,35 @@ public final class OpenAISpeechEngine: SpeechEngine {
         displayLink = nil
     }
 
+    private var lastReportedTimingSource: TimingSource?
+
     private func updateWordHighlight() {
         guard case .playing = state else { return }
         let currentTime = audioPlayer?.currentTime ?? 0
 
         // Priority: final timings > progressive aligner timings > cadence heuristic
         let activeTimings: [WordTiming]
+        let source: TimingSource
         if let final = finalTimings {
+            source = finalTimingsSource
             activeTimings = final
         } else if let partial = aligner?.timings, !partial.isEmpty {
+            if !loggedAlignerSwitch, let start = playbackStartTime {
+                let elapsed = ContinuousClock.now - start
+                let elapsedMs = elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000
+                Log.tts.info("⏱ Switched to aligner timings after \(elapsedMs)ms of playback (\(partial.count) words)")
+                loggedAlignerSwitch = true
+            }
+            source = .aligner
             activeTimings = partial
         } else {
+            source = .cadence
             activeTimings = cadenceTimings
+        }
+
+        if source != lastReportedTimingSource {
+            lastReportedTimingSource = source
+            delegate?.speechEngine(self, didChangeTimingSource: source)
         }
 
         let index = WordTimingEstimator.wordIndex(at: currentTime, in: activeTimings)

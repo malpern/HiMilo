@@ -55,6 +55,11 @@ public final class FallbackSpeechEngine: SpeechEngine, SpeechEngineDelegate {
         delegate?.speechEngine(self, didUpdateWordIndex: index)
     }
 
+    public func speechEngine(_ engine: any SpeechEngine, didChangeTimingSource source: TimingSource) {
+        guard isActive(engine) else { return }
+        delegate?.speechEngine(self, didChangeTimingSource: source)
+    }
+
     public func speechEngineDidFinish(_ engine: any SpeechEngine) {
         guard isActive(engine) else { return }
         state = .finished

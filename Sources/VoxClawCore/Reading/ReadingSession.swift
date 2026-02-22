@@ -137,6 +137,10 @@ public final class ReadingSession: SpeechEngineDelegate {
         }
     }
 
+    public func speechEngine(_ engine: any SpeechEngine, didChangeTimingSource source: TimingSource) {
+        appState.timingSource = source
+    }
+
     public func speechEngineDidFinish(_ engine: any SpeechEngine) {
         let finalized = isFinalized
         Log.session.info("speechEngineDidFinish: isFinalized=\(finalized, privacy: .public)")
@@ -225,7 +229,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         appState.speedIndicatorText = text
         speedIndicatorTask?.cancel()
         speedIndicatorTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(1500))
+            try? await Task.sleep(for: .milliseconds(5000))
             if self?.appState.speedIndicatorText == text {
                 self?.appState.speedIndicatorText = nil
             }

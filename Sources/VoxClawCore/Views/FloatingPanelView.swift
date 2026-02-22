@@ -23,7 +23,8 @@ struct FloatingPanelView: View {
                                 word: appState.words[index],
                                 isHighlighted: index == appState.currentWordIndex,
                                 isPast: index < appState.currentWordIndex,
-                                appearance: appearance
+                                appearance: appearance,
+                                timingSource: appState.timingSource
                             )
                             .id(index)
                         }
@@ -114,6 +115,7 @@ private struct WordView: View {
     let isHighlighted: Bool
     let isPast: Bool
     let appearance: OverlayAppearance
+    var timingSource: TimingSource = .cadence
 
     var body: some View {
         Text(word)
@@ -125,10 +127,21 @@ private struct WordView: View {
                 Group {
                     if isHighlighted {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(appearance.highlightColor.color)
+                            .fill(debugHighlightColor)
                     }
                 }
             )
+    }
+
+    /// Debug: different highlight colors per timing source.
+    /// Red = cadence heuristic, orange = aligner partial, green = proportional, blue = final aligned.
+    private var debugHighlightColor: Color {
+        switch timingSource {
+        case .cadence: return .red.opacity(0.7)
+        case .aligner: return .orange.opacity(0.7)
+        case .proportional: return .green.opacity(0.7)
+        case .aligned: return .blue.opacity(0.7)
+        }
     }
 
     private var textColor: Color {

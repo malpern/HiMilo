@@ -23,6 +23,7 @@ final class SpeechAligner: @unchecked Sendable {
 
     private let _timings = Mutex<[WordTiming]>([])
     private let _isFinished = Mutex(false)
+    private let creationTime = ContinuousClock.now
 
     /// Progressively updated word timings from speech recognition.
     var timings: [WordTiming] {
@@ -88,21 +89,42 @@ final class SpeechAligner: @unchecked Sendable {
             return
         }
 
+        let authStatus = SFSpeechRecognizer.authorizationStatus()
+        Log.tts.info("Speech recognizer auth status: \(authStatus.rawValue, privacy: .public), isAvailable: \(recognizer.isAvailable)")
+
+        if authStatus == .denied || authStatus == .restricted {
+            Log.tts.warning("Speech recognition denied/restricted (status=\(authStatus.rawValue, privacy: .public)), will use heuristic timings")
+            _isFinished.withLock { $0 = true }
+            return
+        }
+
+        // For .notDetermined, proceed — the recognition task will trigger the system auth dialog.
+        // For .authorized, proceed normally.
         recognitionTask = recognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
             guard let self else { return }
 
             if let result {
                 let aligned = self.align(transcription: result.bestTranscription)
+                let isFirstResult = self._timings.withLock { $0.isEmpty }
                 self._timings.withLock { $0 = aligned }
 
+                let elapsed = ContinuousClock.now - self.creationTime
+                let elapsedMs = elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000
+                if isFirstResult && !aligned.isEmpty {
+                    Log.tts.info("⏱ First partial alignment: \(aligned.count) words after \(elapsedMs)ms")
+                }
+
                 if result.isFinal {
-                    Log.tts.info("Speech alignment complete: \(aligned.count) words aligned")
+                    Log.tts.info("Speech alignment complete: \(aligned.count) words aligned after \(elapsedMs)ms")
                     self._isFinished.withLock { $0 = true }
                 }
             }
 
             if let error {
-                Log.tts.warning("Speech recognition error: \(error.localizedDescription)")
+                let desc = error.localizedDescription
+                let code = (error as NSError).code
+                let domain = (error as NSError).domain
+                Log.tts.warning("Speech recognition error: \(desc, privacy: .public) (code=\(code), domain=\(domain, privacy: .public))")
                 self._isFinished.withLock { $0 = true }
             }
         }

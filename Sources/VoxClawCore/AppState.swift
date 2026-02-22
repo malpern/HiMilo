@@ -18,6 +18,14 @@ public enum SessionState: Sendable {
     case finished
 }
 
+/// Which timing algorithm is currently driving word highlighting.
+public enum TimingSource: Sendable {
+    case cadence      // Fixed per-character estimate (initial)
+    case aligner      // On-device speech recognition partial results
+    case proportional // Duration-proportional heuristic (stream complete)
+    case aligned      // Final aligned timings from speech recognizer
+}
+
 @Observable
 @MainActor
 public final class AppState {
@@ -29,6 +37,7 @@ public final class AppState {
     public var isListening: Bool = false
     public var feedbackText: String? = nil
     public var speedIndicatorText: String? = nil
+    public var timingSource: TimingSource = .cadence
     public var inputText: String = ""
     public var autoClosedInstancesOnLaunch: Int = 0
 
@@ -50,6 +59,7 @@ public final class AppState {
         isPaused = false
         feedbackText = nil
         speedIndicatorText = nil
+        timingSource = .cadence
         inputText = ""
     }
 }

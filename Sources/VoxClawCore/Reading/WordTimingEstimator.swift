@@ -89,12 +89,12 @@ enum WordTimingEstimator {
     }
 
     /// Per-word cadence estimate for immediate highlighting before real timings are available.
-    /// Optimized for accuracy in the first ~5 seconds rather than full-passage accuracy.
+    /// Tuned to match typical OpenAI TTS timing (~150 wpm at 1x, ~60ms/char).
     static func estimateCadence(words: [String], rate: Float) -> [WordTiming] {
         guard !words.isEmpty else { return [] }
 
-        let basePerChar: Double = 0.045 / Double(max(rate, 0.5)) // ~45ms per char at 1x
-        let minWordDuration: Double = 0.12 / Double(max(rate, 0.5))
+        let basePerChar: Double = 0.060 / Double(max(rate, 0.5)) // ~60ms per char at 1x
+        let minWordDuration: Double = 0.15 / Double(max(rate, 0.5))
 
         var timings: [WordTiming] = []
         var currentTime: Double = 0
