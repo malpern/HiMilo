@@ -143,7 +143,7 @@ struct FloatingPanelView: View {
                             .font(.system(.callout, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(width: 36, height: 36)
-                            .glassEffect(.regular.interactive(), in: .circle)
+                            .applyOverlayControlGlass()
                     }
                     .buttonStyle(.plain)
                     #if os(macOS)
@@ -156,7 +156,7 @@ struct FloatingPanelView: View {
                         .font(.system(.callout, weight: .bold))
                         .foregroundStyle(.white)
                         .frame(width: 36, height: 36)
-                        .glassEffect(.regular.interactive(), in: .circle)
+                        .applyOverlayControlGlass()
                         .scaleEffect(pauseButtonPulse ? 1.3 : 1.0)
                 }
                 .buttonStyle(.plain)
@@ -169,6 +169,21 @@ struct FloatingPanelView: View {
             .padding(.top, 10)
             Spacer()
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func applyOverlayControlGlass() -> some View {
+#if compiler(>=6.2)
+        if #available(macOS 26, iOS 26, *) {
+            self.glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            self.background(.ultraThinMaterial, in: Circle())
+        }
+#else
+        self.background(.ultraThinMaterial, in: Circle())
+#endif
     }
 }
 

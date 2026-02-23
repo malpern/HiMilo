@@ -92,7 +92,7 @@ struct SettingsView: View {
                             .textSelection(.enabled)
                             .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .glassEffect(.regular, in: .rect(cornerRadius: 6))
+                            .applyAgentHandoffGlass(cornerRadius: 6)
 
                         Button {
                             NSPasteboard.general.clearContents()
@@ -564,5 +564,20 @@ struct SettingsView: View {
         ("D38z5RcWu1voky8WS1ja", "Fin"),
         ("z9fAnlkpzviPz146aGWa", "Glinda"),
     ]
+}
+
+private extension View {
+    @ViewBuilder
+    func applyAgentHandoffGlass(cornerRadius: CGFloat) -> some View {
+#if compiler(>=6.2)
+        if #available(macOS 26, iOS 26, *) {
+            self.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            self.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        }
+#else
+        self.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+#endif
+    }
 }
 #endif
