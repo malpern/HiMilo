@@ -144,32 +144,6 @@
             font-style: italic;
         }
 
-        /* Screenshots */
-        .screenshots-section {
-            margin: 3em 0;
-        }
-        .shot-grid {
-            display: grid;
-            gap: 1em;
-        }
-        .shot-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 0.85em;
-        }
-        .shot-card img {
-            width: 100%;
-            border-radius: 10px;
-            border: 1px solid rgba(255,255,255,0.06);
-            display: block;
-        }
-        .shot-card figcaption {
-            color: var(--text-muted);
-            font-size: 0.9em;
-            margin-top: 0.65em;
-        }
-
         /* Links */
         a { color: var(--accent); text-decoration: none; }
         a:hover { color: var(--accent-hover); }
@@ -287,6 +261,154 @@
             margin: 0;
         }
 
+        /* See VoxClaw in action */
+        .showcase-section {
+            margin-top: 2.5em;
+            padding: 1.2em;
+            border-radius: 14px;
+            border: 1px solid var(--card-border);
+            background:
+                radial-gradient(120% 140% at 0% 0%, rgba(255, 120, 90, 0.08), transparent 45%),
+                radial-gradient(120% 140% at 100% 100%, rgba(88, 166, 255, 0.12), transparent 48%),
+                var(--card-bg);
+        }
+        .showcase-lead {
+            margin-bottom: 1em;
+            color: var(--text-muted);
+            font-size: 0.95em;
+            line-height: 1.55;
+        }
+        .showcase-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.9em;
+            align-items: stretch;
+        }
+        .showcase-card {
+            margin: 0;
+            border-radius: 11px;
+            border: 1px solid rgba(255,255,255,0.09);
+            overflow: hidden;
+            background: rgba(15,17,22,0.72);
+        }
+        .showcase-open {
+            width: 100%;
+            border: 0;
+            padding: 0;
+            margin: 0;
+            display: block;
+            background: transparent;
+            cursor: zoom-in;
+        }
+        .showcase-card img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .showcase-open:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 0;
+        }
+        .showcase-card.overlay img {
+            aspect-ratio: 1040 / 454;
+        }
+        .showcase-card.settings img {
+            aspect-ratio: 1052 / 1518;
+            object-position: center top;
+        }
+        .showcase-card figcaption {
+            padding: 0.65em 0.8em 0.72em;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            color: var(--text-muted);
+            font-size: 0.82em;
+            line-height: 1.45;
+            background: rgba(8,10,14,0.45);
+        }
+
+        /* Screenshot lightbox */
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            z-index: 1200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(5, 6, 10, 0.92);
+            backdrop-filter: blur(4px);
+        }
+        .lightbox.is-open {
+            display: flex;
+        }
+        .lightbox-frame {
+            position: relative;
+            width: min(95vw, 1280px);
+            max-height: 94vh;
+            border-radius: 14px;
+        }
+        .lightbox img {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 84vh;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.5);
+        }
+        .lightbox-close {
+            position: absolute;
+            top: -52px;
+            right: 0;
+            padding: 10px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.24);
+            background: rgba(12, 14, 20, 0.92);
+            color: #fff;
+            font: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 120ms ease;
+        }
+        .lightbox-close:hover {
+            background: rgba(28, 32, 44, 0.98);
+        }
+        .lightbox-close:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .lightbox-caption {
+            margin-top: 10px;
+            color: var(--text-muted);
+            font-size: 0.92em;
+            line-height: 1.5;
+            text-align: center;
+        }
+        body.lightbox-open {
+            overflow: hidden;
+        }
+
+        @media (max-width: 640px) {
+            .lightbox {
+                padding: 12px;
+            }
+            .lightbox-close {
+                top: 10px;
+                right: 10px;
+                z-index: 2;
+            }
+            .lightbox-frame {
+                width: 100%;
+            }
+            .lightbox img {
+                max-height: 88vh;
+                border-radius: 10px;
+            }
+        }
+
         /* Footer */
         .footer {
             margin-top: 3.5em;
@@ -350,21 +472,6 @@
         </p>
     </div>
 
-    <!-- Screenshots -->
-    <div class="section content-block screenshots-section">
-        <h2>See VoxClaw in action</h2>
-        <div class="shot-grid">
-            <figure class="shot-card">
-                <img src="overlay-panel.png" alt="VoxClaw floating overlay with highlighted words">
-                <figcaption>Overlay panel: real-time highlighted text while your agent speaks.</figcaption>
-            </figure>
-            <figure class="shot-card">
-                <img src="settings-panel.png" alt="VoxClaw settings panel with style presets and voice controls">
-                <figcaption>Settings panel: style presets, voice engine selection, speed, and controls.</figcaption>
-            </figure>
-        </div>
-    </div>
-
     <!-- Audio demo -->
     <div class="audio-section">
         <img class="devices-img" src="hero-devices.png" alt="Mac Mini connected to MacBook with VoxClaw">
@@ -404,6 +511,29 @@
         </div>
     </div>
 
+    <!-- See VoxClaw in action -->
+    <div class="section content-block showcase-section">
+        <h2>See VoxClaw in action</h2>
+        <p class="showcase-lead">
+            The live overlay keeps spoken output readable at a glance, while settings let you tune voice engine, speed,
+            and visual style without leaving the app.
+        </p>
+        <div class="showcase-grid">
+            <figure class="showcase-card overlay">
+                <button type="button" class="showcase-open" data-full-src="overlay-panel.png" data-full-alt="VoxClaw floating overlay with highlighted words">
+                    <img src="overlay-panel.png" alt="VoxClaw floating overlay with highlighted words">
+                </button>
+                <figcaption>Overlay panel during playback with synchronized word highlighting.</figcaption>
+            </figure>
+            <figure class="showcase-card settings">
+                <button type="button" class="showcase-open" data-full-src="settings-panel.png" data-full-alt="VoxClaw settings panel with style presets and voice controls">
+                    <img src="settings-panel.png" alt="VoxClaw settings panel with style presets and voice controls">
+                </button>
+                <figcaption>Settings panel with style presets, voice engine selection, speed, and controls.</figcaption>
+            </figure>
+        </div>
+    </div>
+
     <!-- Get started -->
     <div class="section" style="text-align: center;">
         <h2>Get started in 30 seconds</h2>
@@ -422,13 +552,9 @@
     <div class="section content-block" style="padding-top: 0;">
         <p class="muted" style="margin: 0;">
             <strong>🤖 Agent note (and human translator):</strong>
-            Humans run the VoxClaw Mac app on whichever computer they want to hear you from.
-            You, dear agent, should not reverse-engineer the app from vibes.
-            Go to the <a href="https://github.com/malpern/VoxClaw">GitHub repository</a> and use
-            <a href="https://github.com/malpern/VoxClaw/blob/main/SKILL.md">SKILL.md</a> for the actual integration/API details.
-            If the human pastes a <strong>🦞 VoxClaw setup pointer</strong>, trust those machine-specific URLs first.
-            If <code>health_url</code>/<code>speak_url</code> are present, use them immediately and do not ask for LAN IP or discovery first.
-            Start with <code>/status</code> and use <code>speak_url</code>/<code>health_url</code> exactly; do not auto-switch to <code>.local</code>.
+            For integration details, use the <a href="https://github.com/malpern/VoxClaw">GitHub repository</a> and
+            <a href="https://github.com/malpern/VoxClaw/blob/main/SKILL.md">SKILL.md</a>. If the human provides
+            <code>speak_url</code>/<code>health_url</code>, use them directly and start with <code>/status</code>.
         </p>
     </div>
 
@@ -439,10 +565,23 @@
         <a href="privacy.html">Privacy Policy</a>
     </div>
 
+    <div class="lightbox" id="screenshotLightbox" aria-hidden="true">
+        <div class="lightbox-frame">
+            <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close screenshot viewer">Close</button>
+            <img id="lightboxImage" src="" alt="">
+            <p class="lightbox-caption" id="lightboxCaption"></p>
+        </div>
+    </div>
+
     <script>
         const audio = document.getElementById('demoAudio');
         const icon = document.getElementById('playIcon');
         const label = document.getElementById('playLabel');
+        const lightbox = document.getElementById('screenshotLightbox');
+        const lightboxImage = document.getElementById('lightboxImage');
+        const lightboxCaption = document.getElementById('lightboxCaption');
+        const lightboxClose = document.getElementById('lightboxClose');
+        const showcaseOpenButtons = document.querySelectorAll('.showcase-open');
 
         const playSVG = '<polygon points="5,3 19,12 5,21"/>';
         const stopSVG = '<rect x="5" y="4" width="14" height="16" rx="2"/>';
@@ -463,6 +602,45 @@
         audio.addEventListener('ended', function() {
             icon.innerHTML = playSVG;
             label.textContent = 'Play Demo';
+        });
+
+        function openLightbox(imageSrc, imageAlt, captionText) {
+            lightboxImage.src = imageSrc;
+            lightboxImage.alt = imageAlt || 'VoxClaw screenshot';
+            lightboxCaption.textContent = captionText || '';
+            lightbox.classList.add('is-open');
+            lightbox.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('lightbox-open');
+            lightboxClose.focus();
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('is-open');
+            lightbox.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('lightbox-open');
+            lightboxImage.src = '';
+        }
+
+        showcaseOpenButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const imageSrc = button.dataset.fullSrc || '';
+                const imageAlt = button.dataset.fullAlt || '';
+                const captionNode = button.parentElement.querySelector('figcaption');
+                const captionText = captionNode ? captionNode.textContent : '';
+                openLightbox(imageSrc, imageAlt, captionText);
+            });
+        });
+
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (event) => {
+            if (event.target === lightbox) {
+                closeLightbox();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && lightbox.classList.contains('is-open')) {
+                closeLightbox();
+            }
         });
     </script>
 
