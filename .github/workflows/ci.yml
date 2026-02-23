@@ -26,6 +26,7 @@ jobs:
           # The code itself doesn't use 6.2-only features, so this is safe.
           sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.1/' Package.swift
           sed -i '' 's/.macOS(.v26)/.macOS(.v15)/' Package.swift
+          sed -i '' 's/.iOS(.v26)/.iOS(.v18)/' Package.swift
 
       - name: Build
         run: swift build
@@ -44,6 +45,7 @@ jobs:
         run: |
           sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.1/' Package.swift
           sed -i '' 's/.macOS(.v26)/.macOS(.v15)/' Package.swift
+          sed -i '' 's/.iOS(.v26)/.iOS(.v18)/' Package.swift
 
       - name: Build Release
         run: swift build -c release

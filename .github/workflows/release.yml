@@ -44,6 +44,7 @@ jobs:
           # CI runner may not have macOS 26 SDK; patch to v15 for build.
           sed -i '' 's/swift-tools-version: 6.2/swift-tools-version: 6.1/' Package.swift
           sed -i '' 's/.macOS(.v26)/.macOS(.v15)/' Package.swift
+          sed -i '' 's/.iOS(.v26)/.iOS(.v18)/' Package.swift
 
       - name: Build & Package
         env:
