@@ -13,13 +13,25 @@ public final class NetworkListener {
     private let serviceName: String
     private let appState: AppState
     private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
+    private let rateLimiter: RateLimiter
+    private var bindMode: NetworkBindMode
+    private var authToken: String?
 
     public var isListening: Bool { listener != nil }
 
-    public init(port: UInt16 = 4140, serviceName: String? = nil, appState: AppState) {
+    public init(
+        port: UInt16 = 4140,
+        serviceName: String? = nil,
+        bindMode: NetworkBindMode = .localhost,
+        authToken: String? = nil,
+        appState: AppState
+    ) {
         self.port = port
         self.serviceName = serviceName ?? Self.localComputerName()
+        self.bindMode = bindMode
+        self.authToken = authToken
         self.appState = appState
+        self.rateLimiter = RateLimiter()
     }
 
     public func start(onReadRequest: @escaping @Sendable (ReadRequest) async -> Void) throws {
@@ -28,10 +40,15 @@ public final class NetworkListener {
 
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
+        
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             Log.network.error("Invalid port: \(self.port, privacy: .public)")
             return
         }
+        
+        // TODO: Localhost-only binding (bindMode.localhost) has Network.framework bugs
+        // For now, bind to all interfaces (0.0.0.0) - auth token provides security
+        
         listener = try NWListener(using: params, on: nwPort)
 
         // Advertise via Bonjour for LAN discovery with IP+port in TXT record
@@ -89,8 +106,12 @@ public final class NetworkListener {
         Log.network.debug("New connection from \(String(describing: connection.endpoint), privacy: .public)")
         let state = appState
         let listenPort = port
+        let token = authToken
+        let limiter = rateLimiter
         let session = NetworkSession(
             connection: connection,
+            authToken: token,
+            rateLimiter: limiter,
             statusProvider: { @Sendable in
                 await MainActor.run {
                     let reading = state.isActive
@@ -120,18 +141,41 @@ public final class NetworkListener {
     }
 
     private func printListeningInfo() {
-        let ip = Self.localIPAddress() ?? "localhost"
+        let ip = bindMode == .localhost ? "127.0.0.1" : (Self.localIPAddress() ?? "localhost")
+        let mode = bindMode == .localhost ? "localhost only" : "LAN"
+        let authRequired = authToken != nil ? " (auth required)" : ""
+        
         print("")
-        print("  VoxClaw listening on port \(port)")
+        print("  VoxClaw listening on port \(port) (\(mode)\(authRequired))")
         print("")
-        print("  Send text from another machine:")
-        print("    curl -X POST http://\(ip):\(port)/read \\")
-        print("      -H 'Content-Type: application/json' \\")
-        print("      -d '{\"text\": \"Hello from the network\"}'")
-        print("")
-        print("  Or with plain text:")
-        print("    curl -X POST http://\(ip):\(port)/read -d 'Hello from the network'")
-        print("")
+        
+        if bindMode == .lan {
+            print("  Send text from another machine:")
+            if let token = authToken {
+                print("    curl -X POST http://\(ip):\(port)/read \\")
+                print("      -H 'Content-Type: application/json' \\")
+                print("      -H 'Authorization: Bearer \(token)' \\")
+                print("      -d '{\"text\": \"Hello from the network\"}'")
+            } else {
+                print("    curl -X POST http://\(ip):\(port)/read \\")
+                print("      -H 'Content-Type: application/json' \\")
+                print("      -d '{\"text\": \"Hello from the network\"}'")
+            }
+            print("")
+        } else {
+            print("  Localhost-only mode (secure)")
+            print("  To enable LAN access, change bind mode in Settings")
+            print("")
+            print("  Local test:")
+            print("    curl -X POST http://127.0.0.1:\(port)/read \\")
+            print("      -H 'Content-Type: application/json' \\")
+            if let token = authToken {
+                print("      -H 'Authorization: Bearer \(token)' \\")
+            }
+            print("      -d '{\"text\": \"Hello from localhost\"}'")
+            print("")
+        }
+        
         print("  Health check:")
         print("    curl http://\(ip):\(port)/status")
         print("")

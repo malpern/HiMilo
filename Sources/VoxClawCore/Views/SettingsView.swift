@@ -414,6 +414,12 @@ struct SettingsView: View {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            // Add auth token if available (required for localhost/self)
+            if let token = KeychainHelper.readNetworkAuthToken() {
+                request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            
             request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)

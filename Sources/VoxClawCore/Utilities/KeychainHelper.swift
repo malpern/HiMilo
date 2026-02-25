@@ -383,4 +383,62 @@ public enum KeychainHelper {
         guard unique.count == 1 else { return nil }
         return unique.first
     }
+
+    // MARK: - Network Auth Token
+
+    private static var authTokenFileURL: URL {
+        storageDirectory.appendingPathComponent("network-auth-token")
+    }
+
+    /// Read the network authentication token from file storage.
+    /// Returns nil if not found.
+    public static func readNetworkAuthToken() -> String? {
+        let fileURL = authTokenFileURL
+        guard let data = FileManager.default.contents(atPath: fileURL.path),
+              let raw = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        let token = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return nil }
+        Log.keychain.info("Network auth token sourced from file storage")
+        return token
+    }
+
+    /// Save the network authentication token to file storage.
+    public static func saveNetworkAuthToken(_ token: String) throws {
+        let dir = storageDirectory
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let fileURL = authTokenFileURL
+        try token.write(to: fileURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: fileURL.path
+        )
+        Log.keychain.info("Network auth token saved to file storage")
+    }
+
+    /// Delete the network authentication token from file storage.
+    public static func deleteNetworkAuthToken() throws {
+        let fileURL = authTokenFileURL
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+            Log.keychain.info("Network auth token deleted from file storage")
+        }
+    }
+
+    /// Generate and save a new network authentication token.
+    /// Returns the generated token.
+    public static func generateNetworkAuthToken() throws -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let result = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        guard result == errSecSuccess else {
+            // Fallback to UUID if SecRandomCopyBytes fails
+            let token = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            try saveNetworkAuthToken(token)
+            return token
+        }
+        let token = bytes.map { String(format: "%02x", $0) }.joined()
+        try saveNetworkAuthToken(token)
+        return token
+    }
 }

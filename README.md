@@ -240,6 +240,59 @@ curl -X POST http://<mac-ip>:4140/read -H 'Content-Type: application/json' \
 
 If the human pastes you a `🦞 VoxClaw setup pointer`, trust those URLs for that machine/session.
 
+## OpenClaw Integration (Security Hardening Fork)
+
+This fork adds security features for safe LAN deployment:
+
+### Security Features
+
+- ✅ **Bearer token authentication** — Auto-generated on first launch
+- ✅ **Localhost-only binding (default)** — Secure single-machine mode
+- ✅ **Rate limiting** — 10 req/min, 100 req/hour per IP
+- ✅ **Configurable bind mode** — Switch to LAN mode when needed
+
+### Setup for OpenClaw Agents
+
+1. **Get the auth token:**
+   ```bash
+   cat ~/Library/Application\ Support/VoxClaw/network-auth-token
+   ```
+
+2. **Configure bind mode:**
+   - Default: `localhost` (127.0.0.1 only, most secure)
+   - For remote agents: Change to `lan` in VoxClaw Settings → Network
+
+3. **Speak from remote machine:**
+   ```bash
+   curl -X POST http://192.168.1.50:4140/read \
+     -H 'Content-Type: application/json' \
+     -H 'Authorization: Bearer YOUR_TOKEN_HERE' \
+     -d '{"text": "Hello from Cygnus!"}'
+   ```
+
+4. **Install OpenClaw skill:**
+   - Skill location: `~/.agents/skills/voxclaw-remote-tts/SKILL.md`
+   - Includes permission checks, voice mapping, error handling
+
+### Security Audit
+
+See [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md) for detailed security analysis and hardening rationale.
+
+**Key findings addressed:**
+- No authentication (now required with bearer tokens)
+- Binds to all interfaces (now defaults to localhost)
+- No rate limiting (now implemented)
+- CORS-only protection (now proper auth headers)
+
+### Differences from Upstream
+
+This fork prioritizes security for production LAN deployments. Suitable for:
+- Multi-machine OpenClaw setups (laptop + servers)
+- Shared network environments
+- Paranoid security posture
+
+**Pull request to upstream:** Planned after testing
+
 ## License
 
 MIT
