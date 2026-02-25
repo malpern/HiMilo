@@ -25,6 +25,7 @@ public final class SettingsManager {
         static let pauseOtherAudioDuringSpeech = "pauseOtherAudioDuringSpeech"
         static let networkListenerEnabled = "networkListenerEnabled"
         static let networkListenerPort = "networkListenerPort"
+        static let networkBindMode = "networkBindMode"
         static let backgroundKeepAlive = "backgroundKeepAlive"
         static let rememberOverlayPosition = "rememberOverlayPosition"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
@@ -145,6 +146,27 @@ public final class SettingsManager {
         didSet {
             UserDefaults.standard.set(Int(networkListenerPort), forKey: "networkListenerPort")
             NSUbiquitousKeyValueStore.default.set(Int(networkListenerPort), forKey: KVSKey.networkListenerPort)
+        }
+    }
+
+    public var networkBindMode: NetworkBindMode {
+        didSet {
+            UserDefaults.standard.set(networkBindMode.rawValue, forKey: "networkBindMode")
+            NSUbiquitousKeyValueStore.default.set(networkBindMode.rawValue, forKey: KVSKey.networkBindMode)
+        }
+    }
+
+    public var networkAuthToken: String {
+        didSet {
+            do {
+                if networkAuthToken.isEmpty {
+                    try KeychainHelper.deleteNetworkAuthToken()
+                } else {
+                    try KeychainHelper.saveNetworkAuthToken(networkAuthToken)
+                }
+            } catch {
+                Log.settings.error("Failed to persist network auth token: \(error)")
+            }
         }
     }
 
@@ -303,6 +325,27 @@ public final class SettingsManager {
         }
         self.networkListenerPort = selectedPort > 0 && selectedPort <= Int(UInt16.max) ? UInt16(selectedPort) : 4140
 
+        // Network bind mode (default: localhost for security)
+        if let kvsBindMode = kvs.string(forKey: KVSKey.networkBindMode),
+           let bindMode = NetworkBindMode(rawValue: kvsBindMode) {
+            self.networkBindMode = bindMode
+        } else if let storedMode = UserDefaults.standard.string(forKey: "networkBindMode"),
+                  let bindMode = NetworkBindMode(rawValue: storedMode) {
+            self.networkBindMode = bindMode
+        } else {
+            self.networkBindMode = .localhost
+        }
+
+        // Network auth token (generate if missing)
+        if let token = KeychainHelper.readNetworkAuthToken() {
+            self.networkAuthToken = token
+        } else {
+            // Generate a token on first launch
+            let generatedToken = (try? KeychainHelper.generateNetworkAuthToken()) ?? ""
+            self.networkAuthToken = generatedToken
+            Log.settings.info("Generated new network auth token on first launch")
+        }
+
         if kvs.object(forKey: KVSKey.backgroundKeepAlive) != nil {
             self.backgroundKeepAlive = kvs.bool(forKey: KVSKey.backgroundKeepAlive)
         } else if UserDefaults.standard.object(forKey: "backgroundKeepAlive") == nil {
@@ -383,6 +426,7 @@ public final class SettingsManager {
         kvs.set(pauseOtherAudioDuringSpeech, forKey: KVSKey.pauseOtherAudioDuringSpeech)
         kvs.set(networkListenerEnabled, forKey: KVSKey.networkListenerEnabled)
         kvs.set(Int(networkListenerPort), forKey: KVSKey.networkListenerPort)
+        kvs.set(networkBindMode.rawValue, forKey: KVSKey.networkBindMode)
         kvs.set(backgroundKeepAlive, forKey: KVSKey.backgroundKeepAlive)
         kvs.set(rememberOverlayPosition, forKey: KVSKey.rememberOverlayPosition)
         kvs.set(hasCompletedOnboarding, forKey: KVSKey.hasCompletedOnboarding)
@@ -533,6 +577,14 @@ public final class SettingsManager {
                         self.networkListenerPort = port
                         Log.settings.info("Network listener port updated from iCloud KVS")
                     }
+                }
+
+                if changedKeys.contains(KVSKey.networkBindMode),
+                   let raw = kvs.string(forKey: KVSKey.networkBindMode),
+                   let mode = NetworkBindMode(rawValue: raw),
+                   mode != self.networkBindMode {
+                    self.networkBindMode = mode
+                    Log.settings.info("Network bind mode updated from iCloud KVS: \(raw)")
                 }
 
                 if changedKeys.contains(KVSKey.backgroundKeepAlive) {
