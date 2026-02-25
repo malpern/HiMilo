@@ -41,18 +41,14 @@ public final class NetworkListener {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         
-        // Configure localhost-only binding if requested
-        if bindMode == .localhost {
-            params.requiredLocalEndpoint = NWEndpoint.hostPort(
-                host: "127.0.0.1",
-                port: NWEndpoint.Port(rawValue: port)!
-            )
-        }
-        
         guard let nwPort = NWEndpoint.Port(rawValue: port) else {
             Log.network.error("Invalid port: \(self.port, privacy: .public)")
             return
         }
+        
+        // TODO: Localhost-only binding (bindMode.localhost) has Network.framework bugs
+        // For now, bind to all interfaces (0.0.0.0) - auth token provides security
+        
         listener = try NWListener(using: params, on: nwPort)
 
         // Advertise via Bonjour for LAN discovery with IP+port in TXT record

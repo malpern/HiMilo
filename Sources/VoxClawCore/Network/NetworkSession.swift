@@ -67,16 +67,15 @@ final class NetworkSession: Sendable {
                     }
                 }
                 
-                // Check rate limit
-                Task { @MainActor [rateLimiter, clientIP, self] in
-                    let (allowed, retryAfter) = rateLimiter.checkLimit(for: clientIP)
-                    if !allowed {
-                        Log.network.warning("429: Rate limit exceeded for \(clientIP, privacy: .public)")
-                        self.sendRateLimitResponse(retryAfter: retryAfter ?? 60)
-                    } else {
-                        self.handleRead(raw: raw, initialData: data)
-                    }
+                // Check rate limit (synchronously to preserve execution flow)
+                let (allowed, retryAfter) = rateLimiter.checkLimit(for: clientIP)
+                if !allowed {
+                    Log.network.warning("429: Rate limit exceeded for \(clientIP, privacy: .public)")
+                    sendRateLimitResponse(retryAfter: retryAfter ?? 60)
+                    return
                 }
+                
+                handleRead(raw: raw, initialData: data)
             case .claw:
                 handleClaw()
             case .corsPreflight:
