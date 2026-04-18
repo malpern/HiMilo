@@ -9,6 +9,7 @@ enum Log {
     static let input    = Logger(subsystem: subsystem, category: "input")
     static let tts      = Logger(subsystem: subsystem, category: "tts")
     static let audio    = Logger(subsystem: subsystem, category: "audio")
+    static let playback = Logger(subsystem: subsystem, category: "playback")
     static let session  = Logger(subsystem: subsystem, category: "session")
     static let network  = Logger(subsystem: subsystem, category: "network")
     static let panel    = Logger(subsystem: subsystem, category: "panel")

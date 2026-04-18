@@ -11,11 +11,12 @@ public final class ReadingSession: SpeechEngineDelegate {
     #if os(macOS)
     private var panelController: PanelController?
     #endif
-    private var pausedExternalAudio = false
+    private var pausedExternalPlayback: PlaybackSnapshot?
     private var isFinalized = false
     private var finishTask: Task<Void, Never>?
     private var feedbackTask: Task<Void, Never>?
     private var speedIndicatorTask: Task<Void, Never>?
+    private var didAttemptExternalPause = false
 
     public init(
         appState: AppState,
@@ -34,6 +35,8 @@ public final class ReadingSession: SpeechEngineDelegate {
 
     public func start(text: String) async {
         isFinalized = false
+        didAttemptExternalPause = false
+        pausedExternalPlayback = nil
         finishTask?.cancel()
         finishTask = nil
 
@@ -65,7 +68,11 @@ public final class ReadingSession: SpeechEngineDelegate {
         #endif
 
         if pauseExternalAudioDuringSpeech {
-            pausedExternalAudio = playbackController.pauseIfPlaying()
+            didAttemptExternalPause = true
+            pausedExternalPlayback = playbackController.pauseIfPlaying()
+            if pausedExternalPlayback != nil {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
         }
 
         let currentSpeed = settings?.voiceSpeed ?? 1.0
@@ -74,6 +81,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         }
 
         Log.session.info("Session.start: calling engine.start")
+        assert(!pauseExternalAudioDuringSpeech || didAttemptExternalPause, "External playback pause must run before engine.start")
         await engine.start(text: text, words: words)
         Log.session.info("Session.start: engine.start returned")
     }
@@ -123,10 +131,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         panelController = nil
         #endif
         isFinalized = true
-        if pausedExternalAudio {
-            playbackController.resumePaused()
-            pausedExternalAudio = false
-        }
+        resumeExternalPlaybackIfNeeded()
     }
 
     // MARK: - SpeechEngineDelegate
@@ -188,10 +193,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         if mutatingAppState {
             appState.sessionState = .finished
         }
-        if pausedExternalAudio {
-            playbackController.resumePaused()
-            pausedExternalAudio = false
-        }
+        resumeExternalPlaybackIfNeeded()
 
         if delayedReset && mutatingAppState {
             Log.session.info("finish: scheduling delayed reset (500ms)")
@@ -248,5 +250,12 @@ public final class ReadingSession: SpeechEngineDelegate {
                 self?.appState.feedbackText = nil
             }
         }
+    }
+
+    private func resumeExternalPlaybackIfNeeded() {
+        guard let snapshot = pausedExternalPlayback else { return }
+        assert(!snapshot.isEmpty, "Stored playback snapshots must contain at least one paused target")
+        playbackController.resume(snapshot)
+        pausedExternalPlayback = nil
     }
 }

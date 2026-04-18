@@ -653,7 +653,7 @@ final class VoiceDemoPlayer {
     private var synthesizer = AVSpeechSynthesizer()
     private var synthDelegate: SynthFinishDelegate?
     private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
-    private var pausedExternalAudio = false
+    private var pausedExternalPlayback: PlaybackSnapshot?
 
     private let appleDemoText = "Or you could listen to me instead. The built-in Mac voice. I work, but... I kind of suck. You may want that OpenAI key."
 
@@ -732,13 +732,13 @@ final class VoiceDemoPlayer {
 
     private func beginExternalAudioPauseWindow() {
         guard pauseExternalAudioDuringSpeech else { return }
-        pausedExternalAudio = playbackController.pauseIfPlaying()
+        pausedExternalPlayback = playbackController.pauseIfPlaying()
     }
 
     private func endExternalAudioPauseWindow() {
-        guard pausedExternalAudio else { return }
-        playbackController.resumePaused()
-        pausedExternalAudio = false
+        guard let pausedExternalPlayback else { return }
+        playbackController.resume(pausedExternalPlayback)
+        self.pausedExternalPlayback = nil
     }
 }
 
@@ -756,7 +756,7 @@ final class OnboardingNarrator: NSObject {
     private var synthDelegate: SynthFinishDelegate?
     private var fetchTask: Task<Void, Never>?
     private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
-    private var pausedExternalAudio = false
+    private var pausedExternalPlayback: PlaybackSnapshot?
 
     func speak(text: String, apiKey: String?) {
         stop()
@@ -864,13 +864,13 @@ final class OnboardingNarrator: NSObject {
 
     private func beginExternalAudioPauseWindow() {
         guard pauseExternalAudioDuringSpeech else { return }
-        pausedExternalAudio = playbackController.pauseIfPlaying()
+        pausedExternalPlayback = playbackController.pauseIfPlaying()
     }
 
     private func endExternalAudioPauseWindow() {
-        guard pausedExternalAudio else { return }
-        playbackController.resumePaused()
-        pausedExternalAudio = false
+        guard let pausedExternalPlayback else { return }
+        playbackController.resume(pausedExternalPlayback)
+        self.pausedExternalPlayback = nil
     }
 }
 

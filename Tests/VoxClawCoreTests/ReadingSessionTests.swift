@@ -12,9 +12,11 @@ final class MockSpeechEngine: SpeechEngine {
     var pauseCalled = false
     var resumeCalled = false
     var stopCalled = false
+    var onStart: (() -> Void)?
 
     func start(text: String, words: [String]) async {
         startCalled = true
+        onStart?()
         state = .playing
         delegate?.speechEngine(self, didChangeState: .playing)
     }
@@ -48,6 +50,29 @@ final class MockSpeechEngine: SpeechEngine {
     func simulateFinish() {
         state = .finished
         delegate?.speechEngineDidFinish(self)
+    }
+
+    func simulateError(_ message: String = "boom") {
+        state = .error(message)
+        delegate?.speechEngine(self, didEncounterError: NSError(domain: "ReadingSessionTests", code: 1))
+    }
+}
+
+@MainActor
+final class MockPlaybackController: ExternalPlaybackControlling {
+    var pauseCallCount = 0
+    var resumedSnapshots: [PlaybackSnapshot] = []
+    var snapshotToReturn: PlaybackSnapshot?
+    var onPause: (() -> Void)?
+
+    func pauseIfPlaying() -> PlaybackSnapshot? {
+        pauseCallCount += 1
+        onPause?()
+        return snapshotToReturn
+    }
+
+    func resume(_ snapshot: PlaybackSnapshot) {
+        resumedSnapshots.append(snapshot)
     }
 }
 
@@ -144,5 +169,142 @@ struct ReadingSessionTests {
         try? await Task.sleep(for: .milliseconds(700))
 
         #expect(!appState.words.isEmpty)
+    }
+
+    @Test func sessionPausesExternalPlaybackBeforeSpeechStarts() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+        controller.snapshotToReturn = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 2, url: "https://www.youtube.com/watch?v=123")
+        ])
+
+        engine.onStart = {
+            #expect(controller.pauseCallCount == 1)
+        }
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+
+        #expect(engine.startCalled)
+        #expect(controller.pauseCallCount == 1)
+    }
+
+    @Test func sessionResumesExternalPlaybackOnFinish() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+        let snapshot = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 2, url: "https://www.youtube.com/watch?v=123")
+        ])
+        controller.snapshotToReturn = snapshot
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+        engine.simulateFinish()
+
+        #expect(controller.resumedSnapshots == [snapshot])
+    }
+
+    @Test func sessionResumesExternalPlaybackOnStop() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+        let snapshot = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Arc", windowIndex: 1, tabIndex: 5, url: "https://youtu.be/abc")
+        ])
+        controller.snapshotToReturn = snapshot
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+        session.stop()
+
+        #expect(controller.resumedSnapshots == [snapshot])
+    }
+
+    @Test func sessionResumesExternalPlaybackOnReplacement() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+        let snapshot = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 2, tabIndex: 1, url: "https://www.youtube.com/watch?v=xyz")
+        ])
+        controller.snapshotToReturn = snapshot
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+        session.stopForReplacement()
+
+        #expect(controller.resumedSnapshots == [snapshot])
+    }
+
+    @Test func sessionResumesExternalPlaybackOnError() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+        let snapshot = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Arc", windowIndex: 3, tabIndex: 4, url: "https://www.youtube.com/watch?v=oops")
+        ])
+        controller.snapshotToReturn = snapshot
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+        engine.simulateError()
+
+        #expect(controller.resumedSnapshots == [snapshot])
+    }
+
+    @Test func sessionDoesNotResumeWhenNothingWasPaused() async {
+        let appState = AppState()
+        appState.audioOnly = true
+        let engine = MockSpeechEngine()
+        let controller = MockPlaybackController()
+
+        let session = ReadingSession(
+            appState: appState,
+            engine: engine,
+            pauseExternalAudioDuringSpeech: true,
+            playbackController: controller
+        )
+
+        await session.start(text: "hello world")
+        engine.simulateFinish()
+
+        #expect(controller.resumedSnapshots.isEmpty)
     }
 }
