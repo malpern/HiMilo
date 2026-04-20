@@ -6,13 +6,19 @@ final class NetworkSession: Sendable {
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
     private let statusProvider: @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int)
+    private let authToken: String?
+    private let rateLimiter: RateLimiter
 
     init(
         connection: NWConnection,
+        authToken: String?,
+        rateLimiter: RateLimiter,
         statusProvider: @escaping @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int),
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
     ) {
         self.connection = connection
+        self.authToken = authToken
+        self.rateLimiter = rateLimiter
         self.statusProvider = statusProvider
         self.onReadRequest = onReadRequest
     }
@@ -46,6 +52,29 @@ final class NetworkSession: Sendable {
             case .status:
                 Task { await self.handleStatus() }
             case .read:
+                // Extract client IP for rate limiting
+                let clientIP = extractClientIP()
+                
+                // Check authentication if token is configured
+                if let requiredToken = authToken {
+                    let authHeader = HTTPRequestParser.extractHeader(from: raw, name: "Authorization")
+                    let providedToken = NetworkAuthToken.extractToken(from: authHeader)
+                    
+                    if providedToken != requiredToken {
+                        Log.network.warning("401: Unauthorized /read attempt from \(clientIP, privacy: .public)")
+                        sendErrorResponse(status: 401, message: "Unauthorized. Missing or invalid bearer token.")
+                        return
+                    }
+                }
+                
+                // Check rate limit (synchronously to preserve execution flow)
+                let (allowed, retryAfter) = rateLimiter.checkLimit(for: clientIP)
+                if !allowed {
+                    Log.network.warning("429: Rate limit exceeded for \(clientIP, privacy: .public)")
+                    sendRateLimitResponse(retryAfter: retryAfter ?? 60)
+                    return
+                }
+                
                 handleRead(raw: raw, initialData: data)
             case .claw:
                 handleClaw()
@@ -287,5 +316,38 @@ final class NetworkSession: Sendable {
     private func sendErrorResponse(status: Int, message: String) {
         let body = "{\"error\":\"\(message)\"}"
         sendResponse(status: status, body: body, contentType: "application/json")
+    }
+
+    private func sendRateLimitResponse(retryAfter: Int) {
+        var headers = "HTTP/1.1 429 Too Many Requests\r\n"
+        headers += "Retry-After: \(retryAfter)\r\n"
+        headers += "Access-Control-Allow-Origin: http://localhost\r\n"
+        headers += "Connection: close\r\n"
+        
+        let body = "{\"error\":\"Rate limit exceeded. Try again in \(retryAfter) seconds.\"}"
+        let bodyData = body.data(using: .utf8) ?? Data()
+        headers += "Content-Type: application/json\r\n"
+        headers += "Content-Length: \(bodyData.count)\r\n"
+        headers += "\r\n"
+        
+        var responseData = headers.data(using: .utf8) ?? Data()
+        responseData.append(bodyData)
+        connection.send(content: responseData, completion: .contentProcessed { [weak self] _ in
+            self?.connection.cancel()
+        })
+    }
+
+    private func extractClientIP() -> String {
+        if case let .hostPort(host, _) = connection.endpoint {
+            switch host {
+            case .ipv4(let addr):
+                return addr.debugDescription
+            case .ipv6(let addr):
+                return addr.debugDescription
+            default:
+                return "unknown"
+            }
+        }
+        return "unknown"
     }
 }

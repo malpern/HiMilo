@@ -378,7 +378,12 @@ final class AppCoordinator {
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
         stopListening()
         let port = port ?? CLIContext.shared?.port ?? 4140
-        let listener = NetworkListener(port: port, appState: appState)
+        let listener = NetworkListener(
+            port: port,
+            bindMode: settings.networkBindMode,
+            authToken: settings.networkAuthToken.isEmpty ? nil : settings.networkAuthToken,
+            appState: appState
+        )
         do {
             try listener.start { [weak self] request in
                 await self?.handleReadRequest(request, appState: appState, settings: settings)

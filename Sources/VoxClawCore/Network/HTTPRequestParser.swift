@@ -75,6 +75,19 @@ enum HTTPRequestParser {
         return String(raw[range.upperBound...])
     }
 
+    static func extractHeader(from raw: String, name: String) -> String? {
+        let headerName = name.lowercased()
+        for line in raw.components(separatedBy: "\r\n") {
+            let parts = line.split(separator: ":", maxSplits: 1)
+            guard parts.count == 2,
+                  parts[0].trimmingCharacters(in: .whitespaces).lowercased() == headerName else {
+                continue
+            }
+            return parts[1].trimmingCharacters(in: .whitespaces)
+        }
+        return nil
+    }
+
     static func parseReadRequest(from body: String) -> ReadRequest? {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
