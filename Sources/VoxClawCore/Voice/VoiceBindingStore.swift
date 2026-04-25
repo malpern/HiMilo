@@ -92,9 +92,18 @@ public actor VoiceBindingStore {
     public func load() -> VoiceBindingsFile {
         if let cache { return cache }
         let result: VoiceBindingsFile
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode(VoiceBindingsFile.self, from: data) {
-            result = decoded
+        let fm = FileManager.default
+        if fm.fileExists(atPath: fileURL.path) {
+            do {
+                let data = try Data(contentsOf: fileURL)
+                result = try JSONDecoder().decode(VoiceBindingsFile.self, from: data)
+            } catch {
+                Log.settings.warning("Voice bindings file is corrupted, backing up: \(error, privacy: .public)")
+                let backup = fileURL.appendingPathExtension("bak")
+                try? fm.removeItem(at: backup)
+                try? fm.copyItem(at: fileURL, to: backup)
+                result = VoiceBindingsFile()
+            }
         } else {
             result = VoiceBindingsFile()
         }

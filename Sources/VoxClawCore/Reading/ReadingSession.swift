@@ -46,10 +46,20 @@ public final class ReadingSession: SpeechEngineDelegate {
         engine.delegate = self
     }
 
-    /// Suspends until this session is fully stopped or finished. Used by the
-    /// coordinator's queue drain to wait between items.
+    private static let sessionTimeout: Duration = .seconds(300)
+
+    /// Suspends until this session is fully stopped or finished, with a hard
+    /// timeout to prevent a hung TTS stream from zombifying the queue.
     public func waitUntilFinished() async {
         if isFinalized { return }
+
+        let timeoutTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.sessionTimeout)
+            guard let self, !self.isFinalized else { return }
+            Log.session.warning("Session timed out after \(Int(Self.sessionTimeout.components.seconds), privacy: .public)s — force-stopping")
+            self.stop()
+        }
+
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             if isFinalized {
                 cont.resume()
@@ -57,6 +67,8 @@ public final class ReadingSession: SpeechEngineDelegate {
                 finishContinuation = cont
             }
         }
+
+        timeoutTask.cancel()
     }
 
     private func resumeFinishContinuationIfNeeded() {
@@ -275,8 +287,11 @@ public final class ReadingSession: SpeechEngineDelegate {
         resumeExternalPlaybackIfNeeded()
 
         if delayedReset && mutatingAppState {
-            if keepPanelOnFinish {
-                Log.session.info("finish: keepPanelOnFinish — fading content, keeping panel")
+            let hasExternalPanel = externalPanelController != nil
+            let keepFlag = keepPanelOnFinish
+            let shouldKeepPanel = keepFlag || hasExternalPanel
+            if shouldKeepPanel {
+                Log.session.info("finish: keeping panel (keepOnFinish=\(keepFlag, privacy: .public), external=\(hasExternalPanel, privacy: .public))")
                 appState.sessionState = .finished
                 finishTask = Task { @MainActor [weak self] in
                     // Fade out old content

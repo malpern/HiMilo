@@ -609,10 +609,12 @@ final class AppCoordinator {
             activeSession = nil
         }
 
-        // Queue exhausted — dismiss the shared panel.
+        // Queue exhausted — dismiss the shared panel with the normal animation.
         #if os(macOS)
+        sharedPanel?.dismiss()
         sharedPanel = nil
         #endif
+        appState.reset()
     }
 
     /// Polls CoreAudio for "blocker" activity: defer-list apps producing audio
@@ -661,15 +663,21 @@ final class AppCoordinator {
     /// timeout, stops the current session (the next queue item will re-decide
     /// audio vs silent on its own polite-wait pass).
     private func monitorBlockersDuringSpeech(session: ReadingSession?) async {
+        var consecutiveBlockerPolls = 0
         while !Task.isCancelled {
             try? await Task.sleep(for: Self.politePollInterval)
             if Task.isCancelled { return }
             guard let session, !session.hasFinished else { return }
 
             let blockers = currentBlockers()
-            guard !blockers.isEmpty else { continue }
+            if blockers.isEmpty {
+                consecutiveBlockerPolls = 0
+                continue
+            }
+            consecutiveBlockerPolls += 1
+            guard consecutiveBlockerPolls >= 2 else { continue }
 
-            Log.session.info("Mid-speech blockers detected: \(blockers.joined(separator: ","), privacy: .public) — pausing")
+            Log.session.info("Mid-speech blockers detected (sustained): \(blockers.joined(separator: ","), privacy: .public) — pausing")
             session.pauseForBlocker()
 
             let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)

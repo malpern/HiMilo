@@ -58,7 +58,24 @@ final class AudioPlayer {
     /// Start the audio engine without playing. Call `play()` after buffering initial chunks.
     func prepare() throws {
         Log.audio.info("Audio engine preparing")
+        NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.handleConfigurationChange()
+            }
+        }
         try engine.start()
+    }
+
+    private func handleConfigurationChange() {
+        Log.audio.warning("Audio engine configuration changed — ending playback")
+        guard isPlaying else { return }
+        isPlaying = false
+        engine.stop()
+        onFinished?()
     }
 
     /// Begin playback. Call after scheduling initial buffered chunks.

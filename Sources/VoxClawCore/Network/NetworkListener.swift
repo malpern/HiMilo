@@ -79,19 +79,63 @@ public final class NetworkListener {
         print("VoxClaw listener stopped")
     }
 
+    private var retryCount = 0
+    private static let maxRetries = 3
+    private static let retryDelays: [Duration] = [.seconds(1), .seconds(3), .seconds(10)]
+
     private func handleStateUpdate(_ state: NWListener.State) {
         switch state {
         case .ready:
+            retryCount = 0
             Log.network.info("Listener ready on port \(self.port, privacy: .public)")
             print("VoxClaw HTTP listener ready")
         case .failed(let error):
             Log.network.error("Listener failed: \(error)")
-            print("Network listener failed: \(error)")
-            stop()
+            listener?.cancel()
+            listener = nil
+            if retryCount < Self.maxRetries {
+                let delay = Self.retryDelays[retryCount]
+                retryCount += 1
+                Log.network.info("Listener retry \(self.retryCount, privacy: .public)/\(Self.maxRetries, privacy: .public) in \(Int(delay.components.seconds), privacy: .public)s")
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: delay)
+                    guard let self, self.listener == nil else { return }
+                    self.retryListener()
+                }
+            } else {
+                Log.network.error("Listener exhausted retries, giving up on port \(self.port, privacy: .public)")
+                print("Network listener failed permanently: \(error)")
+                stop()
+            }
         case .cancelled:
             break
         default:
             break
+        }
+    }
+
+    private func retryListener() {
+        let params = NWParameters.tcp
+        params.allowLocalEndpointReuse = true
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else { return }
+        do {
+            let newListener = try NWListener(using: params, on: nwPort)
+            let txtRecord = Self.makeTXTRecord([
+                "ip": Self.localIPAddress() ?? "",
+                "port": String(port),
+            ])
+            newListener.service = NWListener.Service(name: serviceName, type: "_voxclaw._tcp", txtRecord: txtRecord)
+            newListener.stateUpdateHandler = { [weak self] state in
+                Task { @MainActor in self?.handleStateUpdate(state) }
+            }
+            newListener.newConnectionHandler = { [weak self] connection in
+                Task { @MainActor in self?.handleNewConnection(connection) }
+            }
+            listener = newListener
+            newListener.start(queue: .main)
+            Log.network.info("Listener retry started on port \(self.port, privacy: .public)")
+        } catch {
+            Log.network.error("Listener retry failed to create: \(error)")
         }
     }
 
