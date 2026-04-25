@@ -19,8 +19,6 @@ struct SettingsView: View {
     @State private var voicePreview = VoicePreviewPlayer()
     var peerBrowser: PeerBrowser
     @State private var browserControlStatus: String?
-    @State private var relayToastMessage: String?
-    @State private var relayToastTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
@@ -386,82 +384,29 @@ struct SettingsView: View {
     }
 
     private var peersSection: some View {
-        Section("VoxClaws On This Network") {
-            if peerBrowser.peers.isEmpty {
-                HStack(spacing: 8) {
-                    if peerBrowser.isSearching {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text("Searching...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                ForEach(peerBrowser.peers) { peer in
+        Group {
+            PeerSpeakerList(settings: settings, peerBrowser: peerBrowser)
+
+            Section {
+                ForEach(peerBrowser.peers.filter { $0.baseURL != nil }) { peer in
                     HStack {
-                        Text("\(peer.displayEmoji)  \(peer.name)")
+                        Text(peer.name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         Spacer()
-                        if let baseURL = peer.baseURL {
-                            if peer.isLocalMachine && peerBrowser.peers.filter({ $0.baseURL != nil }).count <= 1 {
-                                Text("This Mac")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Toggle(isOn: Binding(
-                                    get: {
-                                        peer.isLocalMachine
-                                            ? !settings.relayPeerIDs.contains("__mute_local__")
-                                            : settings.relayPeerIDs.contains(peer.id)
-                                    },
-                                    set: { enabled in
-                                        if peer.isLocalMachine {
-                                            if enabled {
-                                                settings.relayPeerIDs.remove("__mute_local__")
-                                                showRelayToast("Speaking on \(peer.name)")
-                                            } else {
-                                                settings.relayPeerIDs.insert("__mute_local__")
-                                                showRelayToast("Muted on \(peer.name)")
-                                            }
-                                        } else {
-                                            if enabled {
-                                                settings.relayPeerIDs.insert(peer.id)
-                                                showRelayToast("Also speaking on \(peer.name)")
-                                            } else {
-                                                settings.relayPeerIDs.remove(peer.id)
-                                                showRelayToast("Stopped speaking on \(peer.name)")
-                                            }
-                                        }
-                                    }
-                                )) { EmptyView() }
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
-                            }
-
-                            Button("Test") {
-                                speakToPeer(peer)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .help("Send a test phrase to \(peer.name)")
-
-                            Button {
-                                copyPeerSetup(baseURL: baseURL, name: peer.name)
-                            } label: {
-                                Image(systemName: "gearshape")
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .help("Copy agent setup for \(peer.name)")
-                        } else if peer.app == .voxclaw {
-                            Text("Resolving...")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("OpenClaw")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button("Test") {
+                            speakToPeer(peer)
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+
+                        Button {
+                            copyPeerSetup(baseURL: peer.baseURL!, name: peer.name)
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
             }
@@ -480,22 +425,6 @@ struct SettingsView: View {
                     .transition(.opacity)
             }
 
-            if let toast = relayToastMessage {
-                Label(toast, systemImage: "speaker.wave.2.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: relayToastMessage)
-            }
-        }
-    }
-
-    private func showRelayToast(_ message: String) {
-        withAnimation { relayToastMessage = message }
-        relayToastTask?.cancel()
-        relayToastTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            withAnimation { relayToastMessage = nil }
         }
     }
 
@@ -558,19 +487,7 @@ struct SettingsView: View {
     }
 
     private func copyPeerSetup(baseURL: String, name: String) {
-        let text = """
-        \u{1F9DE} VoxClaw setup pointer:
-        health_url: \(baseURL)/status
-        speak_url: \(baseURL)/read
-
-        Agent rules:
-        1) GET health_url first.
-        2) If status is ok, POST text to speak_url.
-        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
-
-        Website: https://voxclaw.com/
-        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
-        """
+        let text = AgentHandoffPrompt.make(baseURL: baseURL)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         withAnimation {
@@ -610,21 +527,7 @@ struct SettingsView: View {
     }
 
     private var agentHandoffText: String {
-        let healthURL = "\(networkBaseURL)/status"
-        let speakURL = "\(networkBaseURL)/read"
-        return """
-        🦞 VoxClaw setup pointer:
-        health_url: \(healthURL)
-        speak_url: \(speakURL)
-
-        Agent rules:
-        1) GET health_url first.
-        2) If status is ok, POST text to speak_url.
-        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
-
-        Website: https://voxclaw.com/
-        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
-        """
+        AgentHandoffPrompt.make(baseURL: networkBaseURL)
     }
 
     private var engineCostTooltip: String {

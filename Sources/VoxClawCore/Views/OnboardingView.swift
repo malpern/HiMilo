@@ -184,21 +184,7 @@ struct OnboardingView: View {
         let lanIP = NetworkListener.localIPAddress()
         let baseURL = lanIP.map { "http://\($0):\(port)" }
             ?? "http://<lan-ip>:\(port)"
-        let healthURL = "\(baseURL)/status"
-        let speakURL = "\(baseURL)/read"
-        return """
-        🦞 VoxClaw setup pointer:
-        health_url: \(healthURL)
-        speak_url: \(speakURL)
-
-        Agent rules:
-        1) GET health_url first.
-        2) If status is ok, POST text to speak_url.
-        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
-
-        Website: https://voxclaw.com/
-        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
-        """
+        return AgentHandoffPrompt.make(baseURL: baseURL)
     }
 
     private func handleStepChange(_ step: OnboardingStep) {
@@ -575,21 +561,7 @@ private struct SuccessStep: View {
         let lanIP = NetworkListener.localIPAddress()
         let baseURL = lanIP.map { "http://\($0):\(port)" }
             ?? "http://<lan-ip>:\(port)"
-        let healthURL = "\(baseURL)/status"
-        let speakURL = "\(baseURL)/read"
-        return """
-        🦞 VoxClaw setup pointer:
-        health_url: \(healthURL)
-        speak_url: \(speakURL)
-
-        Agent rules:
-        1) GET health_url first.
-        2) If status is ok, POST text to speak_url.
-        3) Use these URLs exactly (no .local/discovery rewrite unless a human explicitly asks).
-
-        Website: https://voxclaw.com/
-        Skill doc: https://github.com/malpern/VoxClaw/blob/main/SKILL.md
-        """
+        return AgentHandoffPrompt.make(baseURL: baseURL)
     }
 
     var body: some View {
