@@ -34,6 +34,11 @@ final class iOSCoordinator: SpeechQueueDelegate {
                         )
                     }
                 },
+                onAck: { [weak self] projectId in
+                    await MainActor.run {
+                        self?.queue.handleAck(projectId: projectId, appState: appState)
+                    }
+                },
                 onControl: { [weak self] control in
                     await MainActor.run {
                         self?.queue.handleControl(control, deviceID: "ios-\(UIDevice.current.name)")

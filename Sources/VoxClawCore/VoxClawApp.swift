@@ -539,7 +539,32 @@ final class AppCoordinator: SpeechQueueDelegate {
 
     func onAckReceived(projectId: String) {
         guard let settings = settingsRef else { return }
-        relayControl(action: .stop, settings: settings)
+        relayAck(projectId: projectId, settings: settings)
+    }
+
+    private func relayAck(projectId: String, settings: SettingsManager) {
+        let relayIDs = settings.relayPeerIDs
+        guard !relayIDs.isEmpty else { return }
+
+        for peer in peerBrowser.peers {
+            guard relayIDs.contains(peer.id), let baseURL = peer.baseURL else { continue }
+            guard let url = URL(string: "\(baseURL)/ack") else { continue }
+
+            let peerName = peer.name
+            let payload: [String: Any] = ["project_id": projectId]
+            guard let body = try? JSONSerialization.data(withJSONObject: payload) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+            req.timeoutInterval = 2
+
+            let request = req
+            Task.detached {
+                _ = try? await URLSession.shared.data(for: request)
+                Log.network.info("Relayed ack to \(peerName, privacy: .public)")
+            }
+        }
     }
 
     // MARK: - Thin wrappers
