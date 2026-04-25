@@ -271,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "VoxClaw Settings"
-        window.contentView = NSHostingView(rootView: SettingsView(settings: SharedApp.settings, appState: SharedApp.appState))
+        window.contentView = NSHostingView(rootView: SettingsView(settings: SharedApp.settings, appState: SharedApp.appState, peerBrowser: SharedApp.coordinator.peerBrowser))
         window.center()
         window.isReleasedWhenClosed = false
         settingsWindow = window
@@ -330,7 +330,7 @@ struct VoxClawApp: App {
         }
 
         Window("VoxClaw Settings", id: "settings") {
-            SettingsView(settings: settings, appState: appState)
+            SettingsView(settings: settings, appState: appState, peerBrowser: coordinator.peerBrowser)
         }
         .defaultSize(width: 440, height: 420)
 
@@ -383,6 +383,7 @@ final class AppCoordinator {
     private var networkListener: NetworkListener?
     private var activeSession: ReadingSession?
     let voiceAssigner = VoiceAssigner(store: VoiceBindingStore(fileURL: VoiceBindingStore.defaultURL()))
+    let peerBrowser = PeerBrowser()
 
     private struct SpeechItem {
         let text: String
@@ -405,6 +406,7 @@ final class AppCoordinator {
 
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
         stopListening()
+        peerBrowser.start()
         let port = port ?? CLIContext.shared?.port ?? 4140
         let listener = NetworkListener(port: port, appState: appState, settings: settings)
         do {
@@ -425,14 +427,72 @@ final class AppCoordinator {
     }
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
-        let engine = await makeEngine(for: request, settings: settings)
-        await readText(
-            request.text,
-            appState: appState,
-            settings: settings,
-            engineOverride: engine,
-            projectId: request.projectId
+        // Resolve the voice before building the engine so we can pass the
+        // same voice to relay peers for cross-device consistency.
+        let assignedVoice = await voiceAssigner.resolveVoice(
+            projectId: request.projectId,
+            agentId: request.agentId,
+            engine: .openai
         )
+        let resolvedVoice = request.voice ?? assignedVoice ?? settings.openAIVoice
+
+        var resolvedRequest = request
+        resolvedRequest.voice = resolvedVoice
+
+        let localMuted = settings.relayPeerIDs.contains("__mute_local__")
+        if !localMuted {
+            let engine = await makeEngine(for: resolvedRequest, settings: settings)
+            await readText(
+                resolvedRequest.text,
+                appState: appState,
+                settings: settings,
+                engineOverride: engine,
+                projectId: resolvedRequest.projectId
+            )
+        } else {
+            Log.session.info("Local playback muted, skipping")
+        }
+
+        if !request.relayed {
+            relayToPeers(request: resolvedRequest, settings: settings)
+        }
+    }
+
+    private func relayToPeers(request: ReadRequest, settings: SettingsManager) {
+        let relayIDs = settings.relayPeerIDs
+        guard !relayIDs.isEmpty else { return }
+
+        for peer in peerBrowser.peers {
+            guard relayIDs.contains(peer.id), let baseURL = peer.baseURL else { continue }
+            guard let url = URL(string: "\(baseURL)/read") else { continue }
+
+            Log.network.info("Relaying to peer \(peer.name, privacy: .public)")
+            var payload: [String: Any] = ["text": request.text, "relayed": true]
+            if let v = request.voice { payload["voice"] = v }
+            if let r = request.rate { payload["rate"] = r }
+            if let i = request.instructions { payload["instructions"] = i }
+            if let p = request.projectId { payload["project_id"] = p }
+            if let a = request.agentId { payload["agent_id"] = a }
+
+            guard let body = try? JSONSerialization.data(withJSONObject: payload) else { continue }
+            var urlRequest = URLRequest(url: url)
+            urlRequest.httpMethod = "POST"
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            urlRequest.httpBody = body
+            urlRequest.timeoutInterval = 3
+
+            let peerName = peer.name
+            let req = urlRequest
+            Task.detached {
+                do {
+                    let (_, response) = try await URLSession.shared.data(for: req)
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    Log.network.info("Relay to \(peerName, privacy: .public): status=\(status, privacy: .public)")
+                } catch {
+                    Log.network.warning("Relay to \(peerName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
     }
 
     /// Constructs the speech engine for a /read request, factoring in the project/agent
@@ -503,6 +563,10 @@ final class AppCoordinator {
             projectActivity.record(pid)
         }
         rebuildProjectIndicators(appState: appState)
+        let indicatorCount = appState.projectIndicators.count
+        let distinctCount = projectActivity.distinctProjectsInWindow()
+        let draining = isDrainingQueue
+        Log.session.info("Enqueue: indicators=\(indicatorCount, privacy: .public), distinct=\(distinctCount, privacy: .public), draining=\(draining, privacy: .public)")
         if !isDrainingQueue {
             Task { @MainActor in
                 await self.drainQueue(appState: appState, settings: settings)

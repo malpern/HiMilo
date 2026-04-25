@@ -132,13 +132,14 @@ AppCoordinator).
 
 **Option C — iPhone is relay-only, Mac controls everything**
 
-Don't give the iPhone its own queue. The Mac relays one item at a
-time (already working). The Mac sends `/control` for pause/stop.
-The iPhone is a dumb speaker that plays what it's told.
+The Mac is always the hub. The iPhone never needs its own queue —
+the Mac relays one item at a time (already working) and sends
+`/control` for pause/stop. But the iPhone's PRESENTATION must be
+first-class: same teleprompter quality, same badges, same transitions.
 
-*Pro:* minimal iOS code change. No queue duplication.
-*Con:* iPhone can't work standalone (no Mac = no speech). If
-the Mac dies mid-queue, the iPhone stops.
+*Pro:* minimal iOS queue code. Mac is the single source of truth.
+*Con:* iPhone can't work without a Mac. Acceptable — the user
+confirmed a Mac will always be present.
 
 **Recommendation:** Option B for long-term, Option C as a fast
 interim. Option C can ship today (add `/control` endpoint to iOS,
@@ -216,12 +217,25 @@ multi-device experience.
 
 ---
 
+## Settings UI rules (implemented)
+
+The peer list in macOS Settings adapts based on how many devices are
+visible:
+
+- **One device (this Mac only):** "This Mac" label, no switch. The Mac
+  always speaks locally when it's the only device.
+- **Multiple devices:** ALL devices get a switch, including "This Mac."
+  The user can mute local playback and have speech play only on the
+  iPhone (or vice versa, or both). Uses a `__mute_local__` sentinel
+  in `relayPeerIDs` to track local mute.
+
+---
+
 ## Open questions
 
-1. **Should the iPhone auto-discover the Mac and offer to be a
-   relay target?** Currently the Mac discovers the iPhone. The
-   reverse (iPhone settings showing "Also speak on MacBook Air")
-   would make the iPhone a peer hub. Phase 3 territory.
+1. **~~Should the iPhone auto-discover the Mac and offer to be a
+   relay target?~~** No. The Mac is always the hub. The iPhone is
+   always a relay target. Discovery and relay config live on the Mac.
 
 2. **What happens when the Mac relays to the iPhone but the iPhone
    is locked?** iOS suspends apps when locked. The background audio

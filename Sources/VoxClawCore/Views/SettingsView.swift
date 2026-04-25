@@ -17,8 +17,10 @@ struct SettingsView: View {
     @State private var peerSpeakStatusIsError = false
     @State private var peerSpeakStatusToken = UUID()
     @State private var voicePreview = VoicePreviewPlayer()
-    @State private var peerBrowser = PeerBrowser()
+    var peerBrowser: PeerBrowser
     @State private var browserControlStatus: String?
+    @State private var relayToastMessage: String?
+    @State private var relayToastTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
@@ -33,7 +35,6 @@ struct SettingsView: View {
         }
         .frame(width: 520, height: 720)
         .onAppear { peerBrowser.start() }
-        .onDisappear { peerBrowser.stop() }
     }
 
     private var agentSetupSection: some View {
@@ -402,15 +403,52 @@ struct SettingsView: View {
                         Text("\(peer.displayEmoji)  \(peer.name)")
                         Spacer()
                         if let baseURL = peer.baseURL {
-                            Button("Speak") {
+                            if peer.isLocalMachine && peerBrowser.peers.filter({ $0.baseURL != nil }).count <= 1 {
+                                Text("This Mac")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Toggle(isOn: Binding(
+                                    get: {
+                                        peer.isLocalMachine
+                                            ? !settings.relayPeerIDs.contains("__mute_local__")
+                                            : settings.relayPeerIDs.contains(peer.id)
+                                    },
+                                    set: { enabled in
+                                        if peer.isLocalMachine {
+                                            if enabled {
+                                                settings.relayPeerIDs.remove("__mute_local__")
+                                                showRelayToast("Speaking on \(peer.name)")
+                                            } else {
+                                                settings.relayPeerIDs.insert("__mute_local__")
+                                                showRelayToast("Muted on \(peer.name)")
+                                            }
+                                        } else {
+                                            if enabled {
+                                                settings.relayPeerIDs.insert(peer.id)
+                                                showRelayToast("Also speaking on \(peer.name)")
+                                            } else {
+                                                settings.relayPeerIDs.remove(peer.id)
+                                                showRelayToast("Stopped speaking on \(peer.name)")
+                                            }
+                                        }
+                                    }
+                                )) { EmptyView() }
+                                .toggleStyle(.switch)
+                                .controlSize(.small)
+                            }
+
+                            Button("Test") {
                                 speakToPeer(peer)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
-                            .help("Send a random quote to \(peer.name)")
+                            .help("Send a test phrase to \(peer.name)")
 
-                            Button("Setup") {
+                            Button {
                                 copyPeerSetup(baseURL: baseURL, name: peer.name)
+                            } label: {
+                                Image(systemName: "gearshape")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -437,6 +475,23 @@ struct SettingsView: View {
                     .foregroundStyle(peerSpeakStatusIsError ? .orange : .green)
                     .transition(.opacity)
             }
+
+            if let toast = relayToastMessage {
+                Label(toast, systemImage: "speaker.wave.2.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: relayToastMessage)
+            }
+        }
+    }
+
+    private func showRelayToast(_ message: String) {
+        withAnimation { relayToastMessage = message }
+        relayToastTask?.cancel()
+        relayToastTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { relayToastMessage = nil }
         }
     }
 
