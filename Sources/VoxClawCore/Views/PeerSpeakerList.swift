@@ -63,6 +63,13 @@ public struct PeerSpeakerList: View {
                 } else {
                     speakerToggle(for: peer, isLocal: peer.isLocalMachine)
                 }
+                Button("Test") {
+                    testPeer(peer)
+                }
+                .buttonStyle(.bordered)
+                #if os(macOS)
+                .controlSize(.small)
+                #endif
             } else if peer.app == .voxclaw {
                 Text("Resolving...")
                     .font(.caption)
@@ -106,6 +113,38 @@ public struct PeerSpeakerList: View {
         #if os(macOS)
         .controlSize(.small)
         #endif
+    }
+
+    private static let testQuotes = [
+        "The ships hung in the sky in much the same way that bricks don't.",
+        "Time is an illusion. Lunchtime doubly so.",
+        "I love deadlines. I love the whooshing noise they make as they go by.",
+        "Don't panic.",
+        "So long, and thanks for all the fish.",
+    ]
+
+    private func testPeer(_ peer: DiscoveredPeer) {
+        guard let baseURL = peer.baseURL,
+              let url = URL(string: "\(baseURL)/read") else { return }
+        let quote = Self.testQuotes.randomElement()!
+        Task {
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote, "relayed": true])
+            req.timeoutInterval = 3
+            do {
+                let (_, response) = try await URLSession.shared.data(for: req)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                if status >= 200 && status < 300 {
+                    showToast("Sent test to \(peer.name)")
+                } else {
+                    showToast("Failed: HTTP \(status)")
+                }
+            } catch {
+                showToast("Failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func showToast(_ message: String) {

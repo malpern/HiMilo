@@ -387,30 +387,6 @@ struct SettingsView: View {
         Group {
             PeerSpeakerList(settings: settings, peerBrowser: peerBrowser)
 
-            Section {
-                ForEach(peerBrowser.peers.filter { $0.baseURL != nil }) { peer in
-                    HStack {
-                        Text(peer.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Test") {
-                            speakToPeer(peer)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-
-                        Button {
-                            copyPeerSetup(baseURL: peer.baseURL!, name: peer.name)
-                        } label: {
-                            Image(systemName: "gearshape")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-            }
-
             if let copiedName = copiedPeerSetup {
                 Label("Copied setup for \(copiedName). Paste into OpenClaw.", systemImage: "checkmark.circle.fill")
                     .font(.caption)
