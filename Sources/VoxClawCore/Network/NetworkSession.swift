@@ -19,18 +19,21 @@ final class NetworkSession: Sendable {
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
     private let onAck: @Sendable (String) async -> Void
+    private let onControl: @Sendable (HTTPRequestParser.ControlRequest) async -> Void
     private let statusProvider: @Sendable () async -> StatusInfo
 
     init(
         connection: NWConnection,
         statusProvider: @escaping @Sendable () async -> StatusInfo,
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
-        onAck: @escaping @Sendable (String) async -> Void = { _ in }
+        onAck: @escaping @Sendable (String) async -> Void = { _ in },
+        onControl: @escaping @Sendable (HTTPRequestParser.ControlRequest) async -> Void = { _ in }
     ) {
         self.connection = connection
         self.statusProvider = statusProvider
         self.onReadRequest = onReadRequest
         self.onAck = onAck
+        self.onControl = onControl
     }
 
     func start() {
@@ -64,6 +67,8 @@ final class NetworkSession: Sendable {
             case .read:
                 handleRead(raw: raw, initialData: data)
             case .ack:
+                handleRead(raw: raw, initialData: data)
+            case .control:
                 handleRead(raw: raw, initialData: data)
             case .claw:
                 handleClaw()
@@ -246,6 +251,16 @@ final class NetworkSession: Sendable {
             sendResponse(status: 200, body: "{\"status\":\"acknowledged\"}", contentType: "application/json")
             Task {
                 await onAck(projectId)
+            }
+        case .control:
+            guard let control = HTTPRequestParser.parseControlRequest(from: body) else {
+                sendErrorResponse(status: 400, message: "Send JSON {\"action\":\"pause|resume|stop\"}.")
+                return
+            }
+            Log.network.info("Received control: action=\(control.action.rawValue, privacy: .public), origin=\(control.origin ?? "none", privacy: .public)")
+            sendResponse(status: 200, body: "{\"status\":\"ok\"}", contentType: "application/json")
+            Task {
+                await onControl(control)
             }
         default:
             sendErrorResponse(status: 404, message: "Not found")

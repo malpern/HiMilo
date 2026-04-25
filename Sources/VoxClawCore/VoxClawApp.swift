@@ -384,6 +384,8 @@ final class AppCoordinator {
     private var activeSession: ReadingSession?
     let voiceAssigner = VoiceAssigner(store: VoiceBindingStore(fileURL: VoiceBindingStore.defaultURL()))
     let peerBrowser = PeerBrowser()
+    let deviceID = UUID().uuidString
+    private var settingsRef: SettingsManager?
 
     private struct SpeechItem {
         let text: String
@@ -406,6 +408,7 @@ final class AppCoordinator {
 
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
         stopListening()
+        settingsRef = settings
         peerBrowser.start()
         let port = port ?? CLIContext.shared?.port ?? 4140
         let listener = NetworkListener(port: port, appState: appState, settings: settings)
@@ -417,6 +420,9 @@ final class AppCoordinator {
                 },
                 onAck: { [weak self] projectId in
                     await self?.handleAck(projectId: projectId, appState: appState)
+                },
+                onControl: { [weak self] control in
+                    await self?.handleControl(control)
                 },
                 voiceBindingCountProvider: { @Sendable in await assigner.bindingCount() }
             )
@@ -743,6 +749,9 @@ final class AppCoordinator {
 
             Log.session.info("Mid-speech blockers detected (sustained): \(blockers.joined(separator: ","), privacy: .public) — pausing")
             session.pauseForBlocker()
+            if let settings = settingsRef {
+                relayControl(action: .pause, settings: settings)
+            }
 
             let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)
             var cleared = false
@@ -760,6 +769,9 @@ final class AppCoordinator {
                 try? await Task.sleep(for: Self.interItemDelay)
                 if Task.isCancelled { return }
                 session.resumeFromBlocker()
+                if let settings = settingsRef {
+                    relayControl(action: .resume, settings: settings)
+                }
             } else {
                 Log.session.info("Mid-speech polite wait timed out, stopping current item")
                 session.stop()
@@ -792,6 +804,48 @@ final class AppCoordinator {
             Log.session.info("Ack: removed \(removed, privacy: .public) queued items for project")
             rebuildProjectIndicators(appState: appState)
         }
+
+        // Relay stop to peers so they also stop speaking this project.
+        if let settings = settingsRef {
+            relayControl(action: .stop, settings: settings)
+        }
+    }
+
+    /// Handles a control command from a peer or from local actions.
+    func handleControl(_ control: HTTPRequestParser.ControlRequest) {
+        if control.origin == deviceID { return }
+        Log.session.info("Control: \(control.action.rawValue, privacy: .public)")
+        switch control.action {
+        case .pause: activeSession?.togglePause()
+        case .resume: activeSession?.togglePause()
+        case .stop: stop()
+        }
+    }
+
+    /// Relay a control action to all relay peers.
+    func relayControl(action: HTTPRequestParser.ControlAction, settings: SettingsManager) {
+        let relayIDs = settings.relayPeerIDs
+        guard !relayIDs.isEmpty else { return }
+
+        for peer in peerBrowser.peers {
+            guard relayIDs.contains(peer.id), let baseURL = peer.baseURL else { continue }
+            guard let url = URL(string: "\(baseURL)/control") else { continue }
+
+            let peerName = peer.name
+            let payload: [String: Any] = ["action": action.rawValue, "origin": deviceID]
+            guard let body = try? JSONSerialization.data(withJSONObject: payload) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+            req.timeoutInterval = 2
+
+            let request = req
+            Task.detached {
+                _ = try? await URLSession.shared.data(for: request)
+                Log.network.info("Relayed control \(action.rawValue, privacy: .public) to \(peerName, privacy: .public)")
+            }
+        }
     }
 
     /// Rebuilds `appState.projectIndicators` from the currently-draining
@@ -818,6 +872,10 @@ final class AppCoordinator {
 
     func togglePause() {
         activeSession?.togglePause()
+        if let settings = settingsRef {
+            let action: HTTPRequestParser.ControlAction = activeSession != nil && (activeSession?.hasFinished == false) ? .pause : .resume
+            relayControl(action: action, settings: settings)
+        }
     }
 
     func stop() {
@@ -828,6 +886,9 @@ final class AppCoordinator {
         }
         activeSession?.stop()
         activeSession = nil
+        if let settings = settingsRef {
+            relayControl(action: .stop, settings: settings)
+        }
     }
 
     func setSpeed(_ speed: Float) {

@@ -16,9 +16,16 @@ final class iOSCoordinator {
         let port = settings.networkListenerPort
         let listener = VoxClawCore.NetworkListener(port: port, appState: appState, settings: settings)
         do {
-            try listener.start { [weak self] request in
-                await self?.handleReadRequest(request, appState: appState, settings: settings)
-            }
+            try listener.start(
+                onReadRequest: { [weak self] request in
+                    await self?.handleReadRequest(request, appState: appState, settings: settings)
+                },
+                onControl: { [weak self] control in
+                    await MainActor.run {
+                        self?.handleControl(control, appState: appState)
+                    }
+                }
+            )
             self.networkListener = listener
         } catch {
             print("Failed to start listener: \(error)")
@@ -59,6 +66,22 @@ final class iOSCoordinator {
         activeSession?.stop()
         activeSession = nil
         UIApplication.shared.isIdleTimerDisabled = false
+    }
+
+    func handleControl(_ control: HTTPRequestParser.ControlRequest, appState: AppState) {
+        print("[VoxClaw] iOS control: \(control.action.rawValue)")
+        switch control.action {
+        case .pause:
+            if !(activeSession?.hasFinished ?? true), !appState.isPaused {
+                togglePause()
+            }
+        case .resume:
+            if !(activeSession?.hasFinished ?? true), appState.isPaused {
+                togglePause()
+            }
+        case .stop:
+            stop()
+        }
     }
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {

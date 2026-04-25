@@ -28,6 +28,11 @@ public struct DiscoveredPeer: Identifiable, Hashable {
         }
     }
 
+    @MainActor
+    public var isLocalMachine: Bool {
+        name == NetworkListener.localComputerName()
+    }
+
     /// Base URL for this peer's HTTP API.
     public var baseURL: String? {
         guard app == .voxclaw, let host, !host.isEmpty, let port else { return nil }

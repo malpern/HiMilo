@@ -155,6 +155,14 @@ public final class SettingsManager {
         }
     }
 
+    /// Peer IDs (from DiscoveredPeer.id) that this instance should relay
+    /// incoming /read requests to. Persisted locally (not synced via iCloud).
+    public var relayPeerIDs: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(relayPeerIDs), forKey: "relayPeerIDs")
+        }
+    }
+
     public var rememberOverlayPosition: Bool {
         didSet {
             UserDefaults.standard.set(rememberOverlayPosition, forKey: "rememberOverlayPosition")
@@ -316,6 +324,8 @@ public final class SettingsManager {
         } else {
             self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
         }
+
+        self.relayPeerIDs = Set(UserDefaults.standard.stringArray(forKey: "relayPeerIDs") ?? [])
 
         if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
             let x = UserDefaults.standard.double(forKey: "savedOverlayOriginX")
