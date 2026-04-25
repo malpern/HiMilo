@@ -138,6 +138,17 @@ final class PanelController {
         })
     }
 
+    func dismissInstantly() {
+        stopKeyMonitoring()
+        quickSettingsWindow?.close()
+        quickSettingsWindow = nil
+        if let panel, settings.rememberOverlayPosition {
+            settings.savedOverlayOrigin = panel.frame.origin
+        }
+        panel?.close()
+        panel = nil
+    }
+
     // MARK: - Key Monitoring
 
     private func startKeyMonitoring() {

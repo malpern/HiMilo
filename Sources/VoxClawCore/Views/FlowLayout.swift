@@ -1,5 +1,15 @@
 import SwiftUI
 
+struct ParagraphBreakKey: LayoutValueKey {
+    static let defaultValue = false
+}
+
+extension View {
+    func paragraphBreak() -> some View {
+        layoutValue(key: ParagraphBreakKey.self, value: true)
+    }
+}
+
 public struct FlowLayout: Layout {
     public var hSpacing: CGFloat
     public var vSpacing: CGFloat
@@ -39,6 +49,14 @@ public struct FlowLayout: Layout {
         var maxX: CGFloat = 0
 
         for subview in subviews {
+            if subview[ParagraphBreakKey.self] {
+                currentX = 0
+                currentY += lineHeight + vSpacing * 2
+                lineHeight = 0
+                positions.append(CGPoint(x: 0, y: currentY))
+                continue
+            }
+
             let size = subview.sizeThatFits(.unspecified)
 
             if currentX + size.width > maxWidth && currentX > 0 {
@@ -54,7 +72,7 @@ public struct FlowLayout: Layout {
         }
 
         return ArrangeResult(
-            size: CGSize(width: maxX, height: currentY + lineHeight),
+            size: CGSize(width: min(maxX, maxWidth), height: currentY + lineHeight),
             positions: positions
         )
     }

@@ -28,14 +28,21 @@ struct FloatingPanelView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     FlowLayout(hSpacing: appearance.wordSpacing, vSpacing: appearance.effectiveLineSpacing) {
                         ForEach(appState.words.indices, id: \.self) { index in
-                            WordView(
-                                word: appState.words[index],
-                                isHighlighted: index == appState.currentWordIndex,
-                                isPast: index < appState.currentWordIndex,
-                                isPaused: appState.isPaused,
-                                appearance: appearance
-                            )
-                            .id(index)
+                            if appState.words[index] == ReadingSession.paragraphSentinel {
+                                Color.clear
+                                    .frame(width: 0, height: 0)
+                                    .paragraphBreak()
+                                    .id(index)
+                            } else {
+                                WordView(
+                                    word: appState.words[index],
+                                    isHighlighted: index == appState.currentWordIndex,
+                                    isPast: index < appState.currentWordIndex,
+                                    isPaused: appState.isPaused,
+                                    appearance: appearance
+                                )
+                                .id(index)
+                            }
                         }
                         if !appState.words.isEmpty {
                             Text("🦀")
@@ -46,13 +53,16 @@ struct FloatingPanelView: View {
                     }
                     .padding(.horizontal, appearance.horizontalPadding)
                     .padding(.vertical, appearance.verticalPadding)
+                    .padding(.top, appState.projectIndicators.isEmpty ? 0 : 16)
                 }
+                .clipped()
                 .onChange(of: appState.currentWordIndex) { _, newIndex in
                     withAnimation(.easeOut(duration: 0.15)) {
-                        proxy.scrollTo(newIndex, anchor: .center)
+                        proxy.scrollTo(newIndex, anchor: UnitPoint(x: 0, y: 0.5))
                     }
                 }
             }
+            .padding(.horizontal, 4)
 
             // Speed indicator (bottom-right, fades in/out)
             VStack {
@@ -83,6 +93,31 @@ struct FloatingPanelView: View {
                 }
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.2), value: appState.silentMode)
+            }
+
+            // Project indicators — top-left, subtle. Current + upcoming
+            // projects from the speech queue, each with a colored dot.
+            if !appState.projectIndicators.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(Array(appState.projectIndicators.enumerated()), id: \.element.id) { idx, indicator in
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(indicator.color.opacity(0.8))
+                                .frame(width: 6, height: 6)
+                            Text(indicator.name)
+                                .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular, design: .rounded))
+                                .foregroundStyle(.white.opacity(idx == 0 ? 0.70 : 0.35))
+                        }
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .move(edge: .leading))
+                        ))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.4), value: appState.projectIndicators)
+                .padding(.leading, 12)
+                .padding(.top, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
 
             // Timing source indicator — small dot visible during early heuristic, fades when better algo arrives
@@ -226,12 +261,17 @@ private struct WordView: View {
     var isPaused: Bool = false
     let appearance: OverlayAppearance
 
+    private static let codeMarker = "\u{200B}"
+
+    private var isCode: Bool { word.hasPrefix(Self.codeMarker) }
+    private var displayWord: String { isCode ? String(word.dropFirst()) : word }
+
     @State private var glowRadius: CGFloat = 3
 
     private var highlightColor: Color { appearance.highlightColor.color }
 
     var body: some View {
-        Text(word)
+        Text(displayWord)
             .font(.custom(appearance.fontFamily, size: appearance.fontSize).weight(appearance.fontWeightValue))
             .foregroundStyle(textColor)
             .padding(.horizontal, 4)
@@ -272,12 +312,13 @@ private struct WordView: View {
     }
 
     private var textColor: Color {
+        let base = isCode ? appearance.codeWordColor.color : appearance.textColor.color
         if isHighlighted {
-            return appearance.textColor.color
+            return base
         } else if isPast {
-            return appearance.textColor.color.opacity(appearance.pastWordOpacity)
+            return base.opacity(appearance.pastWordOpacity)
         } else {
-            return appearance.textColor.color.opacity(appearance.futureWordOpacity)
+            return base.opacity(appearance.futureWordOpacity)
         }
     }
 }

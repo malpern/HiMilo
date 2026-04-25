@@ -388,9 +388,12 @@ final class AppCoordinator {
         let text: String
         let engineOverride: (any SpeechEngine)?
         let audioOnlyOverride: Bool?
+        let projectId: String?
     }
     private var speechQueue: [SpeechItem] = []
     private var isDrainingQueue = false
+    private var projectActivity = ProjectActivityTracker()
+    private var currentDrainingProjectId: String?
     private static let maxQueueSize = 20
     private static let interItemDelay: Duration = .seconds(2)
     /// Maximum total time we'll politely wait for a defer-list app (Zoom, Claude
@@ -419,7 +422,13 @@ final class AppCoordinator {
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
         let engine = await makeEngine(for: request, settings: settings)
-        await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
+        await readText(
+            request.text,
+            appState: appState,
+            settings: settings,
+            engineOverride: engine,
+            projectId: request.projectId
+        )
     }
 
     /// Constructs the speech engine for a /read request, factoring in the project/agent
@@ -467,9 +476,15 @@ final class AppCoordinator {
         appState: AppState,
         settings: SettingsManager,
         audioOnlyOverride: Bool? = nil,
-        engineOverride: (any SpeechEngine)? = nil
+        engineOverride: (any SpeechEngine)? = nil,
+        projectId: String? = nil
     ) async {
-        let item = SpeechItem(text: text, engineOverride: engineOverride, audioOnlyOverride: audioOnlyOverride)
+        let item = SpeechItem(
+            text: text,
+            engineOverride: engineOverride,
+            audioOnlyOverride: audioOnlyOverride,
+            projectId: projectId
+        )
         enqueueSpeech(item, appState: appState, settings: settings)
     }
 
@@ -480,6 +495,10 @@ final class AppCoordinator {
         }
         speechQueue.append(item)
         Log.session.info("Enqueued speech: chars=\(item.text.count, privacy: .public), depth=\(self.speechQueue.count, privacy: .public)")
+        if let pid = item.projectId, !pid.isEmpty {
+            projectActivity.record(pid)
+        }
+        rebuildProjectIndicators(appState: appState)
         if !isDrainingQueue {
             Task { @MainActor in
                 await self.drainQueue(appState: appState, settings: settings)
@@ -494,6 +513,9 @@ final class AppCoordinator {
 
         while !speechQueue.isEmpty {
             let item = speechQueue.removeFirst()
+
+            currentDrainingProjectId = item.projectId
+            rebuildProjectIndicators(appState: appState)
 
             // Politely wait if any "blocker" is active: a defer-list app
             // (Zoom, Claude desktop, etc.) producing audio, OR any non-VoxClaw
@@ -520,6 +542,7 @@ final class AppCoordinator {
                 pauseExternalAudioDuringSpeech: !goSilent && settings.pauseOtherAudioDuringSpeech
             )
             session.onUserStop = { [weak self] in self?.stop() }
+            session.keepPanelOnFinish = !speechQueue.isEmpty
             activeSession = session
             Log.session.info("Queue draining item: chars=\(item.text.count, privacy: .public), remaining=\(self.speechQueue.count, privacy: .public), silent=\(goSilent, privacy: .public)")
             await session.start(text: item.text)
@@ -537,12 +560,19 @@ final class AppCoordinator {
             #if os(macOS)
             monitorTask?.cancel()
             #endif
-            activeSession = nil
             appState.silentMode = false
+
+            // Animate project indicators: remove current, slide upcoming left.
+            currentDrainingProjectId = nil
+            rebuildProjectIndicators(appState: appState)
 
             if !speechQueue.isEmpty {
                 try? await Task.sleep(for: Self.interItemDelay)
+                // Swap panels: close the old one instantly, new session will
+                // create a fresh panel at the same position.
+                session.dismissPanel()
             }
+            activeSession = nil
         }
     }
 
@@ -627,6 +657,28 @@ final class AppCoordinator {
         }
     }
     #endif
+
+    /// Rebuilds `appState.projectIndicators` from the currently-draining
+    /// project + distinct upcoming projects in the speech queue. Produces an
+    /// empty list when <2 projects are in the activity window so single-
+    /// project use stays uncluttered.
+    private func rebuildProjectIndicators(appState: AppState) {
+        guard projectActivity.distinctProjectsInWindow() >= 2 else {
+            appState.projectIndicators = []
+            return
+        }
+        var seen = Set<String>()
+        var indicators: [ProjectIndicator] = []
+        if let pid = currentDrainingProjectId, !pid.isEmpty, seen.insert(pid).inserted {
+            indicators.append(ProjectIndicator(projectId: pid))
+        }
+        for item in speechQueue {
+            if let pid = item.projectId, !pid.isEmpty, seen.insert(pid).inserted {
+                indicators.append(ProjectIndicator(projectId: pid))
+            }
+        }
+        appState.projectIndicators = indicators
+    }
 
     func togglePause() {
         activeSession?.togglePause()

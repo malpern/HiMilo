@@ -22,6 +22,9 @@ public final class ReadingSession: SpeechEngineDelegate {
     /// stop button). When set, this is called instead of `stop()` so the coordinator
     /// can also clear any queued speech. If nil, the panel calls `stop()` directly.
     public var onUserStop: (@MainActor () -> Void)?
+    /// When true, finish clears content but keeps the panel visible so the
+    /// coordinator can do a smooth transition to the next queued item.
+    public var keepPanelOnFinish = false
 
     public init(
         appState: AppState,
@@ -58,6 +61,13 @@ public final class ReadingSession: SpeechEngineDelegate {
 
     public var hasFinished: Bool { isFinalized }
 
+    public func dismissPanel() {
+        #if os(macOS)
+        panelController?.dismissInstantly()
+        panelController = nil
+        #endif
+    }
+
     /// Pause initiated by the coordinator because a blocker (mic / defer-list app)
     /// became active mid-speech. Distinguished from the user-pause button only
     /// in logging — both share the same engine pause path and visual state.
@@ -84,7 +94,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         finishTask?.cancel()
         finishTask = nil
 
-        let words = text.split(separator: " ").map(String.init)
+        let words = Self.splitPreservingParagraphs(text)
         let isAudioOnly = appState.audioOnly
         let wordCount = words.count
         let preview = String(text.prefix(80))
@@ -246,28 +256,39 @@ public final class ReadingSession: SpeechEngineDelegate {
         resumeExternalPlaybackIfNeeded()
 
         if delayedReset && mutatingAppState {
-            Log.session.info("finish: scheduling delayed reset (500ms)")
-            finishTask = Task { @MainActor [weak self] in
-                do {
-                    try await Task.sleep(for: .milliseconds(500))
-                } catch {
-                    Log.session.info("finish: delayed reset cancelled during sleep")
+            if keepPanelOnFinish {
+                Log.session.info("finish: keepPanelOnFinish — clearing content, keeping panel")
+                appState.words = []
+                appState.currentWordIndex = 0
+                appState.sessionState = .idle
+                finishTask = Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(300))
                     self?.resumeFinishContinuationIfNeeded()
-                    return
                 }
-                if Task.isCancelled {
-                    Log.session.info("finish: delayed reset cancelled after sleep")
+            } else {
+                Log.session.info("finish: scheduling delayed reset (500ms)")
+                finishTask = Task { @MainActor [weak self] in
+                    do {
+                        try await Task.sleep(for: .milliseconds(500))
+                    } catch {
+                        Log.session.info("finish: delayed reset cancelled during sleep")
+                        self?.resumeFinishContinuationIfNeeded()
+                        return
+                    }
+                    if Task.isCancelled {
+                        Log.session.info("finish: delayed reset cancelled after sleep")
+                        self?.resumeFinishContinuationIfNeeded()
+                        return
+                    }
+                    Log.session.info("finish: delayed reset firing — dismissing panel and resetting appState")
+                    #if os(macOS)
+                    self?.panelController?.dismiss()
+                    #endif
+                    self?.appState.reset()
+                    let wc = self?.appState.words.count ?? -1
+                    Log.session.info("finish: delayed reset complete, words=\(wc, privacy: .public)")
                     self?.resumeFinishContinuationIfNeeded()
-                    return
                 }
-                Log.session.info("finish: delayed reset firing — dismissing panel and resetting appState")
-                #if os(macOS)
-                self?.panelController?.dismiss()
-                #endif
-                self?.appState.reset()
-                let wc = self?.appState.words.count ?? -1
-                Log.session.info("finish: delayed reset complete, words=\(wc, privacy: .public)")
-                self?.resumeFinishContinuationIfNeeded()
             }
         } else {
             Log.session.info("finish: immediate cleanup, dismissing panel")
@@ -304,6 +325,23 @@ public final class ReadingSession: SpeechEngineDelegate {
                 self?.appState.feedbackText = nil
             }
         }
+    }
+
+    /// Unicode paragraph separator used as a sentinel in the words array to
+    /// create visual gaps between paragraphs in the overlay panel.
+    public static let paragraphSentinel = "\u{2029}"
+
+    static func splitPreservingParagraphs(_ text: String) -> [String] {
+        let paragraphs = text.components(separatedBy: "\n\n")
+        var words: [String] = []
+        for (i, para) in paragraphs.enumerated() {
+            if i > 0 && !words.isEmpty {
+                words.append(paragraphSentinel)
+            }
+            let paraWords = para.split(whereSeparator: \.isWhitespace).map(String.init)
+            words.append(contentsOf: paraWords)
+        }
+        return words
     }
 
     private func resumeExternalPlaybackIfNeeded() {
