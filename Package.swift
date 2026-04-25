@@ -25,6 +25,7 @@ let package = Package(
             resources: [
                 .copy("Audio/Samples/onyx-sample.mp3"),
                 .copy("Audio/Samples/onboarding-openai.mp3"),
+                .copy("Audio/Samples/Submarine.aiff"),
             ]
         ),
         .executableTarget(

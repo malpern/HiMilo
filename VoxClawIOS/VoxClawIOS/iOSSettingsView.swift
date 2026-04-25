@@ -24,9 +24,13 @@ struct iOSSettingsView: View {
         ("z9fAnlkpzviPz146aGWa", "Glinda"),
     ]
 
+    @State private var relayToastMessage: String?
+    @State private var relayToastTask: Task<Void, Never>?
+
     var body: some View {
         Form {
             agentSetupSection
+            peersSection
             overlaySection
             voiceSection
             networkSection
@@ -110,6 +114,93 @@ struct iOSSettingsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
+        }
+    }
+
+    // MARK: - Peers
+
+    private var peersSection: some View {
+        Section("VoxClaws On This Network") {
+            if coordinator.peerBrowser.peers.isEmpty {
+                HStack(spacing: 8) {
+                    if coordinator.peerBrowser.isSearching {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text("Searching...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(coordinator.peerBrowser.peers) { peer in
+                    HStack {
+                        Text("\(peer.displayEmoji)  \(peer.name)")
+                        Spacer()
+                        if peer.baseURL != nil {
+                            if peer.isLocalMachine {
+                                if coordinator.peerBrowser.peers.filter({ $0.baseURL != nil }).count <= 1 {
+                                    Text("This device")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    speakerToggle(for: peer, isLocal: true)
+                                }
+                            } else {
+                                speakerToggle(for: peer, isLocal: false)
+                            }
+                        } else {
+                            Text("OpenClaw")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
+            if let toast = relayToastMessage {
+                Label(toast, systemImage: "speaker.wave.2.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func speakerToggle(for peer: DiscoveredPeer, isLocal: Bool) -> some View {
+        Toggle(isOn: Binding(
+            get: {
+                isLocal
+                    ? !settings.relayPeerIDs.contains("__mute_local__")
+                    : settings.relayPeerIDs.contains(peer.id)
+            },
+            set: { enabled in
+                if isLocal {
+                    if enabled {
+                        settings.relayPeerIDs.remove("__mute_local__")
+                        showRelayToast("Speaking on \(peer.name)")
+                    } else {
+                        settings.relayPeerIDs.insert("__mute_local__")
+                        showRelayToast("Muted on \(peer.name)")
+                    }
+                } else {
+                    if enabled {
+                        settings.relayPeerIDs.insert(peer.id)
+                        showRelayToast("Also speaking on \(peer.name)")
+                    } else {
+                        settings.relayPeerIDs.remove(peer.id)
+                        showRelayToast("Stopped speaking on \(peer.name)")
+                    }
+                }
+            }
+        )) { EmptyView() }
+        .toggleStyle(.switch)
+    }
+
+    private func showRelayToast(_ message: String) {
+        withAnimation { relayToastMessage = message }
+        relayToastTask?.cancel()
+        relayToastTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { relayToastMessage = nil }
         }
     }
 

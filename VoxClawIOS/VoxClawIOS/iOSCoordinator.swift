@@ -10,10 +10,12 @@ final class iOSCoordinator: SpeechQueueDelegate {
     private var interruptionTask: Task<Void, Never>?
     let queue = SpeechQueueCoordinator()
     let keepAlive = BackgroundAudioKeepAlive()
+    let peerBrowser = PeerBrowser()
 
     func startListening(appState: AppState, settings: SettingsManager) {
         stopListening()
         queue.delegate = self
+        peerBrowser.start()
         let port = settings.networkListenerPort
         let listener = VoxClawCore.NetworkListener(port: port, appState: appState, settings: settings)
         do {

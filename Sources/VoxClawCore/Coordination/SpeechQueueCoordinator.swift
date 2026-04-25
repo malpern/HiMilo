@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import SwiftUI
 import os
@@ -52,7 +53,19 @@ public final class SpeechQueueCoordinator {
     static let politeWaitMax: Duration = .seconds(150)
     static let politePollInterval: Duration = .seconds(1)
 
+    private var ackSoundPlayer: AVAudioPlayer?
+
     public init() {}
+
+    private func playAckSound() {
+        #if os(macOS)
+        NSSound(named: "Submarine")?.play()
+        #else
+        guard let url = Bundle.module.url(forResource: "Submarine", withExtension: "aiff") else { return }
+        ackSoundPlayer = try? AVAudioPlayer(contentsOf: url)
+        ackSoundPlayer?.play()
+        #endif
+    }
 
     // MARK: - Public API
 
@@ -99,9 +112,7 @@ public final class SpeechQueueCoordinator {
         if currentDrainingProjectId == projectId {
             Log.session.info("Ack: marking current session as acknowledged")
             isCurrentItemAcked = true
-            #if os(macOS)
-            NSSound(named: "Submarine")?.play()
-            #endif
+            playAckSound()
         }
 
         let before = speechQueue.count
