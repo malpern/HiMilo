@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+plugin_dir="$root/plugins/voxclaw"
+manifest="$plugin_dir/.codex-plugin/plugin.json"
+marketplace="$root/.agents/plugins/marketplace.json"
+helper="$plugin_dir/scripts/voxclaw-say"
+
+require_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    echo "missing file: $path" >&2
+    exit 1
+  fi
+}
+
+require_file "$manifest"
+require_file "$marketplace"
+require_file "$helper"
+
+python3 - <<'PY' "$manifest" "$marketplace"
+import json
+import sys
+
+manifest_path, marketplace_path = sys.argv[1], sys.argv[2]
+
+with open(manifest_path, "r", encoding="utf-8") as f:
+    manifest = json.load(f)
+
+with open(marketplace_path, "r", encoding="utf-8") as f:
+    marketplace = json.load(f)
+
+assert manifest["name"] == "voxclaw"
+assert manifest["interface"]["displayName"] == "VoxClaw"
+
+plugins = marketplace["plugins"]
+entry = next((p for p in plugins if p["name"] == "voxclaw"), None)
+assert entry is not None
+assert entry["source"]["path"] == "./plugins/voxclaw"
+assert entry["policy"]["installation"] == "AVAILABLE"
+assert entry["policy"]["authentication"] == "ON_INSTALL"
+
+print("ok: manifest and marketplace")
+PY
+
+"$helper" --health
+"$helper" "VoxClaw plugin smoke test successful."

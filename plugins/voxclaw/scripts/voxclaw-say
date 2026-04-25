@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  voxclaw-say [options] "text to speak"
+  echo "text to speak" | voxclaw-say [options]
+  voxclaw-say --health
+
+Options:
+  --url URL                 Explicit VoxClaw /read URL
+  --health-url URL          Explicit VoxClaw /status URL
+  --health                  Check whether VoxClaw is reachable
+  --project-id ID           Project identifier (default: cwd)
+  --agent-id ID             Agent identifier
+  --voice NAME              Voice override
+  --rate NUMBER             Speech rate multiplier
+  --instructions TEXT       Speaking style instructions
+  --port PORT               Local listener port (default: 4140)
+  -h, --help                Show this help
+
+Resolution order:
+  1. Explicit --url or --health-url
+  2. Local listener on localhost:<port>
+  3. Local voxclaw CLI
+EOF
+}
+
+port=4140
+read_url=""
+health_url=""
+project_id=""
+agent_id=""
+voice=""
+rate=""
+instructions=""
+health_only=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --url)         read_url="${2:-}";    shift 2 ;;
+    --health-url)  health_url="${2:-}";  shift 2 ;;
+    --project-id)  project_id="${2:-}";  shift 2 ;;
+    --agent-id)    agent_id="${2:-}";    shift 2 ;;
+    --voice)       voice="${2:-}";       shift 2 ;;
+    --rate)        rate="${2:-}";        shift 2 ;;
+    --instructions) instructions="${2:-}"; shift 2 ;;
+    --port)        port="${2:-}";        shift 2 ;;
+    --health)      health_only=1;       shift ;;
+    -h|--help)     usage; exit 0 ;;
+    --)            shift; break ;;
+    -*)            echo "Unknown option: $1" >&2; usage >&2; exit 2 ;;
+    *)             break ;;
+  esac
+done
+
+text="${*:-}"
+if [[ -z "$text" && ! -t 0 ]]; then
+  text="$(cat)"
+fi
+
+default_health_url="http://localhost:${port}/status"
+default_read_url="http://localhost:${port}/read"
+
+health_target="${health_url:-}"
+if [[ -z "$health_target" && -n "$read_url" ]]; then
+  health_target="${read_url%/read}/status"
+fi
+if [[ -z "$health_target" ]]; then
+  health_target="$default_health_url"
+fi
+
+read_target="${read_url:-$default_read_url}"
+
+json_string() {
+  python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+}
+
+http_health_ok() {
+  curl -fsS "$1" >/dev/null 2>&1
+}
+
+send_http_read() {
+  local url="$1"
+  local payload
+  payload=$(printf '{"text":%s' "$(printf '%s' "$text" | json_string)")
+  if [[ -n "$project_id" ]]; then
+    payload+=$(printf ',"project_id":%s' "$(printf '%s' "$project_id" | json_string)")
+  fi
+  if [[ -n "$agent_id" ]]; then
+    payload+=$(printf ',"agent_id":%s' "$(printf '%s' "$agent_id" | json_string)")
+  fi
+  if [[ -n "$voice" ]]; then
+    payload+=$(printf ',"voice":%s' "$(printf '%s' "$voice" | json_string)")
+  fi
+  if [[ -n "$rate" ]]; then
+    payload+=$(printf ',"rate":%s' "$rate")
+  fi
+  if [[ -n "$instructions" ]]; then
+    payload+=$(printf ',"instructions":%s' "$(printf '%s' "$instructions" | json_string)")
+  fi
+  payload+='}'
+  curl -fsS -X POST "$url" -H 'Content-Type: application/json' -d "$payload"
+}
+
+send_cli_read() {
+  local cmd=(voxclaw)
+  if [[ -n "$voice" ]]; then cmd+=(--voice "$voice"); fi
+  if [[ -n "$rate" ]]; then cmd+=(--rate "$rate"); fi
+  if [[ -n "$instructions" ]]; then cmd+=(--instructions "$instructions"); fi
+  cmd+=("$text")
+  "${cmd[@]}"
+}
+
+# Health check mode
+if [[ $health_only -eq 1 ]]; then
+  if http_health_ok "$health_target"; then
+    echo "ok: $health_target"
+    exit 0
+  fi
+  if command -v voxclaw >/dev/null 2>&1; then
+    if voxclaw --status >/dev/null 2>&1; then
+      echo "ok: voxclaw --status"
+      exit 0
+    fi
+  fi
+  echo "error: VoxClaw is not reachable via $health_target or local CLI" >&2
+  exit 1
+fi
+
+if [[ -z "$text" ]]; then
+  echo "error: missing text to speak" >&2
+  usage >&2
+  exit 2
+fi
+
+# Try explicit URL, then local listener, then CLI
+if [[ -n "$read_url" ]]; then
+  send_http_read "$read_target"
+  exit 0
+fi
+
+if http_health_ok "$default_health_url"; then
+  send_http_read "$default_read_url"
+  exit 0
+fi
+
+if command -v voxclaw >/dev/null 2>&1; then
+  send_cli_read
+  exit 0
+fi
+
+echo "error: no reachable VoxClaw listener and no local voxclaw CLI found" >&2
+exit 1

@@ -1,0 +1,8 @@
+{
+  "name": "voxclaw",
+  "description": "Give Codex a voice with the VoxClaw macOS app, CLI, and local HTTP listener.",
+  "homepage": "https://github.com/malpern/VoxClaw",
+  "interface": {
+    "displayName": "VoxClaw"
+  }
+}
