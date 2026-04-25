@@ -155,11 +155,14 @@ public final class SettingsManager {
         }
     }
 
-    /// Peer IDs (from DiscoveredPeer.id) that this instance should relay
-    /// incoming /read requests to. Persisted locally (not synced via iCloud).
+    /// Peer IDs (from DiscoveredPeer.id) that should receive relayed speech.
+    /// Synced via iCloud KVS so any device can toggle speakers for all devices.
+    /// The sentinel "__mute_local__" mutes local playback.
     public var relayPeerIDs: Set<String> {
         didSet {
-            UserDefaults.standard.set(Array(relayPeerIDs), forKey: "relayPeerIDs")
+            let array = Array(relayPeerIDs)
+            UserDefaults.standard.set(array, forKey: "relayPeerIDs")
+            NSUbiquitousKeyValueStore.default.set(array, forKey: "relayPeerIDs")
         }
     }
 
@@ -325,7 +328,11 @@ public final class SettingsManager {
             self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
         }
 
-        self.relayPeerIDs = Set(UserDefaults.standard.stringArray(forKey: "relayPeerIDs") ?? [])
+        if let kvsRelay = kvs.array(forKey: "relayPeerIDs") as? [String] {
+            self.relayPeerIDs = Set(kvsRelay)
+        } else {
+            self.relayPeerIDs = Set(UserDefaults.standard.stringArray(forKey: "relayPeerIDs") ?? [])
+        }
 
         if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
             let x = UserDefaults.standard.double(forKey: "savedOverlayOriginX")
@@ -568,6 +575,15 @@ public final class SettingsManager {
                     if value != self.hasCompletedOnboarding {
                         self.hasCompletedOnboarding = value
                         Log.settings.info("Onboarding completion updated from iCloud KVS")
+                    }
+                }
+
+                if changedKeys.contains("relayPeerIDs"),
+                   let array = kvs.array(forKey: "relayPeerIDs") as? [String] {
+                    let newSet = Set(array)
+                    if newSet != self.relayPeerIDs {
+                        self.relayPeerIDs = newSet
+                        Log.settings.info("Relay peer IDs updated from iCloud KVS")
                     }
                 }
 
