@@ -8,10 +8,6 @@ enum AccessibilityID {
         static let settings = "menuBar.settings"
         static let about = "menuBar.about"
         static let quit = "menuBar.quit"
-        static let agentSpeechMenu = "menuBar.agentSpeechMenu"
-        static let agentSpeechModeOff = "menuBar.agentSpeechMode.off"
-        static let agentSpeechModeSummary = "menuBar.agentSpeechMode.summary"
-        static let agentSpeechModeLive = "menuBar.agentSpeechMode.live"
     }
 
     enum Overlay {

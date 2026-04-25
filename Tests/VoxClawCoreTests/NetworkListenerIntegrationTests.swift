@@ -10,9 +10,10 @@ struct NetworkListenerIntegrationTests {
 
     @Test func statusEndpointReturnsOK() async throws {
         let appState = AppState()
-        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        let settings = SettingsManager()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState, settings: settings)
 
-        try listener.start { _ in }
+        try listener.start(onReadRequest: { _ in })
         defer { listener.stop() }
 
         try await waitForListener(port: Self.testPort)
@@ -39,12 +40,15 @@ struct NetworkListenerIntegrationTests {
 
     @Test func readEndpointAcceptsJSON() async throws {
         let appState = AppState()
-        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        let settings = SettingsManager()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState, settings: settings)
         var receivedRequests: [ReadRequest] = []
 
-        try listener.start { request in
-            await MainActor.run { receivedRequests.append(request) }
-        }
+        try listener.start(
+            onReadRequest: { request in
+                await MainActor.run { receivedRequests.append(request) }
+            }
+        )
         defer { listener.stop() }
 
         try await waitForListener(port: Self.testPort)
@@ -69,12 +73,15 @@ struct NetworkListenerIntegrationTests {
 
     @Test func readEndpointAcceptsVoiceAndRate() async throws {
         let appState = AppState()
-        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        let settings = SettingsManager()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState, settings: settings)
         var receivedRequests: [ReadRequest] = []
 
-        try listener.start { request in
-            await MainActor.run { receivedRequests.append(request) }
-        }
+        try listener.start(
+            onReadRequest: { request in
+                await MainActor.run { receivedRequests.append(request) }
+            }
+        )
         defer { listener.stop() }
 
         try await waitForListener(port: Self.testPort)
@@ -98,12 +105,15 @@ struct NetworkListenerIntegrationTests {
 
     @Test func readEndpointAcceptsPlainText() async throws {
         let appState = AppState()
-        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        let settings = SettingsManager()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState, settings: settings)
         var receivedRequests: [ReadRequest] = []
 
-        try listener.start { request in
-            await MainActor.run { receivedRequests.append(request) }
-        }
+        try listener.start(
+            onReadRequest: { request in
+                await MainActor.run { receivedRequests.append(request) }
+            }
+        )
         defer { listener.stop() }
 
         try await waitForListener(port: Self.testPort)
@@ -125,9 +135,10 @@ struct NetworkListenerIntegrationTests {
 
     @Test func notFoundForUnknownRoute() async throws {
         let appState = AppState()
-        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState)
+        let settings = SettingsManager()
+        let listener = NetworkListener(port: Self.testPort, serviceName: nil, appState: appState, settings: settings)
 
-        try listener.start { _ in }
+        try listener.start(onReadRequest: { _ in })
         defer { listener.stop() }
 
         try await waitForListener(port: Self.testPort)

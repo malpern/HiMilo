@@ -26,13 +26,6 @@ struct HTTPRequestParserTests {
         #expect(req?.agentId == nil)
     }
 
-    @Test func parseAgentNotifyWithProjectId() {
-        let body = #"{"kind":"summary","text":"done","project_id":"/tmp/proj","agent_id":"a1"}"#
-        let req = HTTPRequestParser.parseAgentNotificationRequest(from: body)
-        #expect(req?.projectId == "/tmp/proj")
-        #expect(req?.agentId == "a1")
-    }
-
     // MARK: - parseContentLength
 
     @Test func parseContentLengthPresent() {
@@ -127,33 +120,6 @@ struct HTTPRequestParserTests {
         #expect(req?.rate == 2.0)
     }
 
-    @Test func parseAgentNotificationRequestJSON() {
-        let req = HTTPRequestParser.parseAgentNotificationRequest(from: "{\"kind\":\"summary\",\"text\":\"done\",\"source\":\"codex\"}")
-        #expect(req?.kind == .summary)
-        #expect(req?.text == "done")
-        #expect(req?.source == "codex")
-    }
-
-    @Test func parseAgentNotificationRequestInvalid() {
-        #expect(HTTPRequestParser.parseAgentNotificationRequest(from: "{\"text\":\"missing kind\"}") == nil)
-        #expect(HTTPRequestParser.parseAgentNotificationRequest(from: "{\"kind\":\"nope\",\"text\":\"bad kind\"}") == nil)
-    }
-
-    @Test func parseAgentNotificationRequestWithModeOverride() {
-        let req = HTTPRequestParser.parseAgentNotificationRequest(
-            from: "{\"kind\":\"progress\",\"text\":\"working\",\"mode\":\"live\"}"
-        )
-        #expect(req?.modeOverride == .live)
-    }
-
-    @Test func parseAgentNotificationRequestIgnoresUnknownMode() {
-        let req = HTTPRequestParser.parseAgentNotificationRequest(
-            from: "{\"kind\":\"summary\",\"text\":\"done\",\"mode\":\"bogus\"}"
-        )
-        #expect(req?.kind == .summary)
-        #expect(req?.modeOverride == nil)
-    }
-
     // MARK: - parseRequestLine
 
     @Test func parseRequestLineValidGET() {
@@ -192,10 +158,6 @@ struct HTTPRequestParserTests {
 
     @Test func routePostRead() {
         #expect(HTTPRequestParser.route(method: "POST", path: "/read") == .read)
-    }
-
-    @Test func routePostAgentNotify() {
-        #expect(HTTPRequestParser.route(method: "POST", path: "/agent-notify") == .agentNotify)
     }
 
     @Test func routeGetClaw() {

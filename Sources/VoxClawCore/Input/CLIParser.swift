@@ -76,6 +76,9 @@ struct CLIParser: ParsableCommand {
     @Option(name: .long, help: "Send text to a running listener")
     var send: String? = nil
 
+    @Flag(name: .customLong("browser-control-native-host"), help: ArgumentHelp("Run as the Chrome native messaging host", visibility: .hidden))
+    var browserControlNativeHost = false
+
     @Argument(help: "Text to read aloud")
     var text: [String] = []
 
@@ -83,6 +86,11 @@ struct CLIParser: ParsableCommand {
         if verbose {
             Log.isVerbose = true
             Log.verbose("Verbose mode enabled")
+        }
+
+        if browserControlNativeHost {
+            try BrowserControlNativeHostRunner.run()
+            return
         }
 
         // --status: query a running listener
@@ -102,6 +110,7 @@ struct CLIParser: ParsableCommand {
             clipboardFlag: clipboard,
             filePath: file
         )
+
 
         // --output: save audio to file without launching the app
         if let outputPath = output {
@@ -252,7 +261,7 @@ final class CLIContext: Sendable {
     let verbose: Bool
     let instructions: String?
 
-    init(text: String?, audioOnly: Bool, voice: String, rate: Float = 1.0, listen: Bool = false, port: UInt16 = 4140, verbose: Bool = false, instructions: String? = nil) {
+    init(text: String? = nil, audioOnly: Bool = false, voice: String = "onyx", rate: Float = 1.0, listen: Bool = false, port: UInt16 = 4140, verbose: Bool = false, instructions: String? = nil) {
         self.text = text
         self.audioOnly = audioOnly
         self.voice = voice

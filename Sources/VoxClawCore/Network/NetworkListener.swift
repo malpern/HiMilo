@@ -14,7 +14,6 @@ public final class NetworkListener {
     private let appState: AppState
     private let settings: SettingsManager
     private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
-    private var onAgentNotificationRequest: (@Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome)?
     private var voiceBindingCountProvider: (@Sendable () async -> Int)?
 
     public var isListening: Bool { listener != nil }
@@ -28,12 +27,10 @@ public final class NetworkListener {
 
     public func start(
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
-        onAgentNotificationRequest: @escaping @Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome,
         voiceBindingCountProvider: (@Sendable () async -> Int)? = nil
     ) throws {
         guard listener == nil else { return }
         self.onReadRequest = onReadRequest
-        self.onAgentNotificationRequest = onAgentNotificationRequest
         self.voiceBindingCountProvider = voiceBindingCountProvider
 
         let params = NWParameters.tcp
@@ -75,7 +72,6 @@ public final class NetworkListener {
         listener = nil
         appState.isListening = false
         onReadRequest = nil
-        onAgentNotificationRequest = nil
         Log.network.info("Listener stopped")
         print("VoxClaw listener stopped")
     }
@@ -101,7 +97,6 @@ public final class NetworkListener {
         let state = appState
         let listenPort = port
         let onReadRequest = self.onReadRequest
-        let onAgentNotificationRequest = self.onAgentNotificationRequest
         let voiceBindingCountProvider = self.voiceBindingCountProvider
         let session = NetworkSession(
             connection: connection,
@@ -124,8 +119,6 @@ public final class NetworkListener {
                         port: listenPort,
                         lanIP: NetworkListener.localIPAddress(),
                         autoClosedInstancesOnLaunch: state.autoClosedInstancesOnLaunch,
-                        agentSpeechMode: self.settings.agentSpeechMode,
-                        agentSpeechVerbosity: self.settings.agentSpeechVerbosity,
                         voiceBindingCount: voiceBindingCount
                     )
                 }
@@ -136,12 +129,6 @@ public final class NetworkListener {
                 } else {
                     await self?.onReadRequest?(request)
                 }
-            },
-            onAgentNotificationRequest: { request in
-                if let onAgentNotificationRequest {
-                    return await onAgentNotificationRequest(request)
-                }
-                return .suppressed
             }
         )
         session.start()
@@ -162,11 +149,6 @@ public final class NetworkListener {
         print("")
         print("  Health check:")
         print("    curl http://\(ip):\(port)/status")
-        print("")
-        print("  Agent notification:")
-        print("    curl -X POST http://\(ip):\(port)/agent-notify \\")
-        print("      -H 'Content-Type: application/json' \\")
-        print("      -d '{\"kind\": \"summary\", \"text\": \"Task complete.\"}'")
         print("")
     }
 

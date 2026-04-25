@@ -409,9 +409,6 @@ final class AppCoordinator {
                 onReadRequest: { [weak self] request in
                     await self?.handleReadRequest(request, appState: appState, settings: settings)
                 },
-                onAgentNotificationRequest: { [weak self] request in
-                    await self?.handleAgentNotificationRequest(request, appState: appState, settings: settings) ?? .suppressed
-                },
                 voiceBindingCountProvider: { @Sendable in await assigner.bindingCount() }
             )
             self.networkListener = listener
@@ -449,50 +446,6 @@ final class AppCoordinator {
             engine = AppleSpeechEngine(rate: rate)
         }
         await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
-    }
-
-    private func handleAgentNotificationRequest(
-        _ request: AgentNotificationRequest,
-        appState: AppState,
-        settings: SettingsManager
-    ) async -> AgentNotificationOutcome {
-        guard request.shouldSpeak(currentMode: settings.agentSpeechMode) else {
-            let effectiveMode = request.modeOverride ?? settings.agentSpeechMode
-            Log.app.info("Agent notification suppressed: mode=\(effectiveMode.rawValue, privacy: .public), kind=\(request.kind.rawValue, privacy: .public), override=\(request.modeOverride?.rawValue ?? "none", privacy: .public)")
-            return .suppressed
-        }
-
-        let spokenText = request.spokenText(verbosity: settings.agentSpeechVerbosity)
-        let rate = request.rate ?? settings.voiceSpeed
-        let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
-
-        let assignedOpenAI = await voiceAssigner.resolveVoice(
-            projectId: request.projectId,
-            agentId: request.agentId,
-            engine: .openai
-        )
-        let openaiVoice = request.voice ?? assignedOpenAI ?? settings.openAIVoice
-
-        let assignedApple = await voiceAssigner.resolveVoice(
-            projectId: request.projectId,
-            agentId: request.agentId,
-            engine: .apple
-        )
-        let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
-
-        var engine: (any SpeechEngine)?
-        if !settings.openAIAPIKey.isEmpty {
-            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: rate, instructions: instructions)
-            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-            engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
-        } else if request.projectId != nil {
-            engine = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-        } else if request.rate != nil {
-            engine = AppleSpeechEngine(rate: rate)
-        }
-
-        await readText(spokenText, appState: appState, settings: settings, engineOverride: engine)
-        return .reading
     }
 
     func stopListening() {
@@ -692,8 +645,6 @@ final class AppCoordinator {
 
         if context.listen {
             startListening(appState: appState, settings: settings, port: context.port)
-        } else if let notification = context.agentNotification {
-            _ = await handleAgentNotificationRequest(notification, appState: appState, settings: settings)
         } else if let text = context.text {
             let instructions = context.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
             let engine: any SpeechEngine

@@ -51,4 +51,5 @@ struct SettingsManagerTests {
         let settings = SettingsManager()
         #expect(settings.voiceSpeed == 1.0)
     }
+
 }

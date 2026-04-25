@@ -37,7 +37,6 @@ enum HTTPRequestParser {
     enum Route: Equatable {
         case status
         case read
-        case agentNotify
         case claw
         case corsPreflight
         case notFound(method: String, path: String)
@@ -62,8 +61,6 @@ enum HTTPRequestParser {
             return .status
         case ("POST", "/read"):
             return .read
-        case ("POST", "/agent-notify"):
-            return .agentNotify
         case ("GET", "/claw"):
             return .claw
         case ("OPTIONS", _):
@@ -116,34 +113,4 @@ enum HTTPRequestParser {
         return ReadRequest(text: trimmed)
     }
 
-    static func parseAgentNotificationRequest(from body: String) -> AgentNotificationRequest? {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let jsonData = trimmed.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-              let kindRaw = json["kind"] as? String,
-              let kind = AgentNotificationKind(rawValue: kindRaw),
-              let text = json["text"] as? String else {
-            return nil
-        }
-
-        let source = json["source"] as? String
-        let voice = json["voice"] as? String
-        let rate = (json["rate"] as? NSNumber)?.floatValue
-        let instructions = json["instructions"] as? String
-        let modeOverride = (json["mode"] as? String).flatMap(AgentSpeechMode.init(rawValue:))
-        let projectId = (json["project_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let agentId = (json["agent_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return AgentNotificationRequest(
-            kind: kind,
-            text: text,
-            source: source,
-            voice: voice,
-            rate: rate,
-            instructions: instructions,
-            modeOverride: modeOverride,
-            projectId: projectId?.isEmpty == true ? nil : projectId,
-            agentId: agentId?.isEmpty == true ? nil : agentId
-        )
-    }
 }
