@@ -132,9 +132,13 @@ public final class PeerBrowser {
                     self?.openclawResults = results
                 }
                 self?.rebuildPeers()
-                // Resolve VoxClaw endpoints and prefer resolved addresses over TXT metadata.
                 if app == .voxclaw {
                     self?.resolvePeers()
+                    // Retry rebuild after a brief delay to pick up resolved addresses.
+                    Task { @MainActor [weak self] in
+                        try? await Task.sleep(for: .seconds(2))
+                        self?.rebuildPeers()
+                    }
                 }
             }
         }

@@ -72,11 +72,31 @@ final class iOSCoordinator: SpeechQueueDelegate {
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
+    private let deviceID = "ios-\(UIDevice.current.name)"
+
     // MARK: - SpeechQueueDelegate
 
     func makeEngine(for item: SpeechQueueCoordinator.QueueItem, settings: SettingsManager) async -> (any SpeechEngine)? {
         guard item.engineOverride == nil else { return item.engineOverride }
         return settings.createEngine()
+    }
+
+    func onControlAction(_ action: HTTPRequestParser.ControlAction) {
+        let relayIDs = SettingsManager().relayPeerIDs
+        guard !relayIDs.isEmpty else { return }
+        for peer in peerBrowser.peers {
+            guard relayIDs.contains(peer.id), let baseURL = peer.baseURL else { continue }
+            guard let url = URL(string: "\(baseURL)/control") else { continue }
+            let payload: [String: Any] = ["action": action.rawValue, "origin": deviceID]
+            guard let body = try? JSONSerialization.data(withJSONObject: payload) else { continue }
+            var req = URLRequest(url: url)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = body
+            req.timeoutInterval = 2
+            let request = req
+            Task.detached { _ = try? await URLSession.shared.data(for: request) }
+        }
     }
 
     // MARK: - Background / Interruptions

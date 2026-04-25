@@ -148,6 +148,10 @@ struct iOSSettingsView: View {
                             } else {
                                 speakerToggle(for: peer, isLocal: false)
                             }
+                        } else if peer.app == .voxclaw {
+                            Text("Resolving...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         } else {
                             Text("OpenClaw")
                                 .font(.caption)

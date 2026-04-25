@@ -453,6 +453,10 @@ struct SettingsView: View {
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                             .help("Copy agent setup for \(peer.name)")
+                        } else if peer.app == .voxclaw {
+                            Text("Resolving...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         } else {
                             Text("OpenClaw")
                                 .font(.caption)
