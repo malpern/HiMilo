@@ -17,6 +17,11 @@ public final class ReadingSession: SpeechEngineDelegate {
     private var feedbackTask: Task<Void, Never>?
     private var speedIndicatorTask: Task<Void, Never>?
     private var didAttemptExternalPause = false
+    private var finishContinuation: CheckedContinuation<Void, Never>?
+    /// Optional callback invoked when the user requests stop (e.g. via the overlay's
+    /// stop button). When set, this is called instead of `stop()` so the coordinator
+    /// can also clear any queued speech. If nil, the panel calls `stop()` directly.
+    public var onUserStop: (@MainActor () -> Void)?
 
     public init(
         appState: AppState,
@@ -31,6 +36,45 @@ public final class ReadingSession: SpeechEngineDelegate {
         self.pauseExternalAudioDuringSpeech = pauseExternalAudioDuringSpeech
         self.playbackController = playbackController
         engine.delegate = self
+    }
+
+    /// Suspends until this session is fully stopped or finished. Used by the
+    /// coordinator's queue drain to wait between items.
+    public func waitUntilFinished() async {
+        if isFinalized { return }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            if isFinalized {
+                cont.resume()
+            } else {
+                finishContinuation = cont
+            }
+        }
+    }
+
+    private func resumeFinishContinuationIfNeeded() {
+        finishContinuation?.resume()
+        finishContinuation = nil
+    }
+
+    public var hasFinished: Bool { isFinalized }
+
+    /// Pause initiated by the coordinator because a blocker (mic / defer-list app)
+    /// became active mid-speech. Distinguished from the user-pause button only
+    /// in logging — both share the same engine pause path and visual state.
+    public func pauseForBlocker() {
+        guard !isFinalized, !appState.isPaused else { return }
+        Log.session.info("pauseForBlocker: engine.pause()")
+        engine.pause()
+        appState.isPaused = true
+        appState.sessionState = .paused
+    }
+
+    public func resumeFromBlocker() {
+        guard !isFinalized, appState.isPaused else { return }
+        Log.session.info("resumeFromBlocker: engine.resume()")
+        engine.resume()
+        appState.isPaused = false
+        appState.sessionState = .playing
     }
 
     public func start(text: String) async {
@@ -59,7 +103,12 @@ public final class ReadingSession: SpeechEngineDelegate {
             panelController = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
                 self?.togglePause()
             }, onStop: { [weak self] in
-                self?.stop()
+                guard let self else { return }
+                if let onUserStop = self.onUserStop {
+                    onUserStop()
+                } else {
+                    self.stop()
+                }
             })
             Log.panel.info("Session.start: panel prepared, will show when audio begins")
         } else {
@@ -131,6 +180,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         panelController = nil
         #endif
         isFinalized = true
+        resumeFinishContinuationIfNeeded()
         resumeExternalPlaybackIfNeeded()
     }
 
@@ -202,10 +252,12 @@ public final class ReadingSession: SpeechEngineDelegate {
                     try await Task.sleep(for: .milliseconds(500))
                 } catch {
                     Log.session.info("finish: delayed reset cancelled during sleep")
+                    self?.resumeFinishContinuationIfNeeded()
                     return
                 }
                 if Task.isCancelled {
                     Log.session.info("finish: delayed reset cancelled after sleep")
+                    self?.resumeFinishContinuationIfNeeded()
                     return
                 }
                 Log.session.info("finish: delayed reset firing — dismissing panel and resetting appState")
@@ -215,6 +267,7 @@ public final class ReadingSession: SpeechEngineDelegate {
                 self?.appState.reset()
                 let wc = self?.appState.words.count ?? -1
                 Log.session.info("finish: delayed reset complete, words=\(wc, privacy: .public)")
+                self?.resumeFinishContinuationIfNeeded()
             }
         } else {
             Log.session.info("finish: immediate cleanup, dismissing panel")
@@ -226,6 +279,7 @@ public final class ReadingSession: SpeechEngineDelegate {
                 let wc = appState.words.count
                 Log.session.info("finish: appState reset, words=\(wc, privacy: .public)")
             }
+            resumeFinishContinuationIfNeeded()
         }
     }
 

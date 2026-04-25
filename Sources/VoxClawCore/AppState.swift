@@ -36,8 +36,12 @@ public final class AppState {
     public var currentWordIndex: Int = 0
     public var isPaused: Bool = false
     public var audioOnly: Bool = false
+    /// True when the current session is rendering silently (no audio) because a
+    /// defer-list app is busy. Used by the panel to show a mute indicator.
+    public var silentMode: Bool = false
     public var isListening: Bool = false
     public var feedbackText: String? = nil
+    public var browserControlWarning: String? = nil
     public var speedIndicatorText: String? = nil
     public var timingSource: TimingSource = .cadence
     public var inputText: String = ""
@@ -59,7 +63,9 @@ public final class AppState {
         words = []
         currentWordIndex = 0
         isPaused = false
+        silentMode = false
         feedbackText = nil
+        browserControlWarning = nil
         speedIndicatorText = nil
         timingSource = .cadence
         inputText = ""

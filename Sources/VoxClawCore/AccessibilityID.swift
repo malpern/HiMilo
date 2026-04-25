@@ -8,12 +8,17 @@ enum AccessibilityID {
         static let settings = "menuBar.settings"
         static let about = "menuBar.about"
         static let quit = "menuBar.quit"
+        static let agentSpeechMenu = "menuBar.agentSpeechMenu"
+        static let agentSpeechModeOff = "menuBar.agentSpeechMode.off"
+        static let agentSpeechModeSummary = "menuBar.agentSpeechMode.summary"
+        static let agentSpeechModeLive = "menuBar.agentSpeechMode.live"
     }
 
     enum Overlay {
         static let panel = "overlay.panel"
         static let settingsButton = "overlay.settingsButton"
         static let pauseButton = "overlay.pauseButton"
+        static let stopButton = "overlay.stopButton"
         static let feedbackBadge = "overlay.feedbackBadge"
     }
 
@@ -39,6 +44,9 @@ enum AccessibilityID {
         static let audioOnlyToggle = "settings.audioOnlyToggle"
         static let launchAtLoginToggle = "settings.launchAtLoginToggle"
         static let rememberOverlayPositionToggle = "settings.rememberOverlayPositionToggle"
+        static let browserControlWarning = "settings.browserControlWarning"
+        static let installBrowserControl = "settings.installBrowserControl"
+        static let revealBrowserExtensionFolder = "settings.revealBrowserExtensionFolder"
     }
 
     enum Appearance {

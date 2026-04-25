@@ -5,16 +5,39 @@ import os
 final class NetworkSession: Sendable {
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
-    private let statusProvider: @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int)
+    private let onAgentNotificationRequest: @Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome
+    private let statusProvider: @Sendable () async -> (
+        reading: Bool,
+        state: String,
+        wordCount: Int,
+        port: UInt16,
+        lanIP: String?,
+        autoClosedInstancesOnLaunch: Int,
+        agentSpeechMode: AgentSpeechMode,
+        agentSpeechVerbosity: AgentSpeechVerbosity,
+        voiceBindingCount: Int
+    )
 
     init(
         connection: NWConnection,
-        statusProvider: @escaping @Sendable () async -> (reading: Bool, state: String, wordCount: Int, port: UInt16, lanIP: String?, autoClosedInstancesOnLaunch: Int),
-        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
+        statusProvider: @escaping @Sendable () async -> (
+            reading: Bool,
+            state: String,
+            wordCount: Int,
+            port: UInt16,
+            lanIP: String?,
+            autoClosedInstancesOnLaunch: Int,
+            agentSpeechMode: AgentSpeechMode,
+            agentSpeechVerbosity: AgentSpeechVerbosity,
+            voiceBindingCount: Int
+        ),
+        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
+        onAgentNotificationRequest: @escaping @Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome
     ) {
         self.connection = connection
         self.statusProvider = statusProvider
         self.onReadRequest = onReadRequest
+        self.onAgentNotificationRequest = onAgentNotificationRequest
     }
 
     func start() {
@@ -47,6 +70,8 @@ final class NetworkSession: Sendable {
                 Task { await self.handleStatus() }
             case .read:
                 handleRead(raw: raw, initialData: data)
+            case .agentNotify:
+                handleAgentNotify(raw: raw, initialData: data)
             case .claw:
                 handleClaw()
             case .corsPreflight:
@@ -75,8 +100,17 @@ final class NetworkSession: Sendable {
             "discovery": "_voxclaw._tcp",
             "speak_url": "\(baseURL)/read",
             "health_url": "\(baseURL)/status",
+            "agent_notify_url": "\(baseURL)/agent-notify",
+            "agent_speech_mode": info.agentSpeechMode.rawValue,
+            "agent_speech_verbosity": info.agentSpeechVerbosity.rawValue,
             "auto_closed_instances_on_launch": info.autoClosedInstancesOnLaunch,
-            "agent_handoff": "🦞 Call health_url first, then POST to speak_url. Use these URLs exactly (no hostname/discovery rewrite unless a human explicitly asks). Website: https://voxclaw.com/ Skill: https://github.com/malpern/VoxClaw/blob/main/SKILL.md"
+            "voice_binding": [
+                "enabled": true,
+                "engines": ["apple", "openai", "elevenlabs"],
+                "binding_count": info.voiceBindingCount,
+                "protocol": "Pass project_id (recommend cwd) and optional agent_id in POST /read to get a stable auto-assigned voice per engine. Explicit voice field still wins."
+            ] as [String: Any],
+            "agent_handoff": "🦞 Call health_url first, then POST to speak_url or agent_notify_url. Use these URLs exactly (no hostname/discovery rewrite unless a human explicitly asks). Website: https://voxclaw.com/ Skill: https://github.com/malpern/VoxClaw/blob/main/SKILL.md"
         ]
 
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
@@ -103,6 +137,32 @@ final class NetworkSession: Sendable {
 
         let headerPortion = raw[raw.startIndex..<headerEndRange.lowerBound]
         let headerByteCount = headerPortion.utf8.count + 4 // +4 for \r\n\r\n
+        let bodyBytes = initialData.count - headerByteCount
+
+        if let contentLength, bodyBytes < contentLength {
+            let remaining = contentLength - bodyBytes
+            receiveBody(accumulated: initialData, remaining: remaining)
+        } else {
+            processFullRequest(data: initialData)
+        }
+    }
+
+    private func handleAgentNotify(raw: String, initialData: Data) {
+        let contentLength = HTTPRequestParser.parseContentLength(from: raw)
+
+        if let contentLength, contentLength > HTTPRequestParser.maxRequestSize {
+            Log.network.warning("Agent notify Content-Length too large: \(contentLength, privacy: .public) bytes")
+            sendErrorResponse(status: 413, message: "Request too large. Maximum size is \(HTTPRequestParser.maxRequestSize / 1_000_000) MB.")
+            return
+        }
+
+        guard let headerEndRange = raw.range(of: "\r\n\r\n") else {
+            receiveMoreData(accumulated: initialData)
+            return
+        }
+
+        let headerPortion = raw[raw.startIndex..<headerEndRange.lowerBound]
+        let headerByteCount = headerPortion.utf8.count + 4
         let bodyBytes = initialData.count - headerByteCount
 
         if let contentLength, bodyBytes < contentLength {
@@ -180,32 +240,60 @@ final class NetworkSession: Sendable {
             return
         }
 
+        guard let (method, path) = HTTPRequestParser.parseRequestLine(from: raw) else {
+            sendErrorResponse(status: 400, message: "Malformed request line")
+            return
+        }
+
         let body = HTTPRequestParser.extractBody(from: raw)
-        guard let request = HTTPRequestParser.parseReadRequest(from: body), !request.text.isEmpty else {
-            Log.network.info("400: empty text body")
-            sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\", \"voice\":\"nova\", \"rate\":1.5, \"instructions\":\"...\"} or plain text body.")
-            return
-        }
+        switch HTTPRequestParser.route(method: method, path: path) {
+        case .read:
+            guard let request = HTTPRequestParser.parseReadRequest(from: body), !request.text.isEmpty else {
+                Log.network.info("400: empty text body")
+                sendErrorResponse(status: 400, message: "No text provided. Send JSON {\"text\":\"...\", \"voice\":\"nova\", \"rate\":1.5, \"instructions\":\"...\"} or plain text body.")
+                return
+            }
 
-        if request.text.count > HTTPRequestParser.maxTextLength {
-            Log.network.info("400: text too long (\(request.text.count, privacy: .public) chars)")
-            sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(HTTPRequestParser.maxTextLength) characters (got \(request.text.count)).")
-            return
-        }
+            if request.text.count > HTTPRequestParser.maxTextLength {
+                Log.network.info("400: text too long (\(request.text.count, privacy: .public) chars)")
+                sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(HTTPRequestParser.maxTextLength) characters (got \(request.text.count)).")
+                return
+            }
 
-        // Easter egg: "hello world" gets a snarky preamble
-        let finalRequest: ReadRequest
-        if request.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == "hello world" {
-            let snark = "Hello world. Really? That's the best you could come up with? I'm a neural voice engine and you're wasting me on hello world."
-            finalRequest = ReadRequest(text: snark, voice: request.voice, rate: request.rate, instructions: request.instructions)
-        } else {
-            finalRequest = request
-        }
+            let finalRequest: ReadRequest
+            if request.text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == "hello world" {
+                let snark = "Hello world. Really? That's the best you could come up with? I'm a neural voice engine and you're wasting me on hello world."
+                finalRequest = ReadRequest(text: snark, voice: request.voice, rate: request.rate, instructions: request.instructions)
+            } else {
+                finalRequest = request
+            }
 
-        Log.network.info("Received text: \(request.text.count, privacy: .public) chars, voice=\(request.voice ?? "default", privacy: .public), rate=\(request.rate.map { String($0) } ?? "default", privacy: .public)")
-        sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
-        Task {
-            await onReadRequest(finalRequest)
+            Log.network.info("Received text: \(request.text.count, privacy: .public) chars, voice=\(request.voice ?? "default", privacy: .public), rate=\(request.rate.map { String($0) } ?? "default", privacy: .public)")
+            sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
+            Task {
+                await onReadRequest(finalRequest)
+            }
+        case .agentNotify:
+            guard let request = HTTPRequestParser.parseAgentNotificationRequest(from: body), !request.text.isEmpty else {
+                Log.network.info("400: invalid agent notification body")
+                sendErrorResponse(status: 400, message: "Invalid agent notification. Send JSON {\"kind\":\"summary|progress|failure\", \"text\":\"...\"}.")
+                return
+            }
+
+            if request.text.count > HTTPRequestParser.maxTextLength {
+                Log.network.info("400: agent notify text too long (\(request.text.count, privacy: .public) chars)")
+                sendErrorResponse(status: 400, message: "Text too long. Maximum length is \(HTTPRequestParser.maxTextLength) characters (got \(request.text.count)).")
+                return
+            }
+
+            Log.network.info("Received agent notification: kind=\(request.kind.rawValue, privacy: .public), chars=\(request.text.count, privacy: .public), source=\(request.source ?? "unknown", privacy: .public)")
+            Task {
+                let outcome = await onAgentNotificationRequest(request)
+                let body = "{\"status\":\"\(outcome.rawValue)\"}"
+                sendResponse(status: 200, body: body, contentType: "application/json")
+            }
+        default:
+            sendErrorResponse(status: 404, message: "Not found")
         }
     }
 

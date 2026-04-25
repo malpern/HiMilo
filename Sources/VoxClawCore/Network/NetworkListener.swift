@@ -12,19 +12,29 @@ public final class NetworkListener {
     private let port: UInt16
     private let serviceName: String
     private let appState: AppState
+    private let settings: SettingsManager
     private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
+    private var onAgentNotificationRequest: (@Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome)?
+    private var voiceBindingCountProvider: (@Sendable () async -> Int)?
 
     public var isListening: Bool { listener != nil }
 
-    public init(port: UInt16 = 4140, serviceName: String? = nil, appState: AppState) {
+    public init(port: UInt16 = 4140, serviceName: String? = nil, appState: AppState, settings: SettingsManager) {
         self.port = port
         self.serviceName = serviceName ?? Self.localComputerName()
         self.appState = appState
+        self.settings = settings
     }
 
-    public func start(onReadRequest: @escaping @Sendable (ReadRequest) async -> Void) throws {
+    public func start(
+        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
+        onAgentNotificationRequest: @escaping @Sendable (AgentNotificationRequest) async -> AgentNotificationOutcome,
+        voiceBindingCountProvider: (@Sendable () async -> Int)? = nil
+    ) throws {
         guard listener == nil else { return }
         self.onReadRequest = onReadRequest
+        self.onAgentNotificationRequest = onAgentNotificationRequest
+        self.voiceBindingCountProvider = voiceBindingCountProvider
 
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
@@ -65,6 +75,7 @@ public final class NetworkListener {
         listener = nil
         appState.isListening = false
         onReadRequest = nil
+        onAgentNotificationRequest = nil
         Log.network.info("Listener stopped")
         print("VoxClaw listener stopped")
     }
@@ -89,10 +100,14 @@ public final class NetworkListener {
         Log.network.debug("New connection from \(String(describing: connection.endpoint), privacy: .public)")
         let state = appState
         let listenPort = port
+        let onReadRequest = self.onReadRequest
+        let onAgentNotificationRequest = self.onAgentNotificationRequest
+        let voiceBindingCountProvider = self.voiceBindingCountProvider
         let session = NetworkSession(
             connection: connection,
             statusProvider: { @Sendable in
-                await MainActor.run {
+                let voiceBindingCount = await voiceBindingCountProvider?() ?? 0
+                return await MainActor.run {
                     let reading = state.isActive
                     let sessionState: String
                     switch state.sessionState {
@@ -108,12 +123,25 @@ public final class NetworkListener {
                         wordCount: state.words.count,
                         port: listenPort,
                         lanIP: NetworkListener.localIPAddress(),
-                        autoClosedInstancesOnLaunch: state.autoClosedInstancesOnLaunch
+                        autoClosedInstancesOnLaunch: state.autoClosedInstancesOnLaunch,
+                        agentSpeechMode: self.settings.agentSpeechMode,
+                        agentSpeechVerbosity: self.settings.agentSpeechVerbosity,
+                        voiceBindingCount: voiceBindingCount
                     )
                 }
             },
             onReadRequest: { [weak self] request in
-                await self?.onReadRequest?(request)
+                if let onReadRequest {
+                    await onReadRequest(request)
+                } else {
+                    await self?.onReadRequest?(request)
+                }
+            },
+            onAgentNotificationRequest: { request in
+                if let onAgentNotificationRequest {
+                    return await onAgentNotificationRequest(request)
+                }
+                return .suppressed
             }
         )
         session.start()
@@ -134,6 +162,11 @@ public final class NetworkListener {
         print("")
         print("  Health check:")
         print("    curl http://\(ip):\(port)/status")
+        print("")
+        print("  Agent notification:")
+        print("    curl -X POST http://\(ip):\(port)/agent-notify \\")
+        print("      -H 'Content-Type: application/json' \\")
+        print("      -d '{\"kind\": \"summary\", \"text\": \"Task complete.\"}'")
         print("")
     }
 

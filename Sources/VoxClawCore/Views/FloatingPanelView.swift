@@ -5,6 +5,7 @@ struct FloatingPanelView: View {
     let settings: SettingsManager
     var onTogglePause: () -> Void = {}
     var onOpenSettings: (() -> Void)?
+    var onStop: () -> Void = {}
 
     @State private var isHovering = false
     @State private var showPauseButton = false
@@ -63,6 +64,25 @@ struct FloatingPanelView: View {
                         .padding(.trailing, 12)
                         .padding(.bottom, 12)
                 }
+            }
+
+            // Silent-mode indicator — appears top-left when speech is being shown without audio
+            // because a defer-list app (Zoom, Claude desktop, etc.) is busy.
+            if appState.silentMode {
+                VStack {
+                    HStack {
+                        Image(systemName: "speaker.slash.fill")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .padding(.leading, 12)
+                            .padding(.top, 10)
+                            .help("Silent: another app is using audio")
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: appState.silentMode)
             }
 
             // Timing source indicator — small dot visible during early heuristic, fades when better algo arrives
@@ -164,6 +184,18 @@ struct FloatingPanelView: View {
                 .help(appState.isPaused ? "Resume" : "Pause")
                 #endif
                 .accessibilityIdentifier(AccessibilityID.Overlay.pauseButton)
+                Button(action: onStop) {
+                    Image(systemName: "xmark")
+                        .font(.system(.callout, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .applyOverlayControlGlass()
+                }
+                .buttonStyle(.plain)
+                #if os(macOS)
+                .help("Stop")
+                #endif
+                .accessibilityIdentifier(AccessibilityID.Overlay.stopButton)
             }
             .padding(.trailing, 12)
             .padding(.top, 10)

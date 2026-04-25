@@ -98,6 +98,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        BrowserControlService.shared.start()
+        do {
+            try BrowserExtensionInstaller().installBundledSupport()
+        } catch {
+            Log.playback.warning("Browser extension support install failed: \(error.localizedDescription, privacy: .public)")
+            SharedApp.appState.browserControlWarning = "Browser extension support is not installed yet. Open Settings to install or refresh it."
+        }
+
         if SharedApp.settings.networkListenerEnabled {
             SharedApp.coordinator.startListening(
                 appState: SharedApp.appState,
@@ -263,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "VoxClaw Settings"
-        window.contentView = NSHostingView(rootView: SettingsView(settings: SharedApp.settings))
+        window.contentView = NSHostingView(rootView: SettingsView(settings: SharedApp.settings, appState: SharedApp.appState))
         window.center()
         window.isReleasedWhenClosed = false
         settingsWindow = window
@@ -322,7 +330,7 @@ struct VoxClawApp: App {
         }
 
         Window("VoxClaw Settings", id: "settings") {
-            SettingsView(settings: settings)
+            SettingsView(settings: settings, appState: appState)
         }
         .defaultSize(width: 440, height: 420)
 
@@ -374,15 +382,38 @@ struct VoxClawApp: App {
 final class AppCoordinator {
     private var networkListener: NetworkListener?
     private var activeSession: ReadingSession?
+    let voiceAssigner = VoiceAssigner(store: VoiceBindingStore(fileURL: VoiceBindingStore.defaultURL()))
+
+    private struct SpeechItem {
+        let text: String
+        let engineOverride: (any SpeechEngine)?
+        let audioOnlyOverride: Bool?
+    }
+    private var speechQueue: [SpeechItem] = []
+    private var isDrainingQueue = false
+    private static let maxQueueSize = 20
+    private static let interItemDelay: Duration = .seconds(2)
+    /// Maximum total time we'll politely wait for a defer-list app (Zoom, Claude
+    /// desktop, etc.) to stop producing audio before falling back to silent display.
+    private static let politeWaitMax: Duration = .seconds(150)
+    /// How often we re-poll CoreAudio for defer-list activity while waiting.
+    private static let politePollInterval: Duration = .seconds(1)
 
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
         stopListening()
         let port = port ?? CLIContext.shared?.port ?? 4140
-        let listener = NetworkListener(port: port, appState: appState)
+        let listener = NetworkListener(port: port, appState: appState, settings: settings)
         do {
-            try listener.start { [weak self] request in
-                await self?.handleReadRequest(request, appState: appState, settings: settings)
-            }
+            let assigner = voiceAssigner
+            try listener.start(
+                onReadRequest: { [weak self] request in
+                    await self?.handleReadRequest(request, appState: appState, settings: settings)
+                },
+                onAgentNotificationRequest: { [weak self] request in
+                    await self?.handleAgentNotificationRequest(request, appState: appState, settings: settings) ?? .suppressed
+                },
+                voiceBindingCountProvider: { @Sendable in await assigner.bindingCount() }
+            )
             self.networkListener = listener
         } catch {
             Log.app.error("Failed to start listener: \(error)")
@@ -390,19 +421,78 @@ final class AppCoordinator {
     }
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
-        // Build engine with request overrides, falling back to settings defaults
-        let voice = request.voice ?? settings.openAIVoice
         let rate = request.rate ?? settings.voiceSpeed
         let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
+
+        let assignedOpenAI = await voiceAssigner.resolveVoice(
+            projectId: request.projectId,
+            agentId: request.agentId,
+            engine: .openai
+        )
+        let openaiVoice = request.voice ?? assignedOpenAI ?? settings.openAIVoice
+
+        let assignedApple = await voiceAssigner.resolveVoice(
+            projectId: request.projectId,
+            agentId: request.agentId,
+            engine: .apple
+        )
+        let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
+
         var engine: (any SpeechEngine)?
         if !settings.openAIAPIKey.isEmpty {
-            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate, instructions: instructions)
-            let fallback = AppleSpeechEngine(voiceIdentifier: settings.appleVoiceIdentifier, rate: rate)
+            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: rate, instructions: instructions)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
             engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
+        } else if request.projectId != nil {
+            engine = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
         } else if request.rate != nil {
             engine = AppleSpeechEngine(rate: rate)
         }
         await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
+    }
+
+    private func handleAgentNotificationRequest(
+        _ request: AgentNotificationRequest,
+        appState: AppState,
+        settings: SettingsManager
+    ) async -> AgentNotificationOutcome {
+        guard request.shouldSpeak(currentMode: settings.agentSpeechMode) else {
+            let effectiveMode = request.modeOverride ?? settings.agentSpeechMode
+            Log.app.info("Agent notification suppressed: mode=\(effectiveMode.rawValue, privacy: .public), kind=\(request.kind.rawValue, privacy: .public), override=\(request.modeOverride?.rawValue ?? "none", privacy: .public)")
+            return .suppressed
+        }
+
+        let spokenText = request.spokenText(verbosity: settings.agentSpeechVerbosity)
+        let rate = request.rate ?? settings.voiceSpeed
+        let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
+
+        let assignedOpenAI = await voiceAssigner.resolveVoice(
+            projectId: request.projectId,
+            agentId: request.agentId,
+            engine: .openai
+        )
+        let openaiVoice = request.voice ?? assignedOpenAI ?? settings.openAIVoice
+
+        let assignedApple = await voiceAssigner.resolveVoice(
+            projectId: request.projectId,
+            agentId: request.agentId,
+            engine: .apple
+        )
+        let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
+
+        var engine: (any SpeechEngine)?
+        if !settings.openAIAPIKey.isEmpty {
+            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: rate, instructions: instructions)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
+            engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
+        } else if request.projectId != nil {
+            engine = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
+        } else if request.rate != nil {
+            engine = AppleSpeechEngine(rate: rate)
+        }
+
+        await readText(spokenText, appState: appState, settings: settings, engineOverride: engine)
+        return .reading
     }
 
     func stopListening() {
@@ -417,28 +507,175 @@ final class AppCoordinator {
         audioOnlyOverride: Bool? = nil,
         engineOverride: (any SpeechEngine)? = nil
     ) async {
-        let hadPrior = activeSession != nil
-        Log.session.info("readText called: \(text.count, privacy: .public) chars, hadPriorSession=\(hadPrior, privacy: .public), audioOnly=\(settings.audioOnly, privacy: .public), state=\(String(describing: appState.sessionState), privacy: .public)")
-        activeSession?.stopForReplacement()
-        appState.audioOnly = audioOnlyOverride ?? settings.audioOnly
-        Log.session.info("readText: appState.audioOnly=\(appState.audioOnly, privacy: .public)")
-        let engine = engineOverride ?? settings.createEngine()
-        let session = ReadingSession(
-            appState: appState,
-            engine: engine,
-            settings: settings,
-            pauseExternalAudioDuringSpeech: settings.pauseOtherAudioDuringSpeech
-        )
-        activeSession = session
-        await session.start(text: text)
-        Log.session.info("readText: session.start returned")
+        let item = SpeechItem(text: text, engineOverride: engineOverride, audioOnlyOverride: audioOnlyOverride)
+        enqueueSpeech(item, appState: appState, settings: settings)
     }
+
+    private func enqueueSpeech(_ item: SpeechItem, appState: AppState, settings: SettingsManager) {
+        if speechQueue.count >= Self.maxQueueSize {
+            Log.session.warning("Speech queue at cap (\(Self.maxQueueSize, privacy: .public)), dropping oldest")
+            speechQueue.removeFirst()
+        }
+        speechQueue.append(item)
+        Log.session.info("Enqueued speech: chars=\(item.text.count, privacy: .public), depth=\(self.speechQueue.count, privacy: .public)")
+        if !isDrainingQueue {
+            Task { @MainActor in
+                await self.drainQueue(appState: appState, settings: settings)
+            }
+        }
+    }
+
+    private func drainQueue(appState: AppState, settings: SettingsManager) async {
+        guard !isDrainingQueue else { return }
+        isDrainingQueue = true
+        defer { isDrainingQueue = false }
+
+        while !speechQueue.isEmpty {
+            let item = speechQueue.removeFirst()
+
+            // Politely wait if any "blocker" is active: a defer-list app
+            // (Zoom, Claude desktop, etc.) producing audio, OR any non-VoxClaw
+            // process using the microphone (Aqua Voice, Superwhisper, etc.).
+            // Falls back to silent display after the polite-wait window expires.
+            let goSilent = await waitForBlockersIfNeeded(item: item)
+
+            appState.audioOnly = item.audioOnlyOverride ?? settings.audioOnly
+            let engine: any SpeechEngine
+            if goSilent {
+                appState.audioOnly = false  // silent mode still shows the panel
+                appState.silentMode = true
+                engine = SilentSpeechEngine(rate: settings.voiceSpeed)
+                Log.session.info("Queue item going silent: defer-list still active after polite wait")
+            } else {
+                appState.silentMode = false
+                engine = item.engineOverride ?? settings.createEngine()
+            }
+
+            let session = ReadingSession(
+                appState: appState,
+                engine: engine,
+                settings: settings,
+                pauseExternalAudioDuringSpeech: !goSilent && settings.pauseOtherAudioDuringSpeech
+            )
+            session.onUserStop = { [weak self] in self?.stop() }
+            activeSession = session
+            Log.session.info("Queue draining item: chars=\(item.text.count, privacy: .public), remaining=\(self.speechQueue.count, privacy: .public), silent=\(goSilent, privacy: .public)")
+            await session.start(text: item.text)
+
+            // Monitor for mid-speech blockers (mic, defer-list apps becoming
+            // active while we're already speaking). Only meaningful for audio
+            // playback — silent mode is already non-disruptive.
+            #if os(macOS)
+            let monitorTask = goSilent ? nil : Task { @MainActor [weak self, weak session] in
+                await self?.monitorBlockersDuringSpeech(session: session)
+            }
+            #endif
+
+            await session.waitUntilFinished()
+            #if os(macOS)
+            monitorTask?.cancel()
+            #endif
+            activeSession = nil
+            appState.silentMode = false
+
+            if !speechQueue.isEmpty {
+                try? await Task.sleep(for: Self.interItemDelay)
+            }
+        }
+    }
+
+    /// Polls CoreAudio for "blocker" activity: defer-list apps producing audio
+    /// (Zoom, Claude desktop, etc.) or any process using the microphone (Aqua
+    /// Voice, Superwhisper, etc.). Returns false if the path is clear (or the
+    /// platform doesn't support detection); returns true if we waited the full
+    /// polite-wait window and should fall back to silent display.
+    private func waitForBlockersIfNeeded(item: SpeechItem) async -> Bool {
+        #if os(macOS)
+        var blockers = currentBlockers()
+        if blockers.isEmpty { return false }
+
+        Log.session.info("Polite wait: blockers=\(blockers.joined(separator: ","), privacy: .public)")
+        let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)
+        while ContinuousClock.now < deadline {
+            try? await Task.sleep(for: Self.politePollInterval)
+            blockers = currentBlockers()
+            if blockers.isEmpty {
+                Log.session.info("Polite wait: blockers cleared, will speak after inter-item gap")
+                try? await Task.sleep(for: Self.interItemDelay)
+                return false
+            }
+        }
+        Log.session.info("Polite wait: timed out after \(Int(Self.politeWaitMax.components.seconds), privacy: .public)s, falling back to silent. Blockers still active=\(blockers.joined(separator: ","), privacy: .public)")
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    #if os(macOS)
+    /// Aggregates currently-active reasons we should not speak aloud.
+    /// Returns bundle IDs for audio-producing defer-list apps, plus the
+    /// sentinel "mic" if any non-VoxClaw process is using the microphone.
+    private func currentBlockers() -> [String] {
+        var blockers = AudioActivityMonitor.activeDeferListBundleIDs()
+        if AudioActivityMonitor.isAnyProcessUsingMicrophone() {
+            blockers.append("mic")
+        }
+        return blockers
+    }
+
+    /// Polls for blockers while a session is actively playing audio. When a
+    /// blocker becomes active, pauses the engine and waits up to the polite-wait
+    /// window for it to clear; on clear, resumes after the inter-item gap; on
+    /// timeout, stops the current session (the next queue item will re-decide
+    /// audio vs silent on its own polite-wait pass).
+    private func monitorBlockersDuringSpeech(session: ReadingSession?) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: Self.politePollInterval)
+            if Task.isCancelled { return }
+            guard let session, !session.hasFinished else { return }
+
+            let blockers = currentBlockers()
+            guard !blockers.isEmpty else { continue }
+
+            Log.session.info("Mid-speech blockers detected: \(blockers.joined(separator: ","), privacy: .public) — pausing")
+            session.pauseForBlocker()
+
+            let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)
+            var cleared = false
+            while ContinuousClock.now < deadline {
+                try? await Task.sleep(for: Self.politePollInterval)
+                if Task.isCancelled { return }
+                if currentBlockers().isEmpty {
+                    cleared = true
+                    break
+                }
+            }
+
+            if cleared {
+                Log.session.info("Mid-speech blockers cleared, resuming after inter-item gap")
+                try? await Task.sleep(for: Self.interItemDelay)
+                if Task.isCancelled { return }
+                session.resumeFromBlocker()
+            } else {
+                Log.session.info("Mid-speech polite wait timed out, stopping current item")
+                session.stop()
+                return
+            }
+        }
+    }
+    #endif
 
     func togglePause() {
         activeSession?.togglePause()
     }
 
     func stop() {
+        let cleared = speechQueue.count
+        speechQueue.removeAll()
+        if cleared > 0 {
+            Log.session.info("Stop: cleared \(cleared, privacy: .public) queued speech items")
+        }
         activeSession?.stop()
         activeSession = nil
     }
@@ -455,6 +692,8 @@ final class AppCoordinator {
 
         if context.listen {
             startListening(appState: appState, settings: settings, port: context.port)
+        } else if let notification = context.agentNotification {
+            _ = await handleAgentNotificationRequest(notification, appState: appState, settings: settings)
         } else if let text = context.text {
             let instructions = context.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
             let engine: any SpeechEngine
