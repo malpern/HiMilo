@@ -102,13 +102,12 @@ final class PanelController {
 
         Log.panel.info("show: panel ordered front at (\(Int(panelX), privacy: .public), \(Int(panelY), privacy: .public)), windowNumber=\(panel.windowNumber, privacy: .public), silent=\(silent, privacy: .public)")
         self.panel = panel
-        // In silent mode, skip makeKey() entirely — we mustn't pull keyboard
-        // focus from a transcription tool. Trade-off: ESC/Space/+/- shortcuts
-        // on the overlay don't work in silent mode (user can stop via menu bar).
-        if !silent {
-            panel.makeKey()
-            startKeyMonitoring()
-        }
+        // Never call makeKey(): on a non-activating panel it nudges keyboard
+        // focus enough to disrupt the user's typing in their active app. Mouse
+        // clicks on the panel still work (FloatingPanel.mouseDown becomes key
+        // on demand), and the visible stop (X) button is the always-on dismiss
+        // affordance. ESC/Space/+/- only fire when the panel is the key window
+        // — i.e., after the user clicks into it.
     }
 
     func dismiss() {

@@ -30,13 +30,11 @@ struct MenuBarView: View {
                 Button(appState.isPaused ? "Resume" : "Pause") {
                     onTogglePause()
                 }
-                .keyboardShortcut(" ", modifiers: [])
                 .accessibilityIdentifier(AccessibilityID.MenuBar.pauseResume)
 
                 Button("Stop") {
                     onStop()
                 }
-                .keyboardShortcut(.escape, modifiers: [])
                 .accessibilityIdentifier(AccessibilityID.MenuBar.stop)
 
                 Divider()
@@ -100,6 +98,7 @@ struct MenuBarView: View {
             .accessibilityIdentifier(AccessibilityID.MenuBar.quit)
         }
     }
+
 
     @MainActor
     private func pasteAndRead() async {
