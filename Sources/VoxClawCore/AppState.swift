@@ -39,6 +39,7 @@ public final class AppState {
     /// True when the current session is rendering silently (no audio) because a
     /// defer-list app is busy. Used by the panel to show a mute indicator.
     public var silentMode: Bool = false
+    public var contentFadedOut: Bool = false
     /// Ordered list of project indicators: current project first, then
     /// distinct upcoming projects from the speech queue. Empty when <2
     /// distinct projects have spoken within the activity window so single-
@@ -69,6 +70,7 @@ public final class AppState {
         currentWordIndex = 0
         isPaused = false
         silentMode = false
+        contentFadedOut = false
         projectIndicators = []
         feedbackText = nil
         browserControlWarning = nil

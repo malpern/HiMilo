@@ -18,16 +18,19 @@ struct StatusInfo: Sendable {
 final class NetworkSession: Sendable {
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
+    private let onAck: @Sendable (String) async -> Void
     private let statusProvider: @Sendable () async -> StatusInfo
 
     init(
         connection: NWConnection,
         statusProvider: @escaping @Sendable () async -> StatusInfo,
-        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
+        onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
+        onAck: @escaping @Sendable (String) async -> Void = { _ in }
     ) {
         self.connection = connection
         self.statusProvider = statusProvider
         self.onReadRequest = onReadRequest
+        self.onAck = onAck
     }
 
     func start() {
@@ -59,6 +62,8 @@ final class NetworkSession: Sendable {
             case .status:
                 Task { await self.handleStatus() }
             case .read:
+                handleRead(raw: raw, initialData: data)
+            case .ack:
                 handleRead(raw: raw, initialData: data)
             case .claw:
                 handleClaw()
@@ -231,6 +236,16 @@ final class NetworkSession: Sendable {
             sendResponse(status: 200, body: "{\"status\":\"reading\"}", contentType: "application/json")
             Task {
                 await onReadRequest(finalRequest)
+            }
+        case .ack:
+            guard let projectId = HTTPRequestParser.parseAckRequest(from: body) else {
+                sendErrorResponse(status: 400, message: "Send JSON {\"project_id\":\"...\"}.")
+                return
+            }
+            Log.network.info("Received ack for project: \(projectId, privacy: .public)")
+            sendResponse(status: 200, body: "{\"status\":\"acknowledged\"}", contentType: "application/json")
+            Task {
+                await onAck(projectId)
             }
         default:
             sendErrorResponse(status: 404, message: "Not found")

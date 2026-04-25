@@ -37,6 +37,7 @@ enum HTTPRequestParser {
     enum Route: Equatable {
         case status
         case read
+        case ack
         case claw
         case corsPreflight
         case notFound(method: String, path: String)
@@ -61,6 +62,8 @@ enum HTTPRequestParser {
             return .status
         case ("POST", "/read"):
             return .read
+        case ("POST", "/ack"):
+            return .ack
         case ("GET", "/claw"):
             return .claw
         case ("OPTIONS", _):
@@ -113,4 +116,14 @@ enum HTTPRequestParser {
         return ReadRequest(text: trimmed)
     }
 
+    static func parseAckRequest(from body: String) -> String? {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let data = trimmed.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let projectId = json["project_id"] as? String,
+              !projectId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return projectId.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }

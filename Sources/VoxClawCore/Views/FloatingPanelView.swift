@@ -55,6 +55,7 @@ struct FloatingPanelView: View {
                     .padding(.vertical, appearance.verticalPadding)
                     .padding(.top, appState.projectIndicators.isEmpty ? 0 : 16)
                 }
+                .opacity(appState.contentFadedOut ? 0 : 1)
                 .clipped()
                 .onChange(of: appState.currentWordIndex) { _, newIndex in
                     withAnimation(.easeOut(duration: 0.15)) {

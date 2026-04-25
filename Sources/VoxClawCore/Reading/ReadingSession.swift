@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import os
 
 @MainActor
@@ -17,6 +18,7 @@ public final class ReadingSession: SpeechEngineDelegate {
     private var feedbackTask: Task<Void, Never>?
     private var speedIndicatorTask: Task<Void, Never>?
     private var didAttemptExternalPause = false
+    private var isBlockerPaused = false
     private var finishContinuation: CheckedContinuation<Void, Never>?
     /// Optional callback invoked when the user requests stop (e.g. via the overlay's
     /// stop button). When set, this is called instead of `stop()` so the coordinator
@@ -25,19 +27,22 @@ public final class ReadingSession: SpeechEngineDelegate {
     /// When true, finish clears content but keeps the panel visible so the
     /// coordinator can do a smooth transition to the next queued item.
     public var keepPanelOnFinish = false
+    private let externalPanelController: PanelController?
 
-    public init(
+    init(
         appState: AppState,
         engine: any SpeechEngine,
         settings: SettingsManager? = nil,
         pauseExternalAudioDuringSpeech: Bool = false,
-        playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
+        playbackController: any ExternalPlaybackControlling = ExternalPlaybackController(),
+        externalPanelController: PanelController? = nil
     ) {
         self.appState = appState
         self.engine = engine
         self.settings = settings
         self.pauseExternalAudioDuringSpeech = pauseExternalAudioDuringSpeech
         self.playbackController = playbackController
+        self.externalPanelController = externalPanelController
         engine.delegate = self
     }
 
@@ -73,6 +78,7 @@ public final class ReadingSession: SpeechEngineDelegate {
     /// in logging — both share the same engine pause path and visual state.
     public func pauseForBlocker() {
         guard !isFinalized, !appState.isPaused else { return }
+        isBlockerPaused = true
         Log.session.info("pauseForBlocker: engine.pause()")
         engine.pause()
         appState.isPaused = true
@@ -80,7 +86,13 @@ public final class ReadingSession: SpeechEngineDelegate {
     }
 
     public func resumeFromBlocker() {
-        guard !isFinalized, appState.isPaused else { return }
+        let blockerFlag = isBlockerPaused
+        let userPaused = appState.isPaused
+        guard !isFinalized, userPaused, blockerFlag else {
+            Log.session.info("resumeFromBlocker: skipping (blockerPaused=\(blockerFlag, privacy: .public), userPaused=\(userPaused, privacy: .public))")
+            return
+        }
+        isBlockerPaused = false
         Log.session.info("resumeFromBlocker: engine.resume()")
         engine.resume()
         appState.isPaused = false
@@ -109,18 +121,23 @@ public final class ReadingSession: SpeechEngineDelegate {
         // Prepare panel but don't show yet — audio leads, visuals follow.
         #if os(macOS)
         if !appState.audioOnly {
-            let effectiveSettings = settings ?? SettingsManager()
-            panelController = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
-                self?.togglePause()
-            }, onStop: { [weak self] in
-                guard let self else { return }
-                if let onUserStop = self.onUserStop {
-                    onUserStop()
-                } else {
-                    self.stop()
-                }
-            })
-            Log.panel.info("Session.start: panel prepared, will show when audio begins")
+            if let external = externalPanelController {
+                panelController = external
+                Log.panel.info("Session.start: reusing external panel")
+            } else {
+                let effectiveSettings = settings ?? SettingsManager()
+                panelController = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
+                    self?.togglePause()
+                }, onStop: { [weak self] in
+                    guard let self else { return }
+                    if let onUserStop = self.onUserStop {
+                        onUserStop()
+                    } else {
+                        self.stop()
+                    }
+                })
+                Log.panel.info("Session.start: panel prepared, will show when audio begins")
+            }
         } else {
             Log.panel.info("Session.start: skipping panel (audioOnly=true)")
         }
@@ -147,12 +164,14 @@ public final class ReadingSession: SpeechEngineDelegate {
 
     public func togglePause() {
         if appState.isPaused {
-            Log.session.info("Session resumed")
+            Log.session.info("Session resumed (manual)")
+            isBlockerPaused = false
             engine.resume()
             appState.isPaused = false
             appState.sessionState = .playing
         } else {
-            Log.session.info("Session paused")
+            Log.session.info("Session paused (manual)")
+            isBlockerPaused = false
             engine.pause()
             appState.isPaused = true
             appState.sessionState = .paused
@@ -257,12 +276,18 @@ public final class ReadingSession: SpeechEngineDelegate {
 
         if delayedReset && mutatingAppState {
             if keepPanelOnFinish {
-                Log.session.info("finish: keepPanelOnFinish — clearing content, keeping panel")
-                appState.words = []
-                appState.currentWordIndex = 0
-                appState.sessionState = .idle
+                Log.session.info("finish: keepPanelOnFinish — fading content, keeping panel")
+                appState.sessionState = .finished
                 finishTask = Task { @MainActor [weak self] in
-                    try? await Task.sleep(for: .milliseconds(300))
+                    // Fade out old content
+                    withAnimation(.easeOut(duration: 0.3)) {
+                        self?.appState.contentFadedOut = true
+                    }
+                    try? await Task.sleep(for: .milliseconds(350))
+                    self?.appState.words = []
+                    self?.appState.currentWordIndex = 0
+                    self?.appState.contentFadedOut = false
+                    self?.appState.sessionState = .idle
                     self?.resumeFinishContinuationIfNeeded()
                 }
             } else {

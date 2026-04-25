@@ -394,8 +394,9 @@ final class AppCoordinator {
     private var isDrainingQueue = false
     private var projectActivity = ProjectActivityTracker()
     private var currentDrainingProjectId: String?
+    private var isCurrentItemAcked = false
     private static let maxQueueSize = 20
-    private static let interItemDelay: Duration = .seconds(2)
+    private static let interItemDelay: Duration = .seconds(1)
     /// Maximum total time we'll politely wait for a defer-list app (Zoom, Claude
     /// desktop, etc.) to stop producing audio before falling back to silent display.
     private static let politeWaitMax: Duration = .seconds(150)
@@ -411,6 +412,9 @@ final class AppCoordinator {
             try listener.start(
                 onReadRequest: { [weak self] request in
                     await self?.handleReadRequest(request, appState: appState, settings: settings)
+                },
+                onAck: { [weak self] projectId in
+                    await self?.handleAck(projectId: projectId, appState: appState)
                 },
                 voiceBindingCountProvider: { @Sendable in await assigner.bindingCount() }
             )
@@ -511,8 +515,15 @@ final class AppCoordinator {
         isDrainingQueue = true
         defer { isDrainingQueue = false }
 
+        // Shared panel controller for the entire queue run. Reused across
+        // sessions so the overlay stays visible between items.
+        #if os(macOS)
+        var sharedPanel: PanelController?
+        #endif
+
         while !speechQueue.isEmpty {
             let item = speechQueue.removeFirst()
+            let hasMoreItems = !speechQueue.isEmpty
 
             currentDrainingProjectId = item.projectId
             rebuildProjectIndicators(appState: appState)
@@ -526,7 +537,7 @@ final class AppCoordinator {
             appState.audioOnly = item.audioOnlyOverride ?? settings.audioOnly
             let engine: any SpeechEngine
             if goSilent {
-                appState.audioOnly = false  // silent mode still shows the panel
+                appState.audioOnly = false
                 appState.silentMode = true
                 engine = SilentSpeechEngine(rate: settings.voiceSpeed)
                 Log.session.info("Queue item going silent: defer-list still active after polite wait")
@@ -535,45 +546,73 @@ final class AppCoordinator {
                 engine = item.engineOverride ?? settings.createEngine()
             }
 
+            // Create the shared panel on the first non-audioOnly item.
+            // Subsequent items reuse it so the window stays visible.
+            #if os(macOS)
+            if !appState.audioOnly && sharedPanel == nil {
+                let effectiveSettings = settings
+                sharedPanel = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
+                    self?.togglePause()
+                }, onStop: { [weak self] in
+                    self?.stop()
+                })
+            }
+            #endif
+
             let session = ReadingSession(
                 appState: appState,
                 engine: engine,
                 settings: settings,
-                pauseExternalAudioDuringSpeech: !goSilent && settings.pauseOtherAudioDuringSpeech
+                pauseExternalAudioDuringSpeech: !goSilent && settings.pauseOtherAudioDuringSpeech,
+                externalPanelController: sharedPanel
             )
             session.onUserStop = { [weak self] in self?.stop() }
-            session.keepPanelOnFinish = !speechQueue.isEmpty
+            session.keepPanelOnFinish = hasMoreItems
             activeSession = session
+            isCurrentItemAcked = false
             Log.session.info("Queue draining item: chars=\(item.text.count, privacy: .public), remaining=\(self.speechQueue.count, privacy: .public), silent=\(goSilent, privacy: .public)")
             await session.start(text: item.text)
 
-            // Monitor for mid-speech blockers (mic, defer-list apps becoming
-            // active while we're already speaking). Only meaningful for audio
-            // playback — silent mode is already non-disruptive.
             #if os(macOS)
             let monitorTask = goSilent ? nil : Task { @MainActor [weak self, weak session] in
                 await self?.monitorBlockersDuringSpeech(session: session)
             }
             #endif
 
+            let ackTask = Task { @MainActor [weak self, weak session] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .milliseconds(200))
+                    guard let self, let session, !session.hasFinished else { return }
+                    if self.isCurrentItemAcked {
+                        Log.session.info("Ack detected mid-speech, stopping current item")
+                        session.stop()
+                        return
+                    }
+                }
+            }
+
             await session.waitUntilFinished()
+            ackTask.cancel()
             #if os(macOS)
             monitorTask?.cancel()
             #endif
+            isCurrentItemAcked = false
             appState.silentMode = false
 
             // Animate project indicators: remove current, slide upcoming left.
             currentDrainingProjectId = nil
             rebuildProjectIndicators(appState: appState)
 
-            if !speechQueue.isEmpty {
+            if hasMoreItems {
                 try? await Task.sleep(for: Self.interItemDelay)
-                // Swap panels: close the old one instantly, new session will
-                // create a fresh panel at the same position.
-                session.dismissPanel()
             }
             activeSession = nil
         }
+
+        // Queue exhausted — dismiss the shared panel.
+        #if os(macOS)
+        sharedPanel = nil
+        #endif
     }
 
     /// Polls CoreAudio for "blocker" activity: defer-list apps producing audio
@@ -657,6 +696,31 @@ final class AppCoordinator {
         }
     }
     #endif
+
+    /// Handles an ack from a UserPromptSubmit hook — the user responded to an
+    /// agent, so that project's update is considered "heard."
+    func handleAck(projectId: String, appState: AppState) {
+        Log.session.info("Ack received for project: \(projectId, privacy: .public)")
+
+        // If the acked project is currently speaking, mark it acknowledged.
+        // The drainQueue loop will see the flag and move on.
+        if currentDrainingProjectId == projectId {
+            Log.session.info("Ack: marking current session as acknowledged")
+            isCurrentItemAcked = true
+            #if os(macOS)
+            NSSound(named: "Submarine")?.play()
+            #endif
+        }
+
+        // Remove any queued items for this project — no need to read them.
+        let before = speechQueue.count
+        speechQueue.removeAll { $0.projectId == projectId }
+        let removed = before - speechQueue.count
+        if removed > 0 {
+            Log.session.info("Ack: removed \(removed, privacy: .public) queued items for project")
+            rebuildProjectIndicators(appState: appState)
+        }
+    }
 
     /// Rebuilds `appState.projectIndicators` from the currently-draining
     /// project + distinct upcoming projects in the speech queue. Produces an

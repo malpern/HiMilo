@@ -14,6 +14,7 @@ public final class NetworkListener {
     private let appState: AppState
     private let settings: SettingsManager
     private var onReadRequest: (@Sendable (ReadRequest) async -> Void)?
+    private var onAck: (@Sendable (String) async -> Void)?
     private var voiceBindingCountProvider: (@Sendable () async -> Int)?
 
     public var isListening: Bool { listener != nil }
@@ -27,10 +28,12 @@ public final class NetworkListener {
 
     public func start(
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void,
+        onAck: @escaping @Sendable (String) async -> Void = { _ in },
         voiceBindingCountProvider: (@Sendable () async -> Int)? = nil
     ) throws {
         guard listener == nil else { return }
         self.onReadRequest = onReadRequest
+        self.onAck = onAck
         self.voiceBindingCountProvider = voiceBindingCountProvider
 
         let params = NWParameters.tcp
@@ -97,6 +100,7 @@ public final class NetworkListener {
         let state = appState
         let listenPort = port
         let onReadRequest = self.onReadRequest
+        let onAck = self.onAck
         let voiceBindingCountProvider = self.voiceBindingCountProvider
         let session = NetworkSession(
             connection: connection,
@@ -127,6 +131,11 @@ public final class NetworkListener {
                     await onReadRequest(request)
                 } else {
                     await self?.onReadRequest?(request)
+                }
+            },
+            onAck: { request in
+                if let onAck {
+                    await onAck(request)
                 }
             }
         )
