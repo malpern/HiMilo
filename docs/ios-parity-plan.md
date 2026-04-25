@@ -273,6 +273,18 @@ visible:
 
 ---
 
+## Known issues
+
+**Voice engine defaults to Apple on fresh iOS install.** iCloud KVS
+may not have propagated the Mac's `voiceEngine` setting yet when
+`SettingsManager.init` runs. The observer eventually picks it up, but
+the user may see "Apple" briefly before it switches. The relay sends
+the resolved voice anyway, so playback uses the correct voice. Monitor
+whether this recurs after the first sync; if so, add a short retry in
+init or a manual "sync now" button.
+
+---
+
 ## Open questions
 
 1. **~~Should the iPhone auto-discover the Mac and offer to be a
