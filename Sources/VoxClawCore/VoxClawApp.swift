@@ -418,6 +418,14 @@ final class AppCoordinator {
     }
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
+        let engine = await makeEngine(for: request, settings: settings)
+        await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
+    }
+
+    /// Constructs the speech engine for a /read request, factoring in the project/agent
+    /// voice binding, available API keys, and per-request overrides. Returns nil when
+    /// the caller should fall back to `settings.createEngine()`.
+    private func makeEngine(for request: ReadRequest, settings: SettingsManager) async -> (any SpeechEngine)? {
         let rate = request.rate ?? settings.voiceSpeed
         let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
 
@@ -435,17 +443,18 @@ final class AppCoordinator {
         )
         let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
 
-        var engine: (any SpeechEngine)?
         if !settings.openAIAPIKey.isEmpty {
             let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: rate, instructions: instructions)
             let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-            engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
-        } else if request.projectId != nil {
-            engine = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-        } else if request.rate != nil {
-            engine = AppleSpeechEngine(rate: rate)
+            return FallbackSpeechEngine(primary: primary, fallback: fallback)
         }
-        await readText(request.text, appState: appState, settings: settings, engineOverride: engine)
+        if request.projectId != nil {
+            return AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
+        }
+        if request.rate != nil {
+            return AppleSpeechEngine(rate: rate)
+        }
+        return nil
     }
 
     func stopListening() {

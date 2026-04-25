@@ -12,7 +12,6 @@ final class PanelController {
     private let onStop: () -> Void
     private var quickSettingsWindow: NSWindow?
     private var localKeyMonitor: Any?
-    private var previouslyFrontmost: NSRunningApplication?
 
     init(appState: AppState, settings: SettingsManager, onTogglePause: @escaping () -> Void, onStop: @escaping () -> Void) {
         self.appState = appState
@@ -37,18 +36,6 @@ final class PanelController {
         }
 
         let silent = appState.silentMode
-
-        // Capture the app that currently has focus so we can return it after the
-        // panel dismisses. Skip in silent mode — we won't take focus, so there's
-        // nothing to restore. (Silent mode runs while a transcription tool may
-        // be active; touching focus at all could break dictation.)
-        if !silent, let frontmost = NSWorkspace.shared.frontmostApplication,
-           frontmost.bundleIdentifier != Bundle.main.bundleIdentifier {
-            previouslyFrontmost = frontmost
-            Log.panel.info("show: captured frontmost app \(frontmost.bundleIdentifier ?? "unknown", privacy: .public)")
-        } else {
-            previouslyFrontmost = nil
-        }
 
         let appearance = settings.overlayAppearance
         let screenFrame = screen.visibleFrame
@@ -147,32 +134,8 @@ final class PanelController {
                 Log.panel.info("dismiss: animation complete, closing panel")
                 panel.close()
                 self?.panel = nil
-                self?.restorePreviousFrontmostIfAppropriate()
             }
         })
-    }
-
-    /// Reactivates whatever app had focus before the panel appeared. Skips if the
-    /// captured app has terminated, or if the user has already moved focus to a
-    /// third app (i.e. the current frontmost is neither VoxClaw nor the captured one).
-    private func restorePreviousFrontmostIfAppropriate() {
-        defer { previouslyFrontmost = nil }
-        guard let prev = previouslyFrontmost else { return }
-        guard !prev.isTerminated else {
-            Log.panel.info("dismiss: skipping restore — captured app terminated")
-            return
-        }
-        let currentFrontmost = NSWorkspace.shared.frontmostApplication
-        let currentBundleId = currentFrontmost?.bundleIdentifier
-        let voxClawBundleId = Bundle.main.bundleIdentifier
-        let prevBundleId = prev.bundleIdentifier
-        // If the user has moved to a third app, don't yank them back.
-        if currentBundleId != voxClawBundleId && currentBundleId != prevBundleId {
-            Log.panel.info("dismiss: skipping restore — user is now in \(currentBundleId ?? "unknown", privacy: .public)")
-            return
-        }
-        Log.panel.info("dismiss: restoring focus to \(prevBundleId ?? "unknown", privacy: .public)")
-        prev.activate()
     }
 
     // MARK: - Key Monitoring

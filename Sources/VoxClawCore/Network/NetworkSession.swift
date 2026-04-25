@@ -2,30 +2,27 @@ import Foundation
 import Network
 import os
 
+/// Snapshot of state surfaced to GET /status. Computed on demand by the
+/// listener; passed to `NetworkSession` as a closure so the session stays
+/// stateless about app internals.
+struct StatusInfo: Sendable {
+    let reading: Bool
+    let state: String
+    let wordCount: Int
+    let port: UInt16
+    let lanIP: String?
+    let autoClosedInstancesOnLaunch: Int
+    let voiceBindingCount: Int
+}
+
 final class NetworkSession: Sendable {
     private let connection: NWConnection
     private let onReadRequest: @Sendable (ReadRequest) async -> Void
-    private let statusProvider: @Sendable () async -> (
-        reading: Bool,
-        state: String,
-        wordCount: Int,
-        port: UInt16,
-        lanIP: String?,
-        autoClosedInstancesOnLaunch: Int,
-        voiceBindingCount: Int
-    )
+    private let statusProvider: @Sendable () async -> StatusInfo
 
     init(
         connection: NWConnection,
-        statusProvider: @escaping @Sendable () async -> (
-            reading: Bool,
-            state: String,
-            wordCount: Int,
-            port: UInt16,
-            lanIP: String?,
-            autoClosedInstancesOnLaunch: Int,
-            voiceBindingCount: Int
-        ),
+        statusProvider: @escaping @Sendable () async -> StatusInfo,
         onReadRequest: @escaping @Sendable (ReadRequest) async -> Void
     ) {
         self.connection = connection

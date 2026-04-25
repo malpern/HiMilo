@@ -103,7 +103,6 @@ public final class NetworkListener {
             statusProvider: { @Sendable in
                 let voiceBindingCount = await voiceBindingCountProvider?() ?? 0
                 return await MainActor.run {
-                    let reading = state.isActive
                     let sessionState: String
                     switch state.sessionState {
                     case .idle: sessionState = "idle"
@@ -112,8 +111,8 @@ public final class NetworkListener {
                     case .paused: sessionState = "paused"
                     case .finished: sessionState = "finished"
                     }
-                    return (
-                        reading: reading,
+                    return StatusInfo(
+                        reading: state.isActive,
                         state: sessionState,
                         wordCount: state.words.count,
                         port: listenPort,
