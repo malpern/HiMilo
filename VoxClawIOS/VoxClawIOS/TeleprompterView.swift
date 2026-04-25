@@ -26,21 +26,30 @@ struct TeleprompterView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         FlowLayout(hSpacing: appearance.wordSpacing, vSpacing: appearance.effectiveLineSpacing) {
                             ForEach(appState.words.indices, id: \.self) { index in
-                                TeleprompterWordView(
-                                    word: appState.words[index],
-                                    isHighlighted: index == appState.currentWordIndex,
-                                    isPast: index < appState.currentWordIndex,
-                                    appearance: appearance
-                                )
-                                .id(index)
+                                if appState.words[index] == ReadingSession.paragraphSentinel {
+                                    Color.clear
+                                        .frame(width: 0, height: 0)
+                                        .paragraphBreak()
+                                        .id(index)
+                                } else {
+                                    TeleprompterWordView(
+                                        word: appState.words[index],
+                                        isHighlighted: index == appState.currentWordIndex,
+                                        isPast: index < appState.currentWordIndex,
+                                        isPaused: appState.isPaused,
+                                        appearance: appearance
+                                    )
+                                    .id(index)
+                                }
                             }
                         }
                         .padding(.horizontal, appearance.horizontalPadding)
                         .padding(.vertical, appearance.verticalPadding + 60)
                     }
+                    .clipped()
                     .onChange(of: appState.currentWordIndex) { _, newIndex in
                         withAnimation(.easeOut(duration: 0.15)) {
-                            proxy.scrollTo(newIndex, anchor: .center)
+                            proxy.scrollTo(newIndex, anchor: UnitPoint(x: 0, y: 0.5))
                         }
                     }
                 }
@@ -133,31 +142,67 @@ private struct TeleprompterWordView: View {
     let word: String
     let isHighlighted: Bool
     let isPast: Bool
+    var isPaused: Bool = false
     let appearance: OverlayAppearance
 
+    private static let codeMarker = "\u{200B}"
+
+    private var isCode: Bool { word.hasPrefix(Self.codeMarker) }
+    private var displayWord: String { isCode ? String(word.dropFirst()) : word }
+
+    @State private var glowRadius: CGFloat = 3
+
+    private var highlightColor: Color { appearance.highlightColor.color }
+
     var body: some View {
-        Text(word)
+        Text(displayWord)
             .font(.custom(appearance.fontFamily, size: appearance.fontSize).weight(appearance.fontWeightValue))
             .foregroundStyle(textColor)
-            .padding(.horizontal, isHighlighted ? 4 : 0)
-            .padding(.vertical, isHighlighted ? 2 : 0)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
             .background(
-                Group {
-                    if isHighlighted {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(appearance.highlightColor.color)
-                    }
-                }
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(highlightColor)
+                    .opacity(isHighlighted ? 1 : 0)
+                    .shadow(color: highlightColor.opacity(isHighlighted ? 0.4 : 0), radius: glowRadius)
             )
+            .animation(.easeInOut(duration: 0.12), value: isHighlighted)
+            .onChange(of: isPaused) { _, paused in
+                if paused && isHighlighted {
+                    startBreathe()
+                } else {
+                    stopBreathe()
+                }
+            }
+            .onChange(of: isHighlighted) { _, highlighted in
+                if highlighted && isPaused {
+                    startBreathe()
+                } else if !highlighted {
+                    stopBreathe()
+                }
+            }
+    }
+
+    private func startBreathe() {
+        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+            glowRadius = 8
+        }
+    }
+
+    private func stopBreathe() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            glowRadius = 3
+        }
     }
 
     private var textColor: Color {
+        let base = isCode ? appearance.codeWordColor.color : appearance.textColor.color
         if isHighlighted {
-            return appearance.textColor.color
+            return base
         } else if isPast {
-            return appearance.textColor.color.opacity(appearance.pastWordOpacity)
+            return base.opacity(appearance.pastWordOpacity)
         } else {
-            return appearance.textColor.color.opacity(appearance.futureWordOpacity)
+            return base.opacity(appearance.futureWordOpacity)
         }
     }
 }

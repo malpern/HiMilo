@@ -1,10 +1,10 @@
 import SwiftUI
 
-struct ParagraphBreakKey: LayoutValueKey {
-    static let defaultValue = false
+public struct ParagraphBreakKey: LayoutValueKey {
+    public static let defaultValue = false
 }
 
-extension View {
+public extension View {
     func paragraphBreak() -> some View {
         layoutValue(key: ParagraphBreakKey.self, value: true)
     }
