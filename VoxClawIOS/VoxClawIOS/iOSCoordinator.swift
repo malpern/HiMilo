@@ -5,24 +5,36 @@ import VoxClawCore
 
 @Observable
 @MainActor
-final class iOSCoordinator {
+final class iOSCoordinator: SpeechQueueDelegate {
     private var networkListener: VoxClawCore.NetworkListener?
-    private var activeSession: ReadingSession?
     private var interruptionTask: Task<Void, Never>?
+    let queue = SpeechQueueCoordinator()
     let keepAlive = BackgroundAudioKeepAlive()
 
     func startListening(appState: AppState, settings: SettingsManager) {
         stopListening()
+        queue.delegate = self
         let port = settings.networkListenerPort
         let listener = VoxClawCore.NetworkListener(port: port, appState: appState, settings: settings)
         do {
             try listener.start(
                 onReadRequest: { [weak self] request in
-                    await self?.handleReadRequest(request, appState: appState, settings: settings)
+                    await MainActor.run {
+                        guard let self else { return }
+                        self.keepAlive.resetTimeout()
+                        self.configureAudioSession()
+                        UIApplication.shared.isIdleTimerDisabled = true
+                        self.queue.enqueue(
+                            request.text,
+                            appState: appState,
+                            settings: settings,
+                            projectId: request.projectId
+                        )
+                    }
                 },
                 onControl: { [weak self] control in
                     await MainActor.run {
-                        self?.handleControl(control, appState: appState)
+                        self?.queue.handleControl(control, deviceID: "ios-\(UIDevice.current.name)")
                     }
                 }
             )
@@ -39,83 +51,28 @@ final class iOSCoordinator {
 
     func readText(_ text: String, appState: AppState, settings: SettingsManager) async {
         keepAlive.resetTimeout()
-        activeSession?.stopForReplacement()
-        appState.audioOnly = false
-
         configureAudioSession()
         UIApplication.shared.isIdleTimerDisabled = true
-
-        let engine = settings.createEngine()
-        let session = ReadingSession(
-            appState: appState,
-            engine: engine,
-            settings: settings,
-            pauseExternalAudioDuringSpeech: false
-        )
-        activeSession = session
-        await session.start(text: text)
-
-        UIApplication.shared.isIdleTimerDisabled = false
+        queue.enqueue(text, appState: appState, settings: settings)
     }
 
     func togglePause() {
-        activeSession?.togglePause()
+        queue.togglePause()
     }
 
     func stop() {
-        activeSession?.stop()
-        activeSession = nil
+        queue.stop()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
-    func handleControl(_ control: HTTPRequestParser.ControlRequest, appState: AppState) {
-        print("[VoxClaw] iOS control: \(control.action.rawValue)")
-        switch control.action {
-        case .pause:
-            if !(activeSession?.hasFinished ?? true), !appState.isPaused {
-                togglePause()
-            }
-        case .resume:
-            if !(activeSession?.hasFinished ?? true), appState.isPaused {
-                togglePause()
-            }
-        case .stop:
-            stop()
-        }
+    // MARK: - SpeechQueueDelegate
+
+    func makeEngine(for item: SpeechQueueCoordinator.QueueItem, settings: SettingsManager) async -> (any SpeechEngine)? {
+        guard item.engineOverride == nil else { return item.engineOverride }
+        return settings.createEngine()
     }
 
-    private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
-        keepAlive.resetTimeout()
-        let voice = request.voice ?? settings.openAIVoice
-        let rate = request.rate ?? 1.0
-        let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
-        var engine: (any SpeechEngine)?
-        if !settings.openAIAPIKey.isEmpty {
-            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: voice, speed: rate, instructions: instructions)
-            let fallback = AppleSpeechEngine(voiceIdentifier: settings.appleVoiceIdentifier, rate: rate)
-            engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
-        } else if request.rate != nil {
-            engine = AppleSpeechEngine(rate: rate)
-        }
-
-        activeSession?.stopForReplacement()
-        appState.audioOnly = false
-
-        configureAudioSession()
-        UIApplication.shared.isIdleTimerDisabled = true
-
-        let finalEngine = engine ?? settings.createEngine()
-        let session = ReadingSession(
-            appState: appState,
-            engine: finalEngine,
-            settings: settings,
-            pauseExternalAudioDuringSpeech: false
-        )
-        activeSession = session
-        await session.start(text: request.text)
-
-        UIApplication.shared.isIdleTimerDisabled = false
-    }
+    // MARK: - Background / Interruptions
 
     func enterBackground(settings: SettingsManager) {
         guard settings.backgroundKeepAlive else { return }
@@ -137,7 +94,7 @@ final class iOSCoordinator {
                       let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { continue }
 
                 if type == .began {
-                    if self.activeSession != nil, !appState.isPaused {
+                    if self.queue.activeSession != nil, !appState.isPaused {
                         self.togglePause()
                     }
                 }

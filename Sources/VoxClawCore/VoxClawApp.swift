@@ -379,36 +379,18 @@ struct VoxClawApp: App {
 
 @Observable
 @MainActor
-final class AppCoordinator {
+final class AppCoordinator: SpeechQueueDelegate {
     private var networkListener: NetworkListener?
-    private var activeSession: ReadingSession?
+    let queue = SpeechQueueCoordinator()
     let voiceAssigner = VoiceAssigner(store: VoiceBindingStore(fileURL: VoiceBindingStore.defaultURL()))
     let peerBrowser = PeerBrowser()
     let deviceID = UUID().uuidString
     private var settingsRef: SettingsManager?
 
-    private struct SpeechItem {
-        let text: String
-        let engineOverride: (any SpeechEngine)?
-        let audioOnlyOverride: Bool?
-        let projectId: String?
-    }
-    private var speechQueue: [SpeechItem] = []
-    private var isDrainingQueue = false
-    private var projectActivity = ProjectActivityTracker()
-    private var currentDrainingProjectId: String?
-    private var isCurrentItemAcked = false
-    private static let maxQueueSize = 20
-    private static let interItemDelay: Duration = .seconds(1)
-    /// Maximum total time we'll politely wait for a defer-list app (Zoom, Claude
-    /// desktop, etc.) to stop producing audio before falling back to silent display.
-    private static let politeWaitMax: Duration = .seconds(150)
-    /// How often we re-poll CoreAudio for defer-list activity while waiting.
-    private static let politePollInterval: Duration = .seconds(1)
-
     func startListening(appState: AppState, settings: SettingsManager, port: UInt16? = nil) {
         stopListening()
         settingsRef = settings
+        queue.delegate = self
         peerBrowser.start()
         let port = port ?? CLIContext.shared?.port ?? 4140
         let listener = NetworkListener(port: port, appState: appState, settings: settings)
@@ -433,8 +415,6 @@ final class AppCoordinator {
     }
 
     private func handleReadRequest(_ request: ReadRequest, appState: AppState, settings: SettingsManager) async {
-        // Resolve the voice before building the engine so we can pass the
-        // same voice to relay peers for cross-device consistency.
         let assignedVoice = await voiceAssigner.resolveVoice(
             projectId: request.projectId,
             agentId: request.agentId,
@@ -447,12 +427,10 @@ final class AppCoordinator {
 
         let localMuted = settings.relayPeerIDs.contains("__mute_local__")
         if !localMuted {
-            let engine = await makeEngine(for: resolvedRequest, settings: settings)
             await readText(
                 resolvedRequest.text,
                 appState: appState,
                 settings: settings,
-                engineOverride: engine,
                 projectId: resolvedRequest.projectId
             )
         } else {
@@ -501,45 +479,70 @@ final class AppCoordinator {
         }
     }
 
-    /// Constructs the speech engine for a /read request, factoring in the project/agent
-    /// voice binding, available API keys, and per-request overrides. Returns nil when
-    /// the caller should fall back to `settings.createEngine()`.
-    private func makeEngine(for request: ReadRequest, settings: SettingsManager) async -> (any SpeechEngine)? {
-        let rate = request.rate ?? settings.voiceSpeed
-        let instructions = request.instructions ?? (settings.readingStyle.isEmpty ? nil : settings.readingStyle)
-
-        let assignedOpenAI = await voiceAssigner.resolveVoice(
-            projectId: request.projectId,
-            agentId: request.agentId,
-            engine: .openai
-        )
-        let openaiVoice = request.voice ?? assignedOpenAI ?? settings.openAIVoice
-
-        let assignedApple = await voiceAssigner.resolveVoice(
-            projectId: request.projectId,
-            agentId: request.agentId,
-            engine: .apple
-        )
-        let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
-
-        if !settings.openAIAPIKey.isEmpty {
-            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: rate, instructions: instructions)
-            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-            return FallbackSpeechEngine(primary: primary, fallback: fallback)
-        }
-        if request.projectId != nil {
-            return AppleSpeechEngine(voiceIdentifier: appleVoice, rate: rate)
-        }
-        if request.rate != nil {
-            return AppleSpeechEngine(rate: rate)
-        }
-        return nil
-    }
-
     func stopListening() {
         networkListener?.stop()
         networkListener = nil
     }
+
+    // MARK: - SpeechQueueDelegate
+
+    func makeEngine(for item: SpeechQueueCoordinator.QueueItem, settings: SettingsManager) async -> (any SpeechEngine)? {
+        let rate = item.engineOverride != nil ? nil : settings.voiceSpeed
+        guard item.engineOverride == nil else { return item.engineOverride }
+
+        let request = ReadRequest(
+            text: item.text,
+            rate: rate,
+            projectId: item.projectId
+        )
+        let assignedOpenAI = await voiceAssigner.resolveVoice(
+            projectId: item.projectId,
+            agentId: nil,
+            engine: .openai
+        )
+        let openaiVoice = assignedOpenAI ?? settings.openAIVoice
+
+        let assignedApple = await voiceAssigner.resolveVoice(
+            projectId: item.projectId,
+            agentId: nil,
+            engine: .apple
+        )
+        let appleVoice = assignedApple ?? settings.appleVoiceIdentifier
+        let engineRate = settings.voiceSpeed
+        let instructions = settings.readingStyle.isEmpty ? nil : settings.readingStyle
+
+        if !settings.openAIAPIKey.isEmpty {
+            let primary = OpenAISpeechEngine(apiKey: settings.openAIAPIKey, voice: openaiVoice, speed: engineRate, instructions: instructions)
+            let fallback = AppleSpeechEngine(voiceIdentifier: appleVoice, rate: engineRate)
+            return FallbackSpeechEngine(primary: primary, fallback: fallback)
+        }
+        if item.projectId != nil {
+            return AppleSpeechEngine(voiceIdentifier: appleVoice, rate: engineRate)
+        }
+        return nil
+    }
+
+    #if os(macOS)
+    func currentBlockers() -> [String] {
+        var blockers = AudioActivityMonitor.activeDeferListBundleIDs()
+        if AudioActivityMonitor.isAnyProcessUsingMicrophone() {
+            blockers.append("mic")
+        }
+        return blockers
+    }
+    #endif
+
+    func onControlAction(_ action: HTTPRequestParser.ControlAction) {
+        guard let settings = settingsRef else { return }
+        relayControl(action: action, settings: settings)
+    }
+
+    func onAckReceived(projectId: String) {
+        guard let settings = settingsRef else { return }
+        relayControl(action: .stop, settings: settings)
+    }
+
+    // MARK: - Thin wrappers
 
     func readText(
         _ text: String,
@@ -549,277 +552,34 @@ final class AppCoordinator {
         engineOverride: (any SpeechEngine)? = nil,
         projectId: String? = nil
     ) async {
-        let item = SpeechItem(
-            text: text,
-            engineOverride: engineOverride,
+        queue.enqueue(
+            text,
+            appState: appState,
+            settings: settings,
             audioOnlyOverride: audioOnlyOverride,
+            engineOverride: engineOverride,
             projectId: projectId
         )
-        enqueueSpeech(item, appState: appState, settings: settings)
     }
 
-    private func enqueueSpeech(_ item: SpeechItem, appState: AppState, settings: SettingsManager) {
-        if speechQueue.count >= Self.maxQueueSize {
-            Log.session.warning("Speech queue at cap (\(Self.maxQueueSize, privacy: .public)), dropping oldest")
-            speechQueue.removeFirst()
-        }
-        speechQueue.append(item)
-        Log.session.info("Enqueued speech: chars=\(item.text.count, privacy: .public), depth=\(self.speechQueue.count, privacy: .public)")
-        if let pid = item.projectId, !pid.isEmpty {
-            projectActivity.record(pid)
-        }
-        rebuildProjectIndicators(appState: appState)
-        let indicatorCount = appState.projectIndicators.count
-        let distinctCount = projectActivity.distinctProjectsInWindow()
-        let draining = isDrainingQueue
-        Log.session.info("Enqueue: indicators=\(indicatorCount, privacy: .public), distinct=\(distinctCount, privacy: .public), draining=\(draining, privacy: .public)")
-        if !isDrainingQueue {
-            Task { @MainActor in
-                await self.drainQueue(appState: appState, settings: settings)
-            }
-        }
+    func togglePause() {
+        queue.togglePause()
     }
 
-    private func drainQueue(appState: AppState, settings: SettingsManager) async {
-        guard !isDrainingQueue else { return }
-        isDrainingQueue = true
-        defer { isDrainingQueue = false }
-
-        // Shared panel controller for the entire queue run. Reused across
-        // sessions so the overlay stays visible between items.
-        #if os(macOS)
-        var sharedPanel: PanelController?
-        #endif
-
-        while !speechQueue.isEmpty {
-            let item = speechQueue.removeFirst()
-            let hasMoreItems = !speechQueue.isEmpty
-
-            currentDrainingProjectId = item.projectId
-            rebuildProjectIndicators(appState: appState)
-
-            // Politely wait if any "blocker" is active: a defer-list app
-            // (Zoom, Claude desktop, etc.) producing audio, OR any non-VoxClaw
-            // process using the microphone (Aqua Voice, Superwhisper, etc.).
-            // Falls back to silent display after the polite-wait window expires.
-            let goSilent = await waitForBlockersIfNeeded(item: item)
-
-            appState.audioOnly = item.audioOnlyOverride ?? settings.audioOnly
-            let engine: any SpeechEngine
-            if goSilent {
-                appState.audioOnly = false
-                appState.silentMode = true
-                engine = SilentSpeechEngine(rate: settings.voiceSpeed)
-                Log.session.info("Queue item going silent: defer-list still active after polite wait")
-            } else {
-                appState.silentMode = false
-                engine = item.engineOverride ?? settings.createEngine()
-            }
-
-            // Create the shared panel on the first non-audioOnly item.
-            // Subsequent items reuse it so the window stays visible.
-            #if os(macOS)
-            if !appState.audioOnly && sharedPanel == nil {
-                let effectiveSettings = settings
-                sharedPanel = PanelController(appState: appState, settings: effectiveSettings, onTogglePause: { [weak self] in
-                    self?.togglePause()
-                }, onStop: { [weak self] in
-                    self?.stop()
-                })
-            }
-            #endif
-
-            let session = ReadingSession(
-                appState: appState,
-                engine: engine,
-                settings: settings,
-                pauseExternalAudioDuringSpeech: !goSilent && settings.pauseOtherAudioDuringSpeech,
-                externalPanelController: sharedPanel
-            )
-            session.onUserStop = { [weak self] in self?.stop() }
-            session.keepPanelOnFinish = hasMoreItems
-            activeSession = session
-            isCurrentItemAcked = false
-            Log.session.info("Queue draining item: chars=\(item.text.count, privacy: .public), remaining=\(self.speechQueue.count, privacy: .public), silent=\(goSilent, privacy: .public)")
-            await session.start(text: item.text)
-
-            #if os(macOS)
-            let monitorTask = goSilent ? nil : Task { @MainActor [weak self, weak session] in
-                await self?.monitorBlockersDuringSpeech(session: session)
-            }
-            #endif
-
-            let ackTask = Task { @MainActor [weak self, weak session] in
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(200))
-                    guard let self, let session, !session.hasFinished else { return }
-                    if self.isCurrentItemAcked {
-                        Log.session.info("Ack detected mid-speech, stopping current item")
-                        session.stop()
-                        return
-                    }
-                }
-            }
-
-            await session.waitUntilFinished()
-            ackTask.cancel()
-            #if os(macOS)
-            monitorTask?.cancel()
-            #endif
-            isCurrentItemAcked = false
-            appState.silentMode = false
-
-            // Animate project indicators: remove current, slide upcoming left.
-            currentDrainingProjectId = nil
-            rebuildProjectIndicators(appState: appState)
-
-            if hasMoreItems {
-                try? await Task.sleep(for: Self.interItemDelay)
-            }
-            activeSession = nil
-        }
-
-        // Queue exhausted — dismiss the shared panel with the normal animation.
-        #if os(macOS)
-        sharedPanel?.dismiss()
-        sharedPanel = nil
-        #endif
-        appState.reset()
+    func stop() {
+        queue.stop()
     }
 
-    /// Polls CoreAudio for "blocker" activity: defer-list apps producing audio
-    /// (Zoom, Claude desktop, etc.) or any process using the microphone (Aqua
-    /// Voice, Superwhisper, etc.). Returns false if the path is clear (or the
-    /// platform doesn't support detection); returns true if we waited the full
-    /// polite-wait window and should fall back to silent display.
-    private func waitForBlockersIfNeeded(item: SpeechItem) async -> Bool {
-        #if os(macOS)
-        var blockers = currentBlockers()
-        if blockers.isEmpty { return false }
-
-        Log.session.info("Polite wait: blockers=\(blockers.joined(separator: ","), privacy: .public)")
-        let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)
-        while ContinuousClock.now < deadline {
-            try? await Task.sleep(for: Self.politePollInterval)
-            blockers = currentBlockers()
-            if blockers.isEmpty {
-                Log.session.info("Polite wait: blockers cleared, will speak after inter-item gap")
-                try? await Task.sleep(for: Self.interItemDelay)
-                return false
-            }
-        }
-        Log.session.info("Polite wait: timed out after \(Int(Self.politeWaitMax.components.seconds), privacy: .public)s, falling back to silent. Blockers still active=\(blockers.joined(separator: ","), privacy: .public)")
-        return true
-        #else
-        return false
-        #endif
+    func setSpeed(_ speed: Float) {
+        queue.setSpeed(speed)
     }
 
-    #if os(macOS)
-    /// Aggregates currently-active reasons we should not speak aloud.
-    /// Returns bundle IDs for audio-producing defer-list apps, plus the
-    /// sentinel "mic" if any non-VoxClaw process is using the microphone.
-    private func currentBlockers() -> [String] {
-        var blockers = AudioActivityMonitor.activeDeferListBundleIDs()
-        if AudioActivityMonitor.isAnyProcessUsingMicrophone() {
-            blockers.append("mic")
-        }
-        return blockers
-    }
-
-    /// Polls for blockers while a session is actively playing audio. When a
-    /// blocker becomes active, pauses the engine and waits up to the polite-wait
-    /// window for it to clear; on clear, resumes after the inter-item gap; on
-    /// timeout, stops the current session (the next queue item will re-decide
-    /// audio vs silent on its own polite-wait pass).
-    private func monitorBlockersDuringSpeech(session: ReadingSession?) async {
-        var consecutiveBlockerPolls = 0
-        while !Task.isCancelled {
-            try? await Task.sleep(for: Self.politePollInterval)
-            if Task.isCancelled { return }
-            guard let session, !session.hasFinished else { return }
-
-            let blockers = currentBlockers()
-            if blockers.isEmpty {
-                consecutiveBlockerPolls = 0
-                continue
-            }
-            consecutiveBlockerPolls += 1
-            guard consecutiveBlockerPolls >= 2 else { continue }
-
-            Log.session.info("Mid-speech blockers detected (sustained): \(blockers.joined(separator: ","), privacy: .public) — pausing")
-            session.pauseForBlocker()
-            if let settings = settingsRef {
-                relayControl(action: .pause, settings: settings)
-            }
-
-            let deadline = ContinuousClock.now.advanced(by: Self.politeWaitMax)
-            var cleared = false
-            while ContinuousClock.now < deadline {
-                try? await Task.sleep(for: Self.politePollInterval)
-                if Task.isCancelled { return }
-                if currentBlockers().isEmpty {
-                    cleared = true
-                    break
-                }
-            }
-
-            if cleared {
-                Log.session.info("Mid-speech blockers cleared, resuming after inter-item gap")
-                try? await Task.sleep(for: Self.interItemDelay)
-                if Task.isCancelled { return }
-                session.resumeFromBlocker()
-                if let settings = settingsRef {
-                    relayControl(action: .resume, settings: settings)
-                }
-            } else {
-                Log.session.info("Mid-speech polite wait timed out, stopping current item")
-                session.stop()
-                return
-            }
-        }
-    }
-    #endif
-
-    /// Handles an ack from a UserPromptSubmit hook — the user responded to an
-    /// agent, so that project's update is considered "heard."
     func handleAck(projectId: String, appState: AppState) {
-        Log.session.info("Ack received for project: \(projectId, privacy: .public)")
-
-        // If the acked project is currently speaking, mark it acknowledged.
-        // The drainQueue loop will see the flag and move on.
-        if currentDrainingProjectId == projectId {
-            Log.session.info("Ack: marking current session as acknowledged")
-            isCurrentItemAcked = true
-            #if os(macOS)
-            NSSound(named: "Submarine")?.play()
-            #endif
-        }
-
-        // Remove any queued items for this project — no need to read them.
-        let before = speechQueue.count
-        speechQueue.removeAll { $0.projectId == projectId }
-        let removed = before - speechQueue.count
-        if removed > 0 {
-            Log.session.info("Ack: removed \(removed, privacy: .public) queued items for project")
-            rebuildProjectIndicators(appState: appState)
-        }
-
-        // Relay stop to peers so they also stop speaking this project.
-        if let settings = settingsRef {
-            relayControl(action: .stop, settings: settings)
-        }
+        queue.handleAck(projectId: projectId, appState: appState)
     }
 
-    /// Handles a control command from a peer or from local actions.
     func handleControl(_ control: HTTPRequestParser.ControlRequest) {
-        if control.origin == deviceID { return }
-        Log.session.info("Control: \(control.action.rawValue, privacy: .public)")
-        switch control.action {
-        case .pause: activeSession?.togglePause()
-        case .resume: activeSession?.togglePause()
-        case .stop: stop()
-        }
+        queue.handleControl(control, deviceID: deviceID)
     }
 
     /// Relay a control action to all relay peers.
@@ -846,53 +606,6 @@ final class AppCoordinator {
                 Log.network.info("Relayed control \(action.rawValue, privacy: .public) to \(peerName, privacy: .public)")
             }
         }
-    }
-
-    /// Rebuilds `appState.projectIndicators` from the currently-draining
-    /// project + distinct upcoming projects in the speech queue. Produces an
-    /// empty list when <2 projects are in the activity window so single-
-    /// project use stays uncluttered.
-    private func rebuildProjectIndicators(appState: AppState) {
-        guard projectActivity.distinctProjectsInWindow() >= 2 else {
-            appState.projectIndicators = []
-            return
-        }
-        var seen = Set<String>()
-        var indicators: [ProjectIndicator] = []
-        if let pid = currentDrainingProjectId, !pid.isEmpty, seen.insert(pid).inserted {
-            indicators.append(ProjectIndicator(projectId: pid))
-        }
-        for item in speechQueue {
-            if let pid = item.projectId, !pid.isEmpty, seen.insert(pid).inserted {
-                indicators.append(ProjectIndicator(projectId: pid))
-            }
-        }
-        appState.projectIndicators = indicators
-    }
-
-    func togglePause() {
-        activeSession?.togglePause()
-        if let settings = settingsRef {
-            let action: HTTPRequestParser.ControlAction = activeSession != nil && (activeSession?.hasFinished == false) ? .pause : .resume
-            relayControl(action: action, settings: settings)
-        }
-    }
-
-    func stop() {
-        let cleared = speechQueue.count
-        speechQueue.removeAll()
-        if cleared > 0 {
-            Log.session.info("Stop: cleared \(cleared, privacy: .public) queued speech items")
-        }
-        activeSession?.stop()
-        activeSession = nil
-        if let settings = settingsRef {
-            relayControl(action: .stop, settings: settings)
-        }
-    }
-
-    func setSpeed(_ speed: Float) {
-        activeSession?.setSpeed(speed)
     }
 
     func handleCLILaunch(appState: AppState, settings: SettingsManager) async {

@@ -71,6 +71,30 @@ struct TeleprompterView: View {
                 .allowsHitTesting(false)
             }
 
+            // Project indicators
+            if !appState.projectIndicators.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(Array(appState.projectIndicators.enumerated()), id: \.element.id) { idx, indicator in
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(indicator.color.opacity(0.8))
+                                .frame(width: 6, height: 6)
+                            Text(indicator.name)
+                                .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular, design: .rounded))
+                                .foregroundStyle(.white.opacity(idx == 0 ? 0.70 : 0.35))
+                        }
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .move(edge: .leading))
+                        ))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.4), value: appState.projectIndicators)
+                .padding(.top, 56)
+                .padding(.leading, 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+
             // Controls overlay
             VStack {
                 HStack {
