@@ -11,6 +11,8 @@ public struct ReadRequest: Sendable {
     /// True when this request was forwarded from another VoxClaw peer.
     /// Relayed requests are never re-relayed (prevents echo loops).
     public var relayed: Bool
+    /// True for test speech — always plays locally even if muted.
+    public var forceLocal: Bool
 
     public init(
         text: String,
@@ -19,7 +21,8 @@ public struct ReadRequest: Sendable {
         instructions: String? = nil,
         projectId: String? = nil,
         agentId: String? = nil,
-        relayed: Bool = false
+        relayed: Bool = false,
+        forceLocal: Bool = false
     ) {
         self.text = text
         self.voice = voice
@@ -28,6 +31,7 @@ public struct ReadRequest: Sendable {
         self.projectId = projectId
         self.agentId = agentId
         self.relayed = relayed
+        self.forceLocal = forceLocal
     }
 }
 
@@ -111,6 +115,7 @@ public enum HTTPRequestParser {
             let projectId = (json["project_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let agentId = (json["agent_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
             let relayed = (json["relayed"] as? Bool) ?? false
+            let forceLocal = (json["force_local"] as? Bool) ?? false
             return ReadRequest(
                 text: text,
                 voice: voice,
@@ -118,7 +123,8 @@ public enum HTTPRequestParser {
                 instructions: instructions,
                 projectId: projectId?.isEmpty == true ? nil : projectId,
                 agentId: agentId?.isEmpty == true ? nil : agentId,
-                relayed: relayed
+                relayed: relayed,
+                forceLocal: forceLocal
             )
         }
 

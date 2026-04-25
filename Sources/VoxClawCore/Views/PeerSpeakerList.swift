@@ -131,7 +131,7 @@ public struct PeerSpeakerList: View {
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote, "relayed": true])
+            req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote, "relayed": true, "force_local": true])
             req.timeoutInterval = 3
             do {
                 let (_, response) = try await URLSession.shared.data(for: req)

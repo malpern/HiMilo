@@ -425,7 +425,7 @@ final class AppCoordinator: SpeechQueueDelegate {
         var resolvedRequest = request
         resolvedRequest.voice = resolvedVoice
 
-        let localMuted = settings.relayPeerIDs.contains("__mute_local__")
+        let localMuted = settings.relayPeerIDs.contains("__mute_local__") && !resolvedRequest.forceLocal
         if !localMuted {
             await readText(
                 resolvedRequest.text,
