@@ -517,7 +517,7 @@ struct SettingsView: View {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote])
+            request.httpBody = try? JSONSerialization.data(withJSONObject: ["text": quote, "relayed": true])
             do {
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
