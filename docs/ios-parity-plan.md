@@ -163,6 +163,47 @@ Missing features that need porting:
    once queue exists.
 5. **Stop button** — already exists on iOS. ✅
 
+### Visual bugs in current iOS teleprompter
+
+Comparing macOS `WordView` to iOS `TeleprompterWordView`:
+
+**1. Highlight causes layout jump (the spacing issue)**
+iOS applies word padding only when highlighted:
+```swift
+.padding(.horizontal, isHighlighted ? 4 : 0)
+.padding(.vertical, isHighlighted ? 2 : 0)
+```
+macOS always applies padding (4h, 2v) regardless of highlight state.
+When a word becomes highlighted on iOS, it gains padding and pushes
+neighboring words — the entire line shifts. On macOS, padding is
+constant so words never move.
+
+**Fix:** always apply `.padding(.horizontal, 4).padding(.vertical, 2)`
+on iOS, matching macOS.
+
+**2. Highlight background missing glow**
+macOS `WordView` has a shadow glow (`glowRadius`) that breathes when
+paused. iOS has a flat rectangle, no shadow, no animation. Makes the
+highlight feel flat.
+
+**Fix:** port the `glowRadius` shadow + breathing animation.
+
+**3. ScrollView horizontal drift**
+iOS uses `.scrollTo(newIndex, anchor: .center)` which can shift the
+view horizontally when a word is near the edge of a line (same bug
+we fixed on macOS). Should use `UnitPoint(x: 0, y: 0.5)`.
+
+**4. No `.clipped()` on ScrollView**
+Long words can overflow the edges (same issue we fixed on macOS).
+
+**5. Missing teleprompter features**
+- No paragraph break sentinel check (no extra spacing between
+  paragraphs)
+- No inline code color (no zero-width space detection)
+- No project badges / indicator strip
+- No content fade-out between queue items
+- No `contentFadedOut` opacity binding
+
 ### Layout differences
 
 The iOS teleprompter fills the screen (not a floating panel). Some
@@ -170,6 +211,7 @@ macOS-specific concerns don't apply:
 - No `makeKey()` / focus-stealing (iOS doesn't have this concept)
 - No `NSPanel` lifecycle (iOS uses a SwiftUI view)
 - `FlowLayout` with `ParagraphBreakKey` should work cross-platform
+  (it's in VoxClawCore, not macOS-gated)
 
 ---
 
