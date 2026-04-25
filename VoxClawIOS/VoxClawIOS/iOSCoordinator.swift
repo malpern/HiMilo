@@ -14,7 +14,7 @@ final class iOSCoordinator {
     func startListening(appState: AppState, settings: SettingsManager) {
         stopListening()
         let port = settings.networkListenerPort
-        let listener = VoxClawCore.NetworkListener(port: port, appState: appState)
+        let listener = VoxClawCore.NetworkListener(port: port, appState: appState, settings: settings)
         do {
             try listener.start { [weak self] request in
                 await self?.handleReadRequest(request, appState: appState, settings: settings)

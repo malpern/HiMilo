@@ -27,15 +27,36 @@ public final class ReadingSession: SpeechEngineDelegate {
     /// When true, finish clears content but keeps the panel visible so the
     /// coordinator can do a smooth transition to the next queued item.
     public var keepPanelOnFinish = false
+    #if os(macOS)
     private let externalPanelController: PanelController?
+    #endif
 
+    public init(
+        appState: AppState,
+        engine: any SpeechEngine,
+        settings: SettingsManager? = nil,
+        pauseExternalAudioDuringSpeech: Bool = false,
+        playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
+    ) {
+        self.appState = appState
+        self.engine = engine
+        self.settings = settings
+        self.pauseExternalAudioDuringSpeech = pauseExternalAudioDuringSpeech
+        self.playbackController = playbackController
+        #if os(macOS)
+        self.externalPanelController = nil
+        #endif
+        engine.delegate = self
+    }
+
+    #if os(macOS)
     init(
         appState: AppState,
         engine: any SpeechEngine,
         settings: SettingsManager? = nil,
         pauseExternalAudioDuringSpeech: Bool = false,
         playbackController: any ExternalPlaybackControlling = ExternalPlaybackController(),
-        externalPanelController: PanelController? = nil
+        externalPanelController: PanelController?
     ) {
         self.appState = appState
         self.engine = engine
@@ -45,6 +66,7 @@ public final class ReadingSession: SpeechEngineDelegate {
         self.externalPanelController = externalPanelController
         engine.delegate = self
     }
+    #endif
 
     private static let sessionTimeout: Duration = .seconds(300)
 
@@ -287,7 +309,11 @@ public final class ReadingSession: SpeechEngineDelegate {
         resumeExternalPlaybackIfNeeded()
 
         if delayedReset && mutatingAppState {
+            #if os(macOS)
             let hasExternalPanel = externalPanelController != nil
+            #else
+            let hasExternalPanel = false
+            #endif
             let keepFlag = keepPanelOnFinish
             let shouldKeepPanel = keepFlag || hasExternalPanel
             if shouldKeepPanel {
