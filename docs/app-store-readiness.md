@@ -22,23 +22,21 @@ blocks submission entirely.
 
 ### Requires work
 
-- **Background audio** — the app has `BackgroundAudioKeepAlive.swift` with
-  a 30-minute timeout. Apple requires the `audio` background mode in
-  Info.plist and reviewers verify the app genuinely plays audio (not just
-  silence to stay alive). VoxClaw does play real speech, so this should
-  pass, but the keep-alive mechanism needs scrutiny — Apple rejects apps
-  that play silent audio to prevent suspension.
+- **Background audio** — the silent-audio keep-alive
+  (`BackgroundAudioKeepAlive.swift`) is compiled out for App Store builds
+  via `#if !APPSTORE`. Apple rejects apps that play inaudible audio to
+  avoid suspension (guideline 2.5.4). The App Store version's network
+  listener will stop when the app is backgrounded. Future improvement:
+  use APNs push notifications to wake the app when the Mac has speech
+  to relay (no silent audio needed).
 - **Local network privacy prompt** — iOS 14+ shows a permission dialog
   when the app listens on the local network. Users need to accept this.
   Not a blocker, but the first-launch UX needs to explain why.
 - **Missing entitlements** — the iOS entitlements file currently only has
   iCloud KVS. Needs `com.apple.security.network.server` and the audio
   background mode added.
-- **Stale codebase** — the iOS app imports `VoxClawCore` which was heavily
-  modified in the Apr 2026 session (deleted AgentSpeech, changed
-  NetworkListener/NetworkSession APIs, added new types). The iOS app
-  almost certainly does not compile against the current library. Fixing
-  the build is straightforward but not zero effort.
+- ~~**Stale codebase**~~ — resolved. iOS app builds clean against
+  current VoxClawCore. Full queue client with shared coordinator.
 
 ### No blockers
 

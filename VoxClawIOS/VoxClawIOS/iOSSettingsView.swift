@@ -243,6 +243,7 @@ struct iOSSettingsView: View {
                     }
             }
 
+            #if !APPSTORE
             Toggle("Keep alive in background", isOn: $settings.backgroundKeepAlive)
 
             if settings.backgroundKeepAlive {
@@ -250,6 +251,7 @@ struct iOSSettingsView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            #endif
         }
     }
 }

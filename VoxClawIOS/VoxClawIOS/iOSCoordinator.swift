@@ -102,14 +102,23 @@ final class iOSCoordinator: SpeechQueueDelegate {
     // MARK: - Background / Interruptions
 
     func enterBackground(settings: SettingsManager) {
+        #if !APPSTORE
         guard settings.backgroundKeepAlive else { return }
         configureAudioSession()
         keepAlive.start()
+        #endif
     }
 
     func exitBackground() {
+        #if !APPSTORE
         keepAlive.stop()
+        #endif
     }
+
+    // TODO: For App Store builds, implement push-notification-based wake
+    // (APNs or CloudKit push) so the Mac can wake the iOS app when it has
+    // speech to relay. This replaces the silent-audio keep-alive which
+    // Apple rejects (guideline 2.5.4).
 
     func observeAudioInterruptions(appState: AppState) {
         interruptionTask?.cancel()
