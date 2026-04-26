@@ -1,0 +1,35 @@
+name: VoxClawMac
+options:
+  bundleIdPrefix: com.malpern
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "26.4"
+
+packages:
+  VoxClawCore:
+    path: ../
+
+targets:
+  VoxClaw:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.malpern.voxclaw
+        PRODUCT_NAME: VoxClaw
+        INFOPLIST_KEY_CFBundleDisplayName: VoxClaw
+        INFOPLIST_KEY_LSUIElement: true
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
+        INFOPLIST_FILE: Sources/Info.plist
+      configs:
+        Release:
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+    dependencies:
+      - package: VoxClawCore
+        product: VoxClawCore
+    entitlements:
+      path: Sources/VoxClaw.entitlements

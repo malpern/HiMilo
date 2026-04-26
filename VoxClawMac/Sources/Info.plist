@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>VoxClaw</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>VoxClaw</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.2.1</string>
+	<key>CFBundleVersion</key>
+	<string>4</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>VoxClaw URL Scheme</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>voxclaw</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_voxclaw._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>VoxClaw listens for text-to-speech requests from other devices on your local network.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>VoxClaw uses on-device speech recognition to synchronize word highlighting with audio playback.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>VoxClaw pauses media playback in other apps while speaking, then resumes when done.</string>
+</dict>
+</plist>

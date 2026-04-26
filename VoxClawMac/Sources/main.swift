@@ -1,0 +1,3 @@
+import VoxClawCore
+
+VoxClawLauncher.main()
