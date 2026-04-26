@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    width: 220px;
+    padding: 16px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 13px;
+    color: #1d1d1f;
+    margin: 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #2c2c2e; color: #f5f5f7; }
+  }
+  h3 { margin: 0 0 12px 0; font-size: 14px; }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .status {
+    margin-top: 10px;
+    font-size: 11px;
+    color: #86868b;
+  }
+</style>
+</head>
+<body>
+  <h3>VoxClaw</h3>
+  <label>
+    <input type="checkbox" id="enabled" checked>
+    Pause YouTube while speaking
+  </label>
+  <div class="status" id="status">Checking...</div>
+  <script src="popup.js"></script>
+</body>
+</html>

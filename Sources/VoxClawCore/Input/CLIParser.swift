@@ -76,9 +76,6 @@ struct CLIParser: ParsableCommand {
     @Option(name: .long, help: "Send text to a running listener")
     var send: String? = nil
 
-    @Flag(name: .customLong("browser-control-native-host"), help: ArgumentHelp("Run as the Chrome native messaging host", visibility: .hidden))
-    var browserControlNativeHost = false
-
     @Argument(help: "Text to read aloud")
     var text: [String] = []
 
@@ -86,11 +83,6 @@ struct CLIParser: ParsableCommand {
         if verbose {
             Log.isVerbose = true
             Log.verbose("Verbose mode enabled")
-        }
-
-        if browserControlNativeHost {
-            try BrowserControlNativeHostRunner.run()
-            return
         }
 
         // --status: query a running listener

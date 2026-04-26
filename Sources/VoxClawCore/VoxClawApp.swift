@@ -102,14 +102,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        BrowserControlService.shared.start()
-        do {
-            try BrowserExtensionInstaller().installBundledSupport()
-        } catch {
-            Log.playback.warning("Browser extension support install failed: \(error.localizedDescription, privacy: .public)")
-            SharedApp.appState.browserControlWarning = "Browser extension support is not installed yet. Open Settings to install or refresh it."
-        }
-
         SharedApp.coordinator.startListening(
             appState: SharedApp.appState,
             settings: SharedApp.settings,

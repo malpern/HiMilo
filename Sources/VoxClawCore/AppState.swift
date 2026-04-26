@@ -50,7 +50,6 @@ public final class AppState {
     public var queueActive: Bool = false
     public var isListening: Bool = false
     public var feedbackText: String? = nil
-    public var browserControlWarning: String? = nil
     public var speedIndicatorText: String? = nil
     public var timingSource: TimingSource = .cadence
     public var inputText: String = ""
@@ -76,7 +75,6 @@ public final class AppState {
         contentFadedOut = false
         projectIndicators = []
         feedbackText = nil
-        browserControlWarning = nil
         speedIndicatorText = nil
         timingSource = .cadence
         inputText = ""

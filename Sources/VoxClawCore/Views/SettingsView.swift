@@ -18,7 +18,6 @@ struct SettingsView: View {
     @State private var peerSpeakStatusToken = UUID()
     @State private var voicePreview = VoicePreviewPlayer()
     var peerBrowser: PeerBrowser
-    @State private var browserControlStatus: String?
 
     var body: some View {
         ScrollView {
@@ -328,49 +327,12 @@ struct SettingsView: View {
 
     private var controlsSection: some View {
         Section("Controls") {
-            Toggle("Pause other audio while VoxClaw speaks", isOn: $settings.pauseOtherAudioDuringSpeech)
+            Toggle("Pause YouTube while speaking", isOn: $settings.pauseOtherAudioDuringSpeech)
                 .accessibilityIdentifier(AccessibilityID.Settings.pauseOtherAudioToggle)
-            if let warning = appState.browserControlWarning {
-                Label(warning, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .accessibilityIdentifier(AccessibilityID.Settings.browserControlWarning)
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                Button("Install or Refresh Browser Control") {
-                    do {
-                        try BrowserExtensionInstaller().installBundledSupport()
-                        appState.browserControlWarning = nil
-                        browserControlStatus = "Installed native host manifests and refreshed the bundled Chrome extension."
-                    } catch {
-                        browserControlStatus = "Install failed: \(error.localizedDescription)"
-                        appState.browserControlWarning = browserControlStatus
-                    }
-                }
-                .accessibilityIdentifier(AccessibilityID.Settings.installBrowserControl)
-
-                Button("Reveal Extension Folder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([BrowserExtensionInstaller().extensionFolderURL()])
-                }
-                .accessibilityIdentifier(AccessibilityID.Settings.revealBrowserExtensionFolder)
-
-                HStack {
-                    Button("Open Chrome Extensions") {
-                        BrowserExtensionInstaller().openChromeExtensionsPage()
-                    }
-                    Button("Open Canary Extensions") {
-                        BrowserExtensionInstaller().openChromeCanaryExtensionsPage()
-                    }
-                }
-
-                Text("Load the bundled extension as an unpacked extension from the revealed folder in Chrome or Chrome Canary. VoxClaw installs the native-host bridge automatically.")
+            if settings.pauseOtherAudioDuringSpeech {
+                Text("Install the VoxClaw Chrome extension to pause YouTube videos automatically.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-
-                if let browserControlStatus {
-                    Text(browserControlStatus)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             Toggle("Enable Network Listener", isOn: $settings.networkListenerEnabled)
                 .accessibilityIdentifier(AccessibilityID.Settings.networkListenerToggle)

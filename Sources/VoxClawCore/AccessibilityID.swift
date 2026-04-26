@@ -41,9 +41,6 @@ enum AccessibilityID {
         static let audioOnlyToggle = "settings.audioOnlyToggle"
         static let launchAtLoginToggle = "settings.launchAtLoginToggle"
         static let rememberOverlayPositionToggle = "settings.rememberOverlayPositionToggle"
-        static let browserControlWarning = "settings.browserControlWarning"
-        static let installBrowserControl = "settings.installBrowserControl"
-        static let revealBrowserExtensionFolder = "settings.revealBrowserExtensionFolder"
     }
 
     enum Appearance {
