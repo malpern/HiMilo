@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/marketplace/marketplace.schema.json",
+  "name": "voxclaw",
+  "version": "1.0.0",
+  "owner": {
+    "name": "Micah Alpern",
+    "email": "malpern@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "voxclaw",
+      "description": "Give your coding agent a voice. Speaks responses aloud through the VoxClaw macOS/iOS app with per-project voices, speech queue, and polite multi-device sync.",
+      "source": "./plugins/voxclaw",
+      "category": "development",
+      "keywords": ["tts", "speech", "voice", "text-to-speech", "accessibility", "audio"]
+    }
+  ]
+}

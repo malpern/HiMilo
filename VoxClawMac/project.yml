@@ -15,6 +15,15 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+        excludes:
+          - "VoxClaw.help"
+    resources:
+      - path: Sources/VoxClaw.help
+        buildPhase: none
+    postBuildScripts:
+      - script: |
+          cp -R "${SRCROOT}/Sources/VoxClaw.help" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/VoxClaw.help"
+        name: Copy Help Book
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.malpern.voxclaw
@@ -40,6 +49,15 @@ targets:
     platform: macOS
     sources:
       - path: Sources
+        excludes:
+          - "VoxClaw.help"
+    resources:
+      - path: Sources/VoxClaw.help
+        buildPhase: none
+    postBuildScripts:
+      - script: |
+          cp -R "${SRCROOT}/Sources/VoxClaw.help" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/VoxClaw.help"
+        name: Copy Help Book
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.malpern.voxclaw

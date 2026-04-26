@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="Troubleshoot common VoxClaw issues">
+<meta name="keywords" content="VoxClaw, troubleshoot, fix, not speaking, no sound, help">
+<title>Troubleshooting — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Troubleshooting</p>
+
+<h1>Troubleshooting</h1>
+
+<div class="card">
+    <h3>VoxClaw isn't speaking</h3>
+    <ul>
+        <li>Check that VoxClaw is running (look for its icon in the menu bar)</li>
+        <li>Verify the listener is active: <code>curl http://localhost:4140/status</code></li>
+        <li>Make sure your volume isn't muted</li>
+        <li>If using OpenAI/ElevenLabs, verify your API key is valid in Settings</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>Agent responses aren't triggering speech</h3>
+    <ul>
+        <li>Restart your Claude Code or Codex session after installing the VoxClaw plugin</li>
+        <li>Check that hooks are installed: look for <code>voxclaw</code> entries in <code>~/.claude/settings.json</code> or <code>~/.codex/config.toml</code></li>
+        <li>Enable the network listener in VoxClaw Settings</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>Speech cuts off mid-sentence</h3>
+    <ul>
+        <li>This usually means the UserPromptSubmit hook fired (you typed a new message)</li>
+        <li>If it happens without typing, check for other applications sending to VoxClaw's port</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>OpenAI voices aren't working</h3>
+    <ul>
+        <li>Verify your API key at <a href="https://platform.openai.com/api-keys">platform.openai.com</a></li>
+        <li>Check that you have available credits in your OpenAI account</li>
+        <li>VoxClaw will fall back to Apple's built-in voice if the OpenAI request fails</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>Peer device not appearing</h3>
+    <ul>
+        <li>Both devices must be on the same Wi-Fi network</li>
+        <li>VoxClaw must be running on both devices</li>
+        <li>Check your firewall settings — Bonjour discovery uses mDNS</li>
+        <li>Wait a few seconds for Bonjour to resolve the peer address</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>Overlay not showing</h3>
+    <ul>
+        <li>Check that "Audio only" is not enabled in Settings</li>
+        <li>The overlay may be positioned off-screen — try toggling "Remember overlay position" off and back on</li>
+    </ul>
+</div>
+
+<h2>View Logs</h2>
+<p>For detailed diagnostics, view VoxClaw's logs in Terminal:</p>
+<pre><code>log stream --predicate 'subsystem == "com.malpern.voxclaw"' --level debug</code></pre>
+
+<h2>Get Help</h2>
+<p>If you're still stuck, open an issue at <a href="https://github.com/malpern/VoxClaw/issues">github.com/malpern/VoxClaw/issues</a>.</p>
+
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="VoxClaw privacy policy — what data goes where">
+<meta name="keywords" content="VoxClaw, privacy, data, API key, OpenAI, security">
+<title>Privacy &amp; Data — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Privacy &amp; Data</p>
+
+<h1>Privacy &amp; Data</h1>
+<p>VoxClaw is designed to keep your data local. We don't run servers, don't have accounts, and don't collect analytics.</p>
+
+<h2>Data That Stays on Your Mac</h2>
+<ul>
+    <li><strong>Apple Built-in Voice:</strong> All speech processing happens on-device via macOS AVSpeechSynthesizer. No text leaves your Mac.</li>
+    <li><strong>Settings:</strong> Stored in local UserDefaults and synced via iCloud Key-Value Storage to your other Apple devices.</li>
+    <li><strong>API keys:</strong> Stored in your Mac's Keychain. Never transmitted to VoxClaw or any server other than the voice provider you selected.</li>
+</ul>
+
+<h2>Data Sent to Third Parties</h2>
+<p>Only when you explicitly enable OpenAI or ElevenLabs voices:</p>
+<ul>
+    <li><strong>What is sent:</strong> The text being read aloud, to the voice provider's API</li>
+    <li><strong>What is not sent:</strong> Your name, email, device identifiers, usage data, or any personal information</li>
+    <li><strong>When:</strong> Only at the moment text is spoken with a third-party engine enabled</li>
+</ul>
+
+<h2>No Data Collection</h2>
+<p>VoxClaw does not collect, store, or transmit analytics, crash reports, device identifiers, location data, or advertising identifiers. We have no servers and no way to access your data.</p>
+
+<h2>Network Listener</h2>
+<p>The HTTP listener on port 4140 accepts connections only from your local machine or local network. It does not expose any data to the internet.</p>
+
+<h2>Full Privacy Policy</h2>
+<p>Read the complete privacy policy at <a href="https://malpern.github.io/VoxClaw/privacy.html">voxclaw.com/privacy</a>.</p>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="Connect VoxClaw to Claude Code">
+<meta name="keywords" content="VoxClaw, Claude Code, plugin, hooks, setup">
+<title>Claude Code Setup — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Claude Code Setup</p>
+
+<h1>Connect to Claude Code</h1>
+<p>The VoxClaw plugin for Claude Code makes every response spoken aloud automatically. When you send a message, VoxClaw stops reading the previous response so it never talks over you.</p>
+
+<h2>Install via Plugin Marketplace</h2>
+<p>Run these two commands in your terminal:</p>
+<pre><code>claude plugin marketplace add malpern/VoxClaw
+claude plugin install voxclaw</code></pre>
+<p>That's it. New Claude Code sessions will pick up the plugin automatically.</p>
+
+<h2>Manual Install</h2>
+<p>If you prefer to install hooks directly:</p>
+<pre><code>git clone https://github.com/malpern/VoxClaw.git
+bash VoxClaw/plugins/voxclaw/setup-claude-code.sh</code></pre>
+<p>This copies hook scripts to <code>~/.claude/hooks/</code> and adds entries to <code>~/.claude/settings.json</code>.</p>
+
+<h2>What the Plugin Does</h2>
+<div class="card">
+    <h3>Stop Hook</h3>
+    <p>When Claude Code finishes responding, the plugin extracts the response text, strips markdown formatting, and sends it to VoxClaw's local listener to be spoken aloud.</p>
+</div>
+<div class="card">
+    <h3>UserPromptSubmit Hook</h3>
+    <p>When you send a new message, the plugin tells VoxClaw to stop reading the previous response. This means VoxClaw never talks over your next interaction.</p>
+</div>
+
+<h2>Multi-Agent Voices</h2>
+<p>If you have multiple Claude Code sessions running in different project directories, VoxClaw assigns each project a distinct voice automatically. Responses are queued — one project speaks at a time, with smooth transitions between them.</p>
+
+<h2>Verify It Works</h2>
+<p>Start a new Claude Code session and ask it a question. You should hear the response spoken aloud and see the teleprompter overlay appear.</p>
+
+<div class="note">Running sessions need to be restarted to load newly installed hooks.</div>
+
+</body>
+</html>

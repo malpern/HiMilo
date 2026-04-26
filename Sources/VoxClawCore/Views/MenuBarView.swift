@@ -89,6 +89,11 @@ struct MenuBarView: View {
             }
             .accessibilityIdentifier(AccessibilityID.MenuBar.about)
 
+            Button("VoxClaw Help") {
+                NSHelpManager.shared.openHelpAnchor("", inBook: "VoxClaw Help")
+            }
+            .accessibilityIdentifier(AccessibilityID.MenuBar.help)
+
             Divider()
 
             Button("Quit") {

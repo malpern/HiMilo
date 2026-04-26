@@ -1,0 +1,115 @@
+:root {
+    color-scheme: light dark;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --bg: #fff;
+    --card-bg: #f5f5f7;
+    --border: #d2d2d7;
+    --code-bg: #f0f0f2;
+    --accent: #0066cc;
+    --accent-hover: #004499;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --text: #f5f5f7;
+        --text-secondary: #a1a1a6;
+        --bg: #1d1d1f;
+        --card-bg: #2c2c2e;
+        --border: #48484a;
+        --code-bg: #2c2c2e;
+        --accent: #2997ff;
+        --accent-hover: #64b5f6;
+    }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+    padding: 20px 24px;
+    max-width: 600px;
+}
+
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+h2 { font-size: 17px; font-weight: 600; margin-top: 24px; margin-bottom: 8px; }
+h3 { font-size: 14px; font-weight: 600; margin-top: 16px; margin-bottom: 6px; }
+
+p { margin-bottom: 10px; }
+ul, ol { margin-bottom: 10px; padding-left: 20px; }
+li { margin-bottom: 4px; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+code {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: var(--code-bg);
+    padding: 2px 5px;
+    border-radius: 4px;
+}
+
+pre {
+    background: var(--code-bg);
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+}
+
+pre code { background: none; padding: 0; }
+
+.card {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.card h3 { margin-top: 0; }
+
+.note {
+    background: var(--card-bg);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.breadcrumb {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.breadcrumb a { color: var(--text-secondary); }
+
+.nav-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.nav-grid a {
+    display: block;
+    background: var(--card-bg);
+    padding: 12px 14px;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.nav-grid a:hover {
+    text-decoration: none;
+    outline: 1px solid var(--accent);
+}
+
+.secondary { color: var(--text-secondary); font-size: 12px; }

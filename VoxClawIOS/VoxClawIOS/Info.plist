@@ -14,5 +14,7 @@
 	<array>
 		<string>_voxclaw._tcp</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

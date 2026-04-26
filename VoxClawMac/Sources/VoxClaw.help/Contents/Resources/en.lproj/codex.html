@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="Connect VoxClaw to OpenAI Codex CLI">
+<meta name="keywords" content="VoxClaw, Codex, OpenAI, plugin, hooks, setup">
+<title>Codex Setup — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Codex Setup</p>
+
+<h1>Connect to Codex</h1>
+<p>VoxClaw integrates with OpenAI's Codex CLI using the same hook system. Every Codex response is spoken aloud, and sending a new message automatically stops the current reading.</p>
+
+<h2>Install</h2>
+<p>Run the setup script in your terminal:</p>
+<pre><code>git clone https://github.com/malpern/VoxClaw.git
+bash VoxClaw/plugins/voxclaw/setup-codex.sh</code></pre>
+<p>This copies hook scripts to <code>~/.codex/hooks/</code> and adds entries to <code>~/.codex/config.toml</code>.</p>
+
+<h2>What Gets Added</h2>
+<p>The setup script adds two hook entries to your Codex config:</p>
+<pre><code>[[hooks.Stop]]
+hooks = [
+  { type = "command", command = "~/.codex/hooks/voxclaw-codex-stop-speak.sh", timeout = 5000 }
+]
+
+[[hooks.UserPromptSubmit]]
+hooks = [
+  { type = "command", command = "~/.codex/hooks/voxclaw-codex-ack.sh", timeout = 2000 }
+]</code></pre>
+
+<h2>How It Works</h2>
+<p>Codex provides the last assistant message directly in the Stop hook payload, so VoxClaw can speak responses without parsing the full transcript. The hook strips markdown formatting, shortens URLs, and preserves paragraph breaks for natural speech pacing.</p>
+
+<h2>Verify It Works</h2>
+<p>Start a new Codex session and ask it something. You should hear the response spoken aloud with the teleprompter overlay.</p>
+
+<div class="note">Running Codex sessions need to be restarted to load newly installed hooks.</div>
+
+</body>
+</html>

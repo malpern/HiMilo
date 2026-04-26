@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="VoxClaw voice engines — Apple, OpenAI, ElevenLabs">
+<meta name="keywords" content="VoxClaw, voice, TTS, OpenAI, ElevenLabs, Apple, text-to-speech">
+<title>Voice Engines — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Voice Engines</p>
+
+<h1>Voice Engines</h1>
+<p>VoxClaw supports three voice engines. You can switch between them at any time in Settings.</p>
+
+<div class="card">
+    <h3>Apple Built-in (Free)</h3>
+    <p>Uses your Mac's built-in text-to-speech. All processing happens on-device — no internet required, no API key needed. This is the default.</p>
+    <p class="secondary">Quality varies by voice. The "Siri" voices sound the most natural.</p>
+</div>
+
+<div class="card">
+    <h3>OpenAI ($)</h3>
+    <p>Uses OpenAI's <code>gpt-4o-mini-tts</code> model for natural, expressive speech. Requires your own API key from <a href="https://platform.openai.com/api-keys">platform.openai.com</a>.</p>
+    <p class="secondary">Cost: approximately $0.15 per 10,000 characters. Available voices: Alloy, Ash, Coral, Echo, Fable, Nova, Onyx, Sage, Shimmer.</p>
+</div>
+
+<div class="card">
+    <h3>ElevenLabs ($$)</h3>
+    <p>Premium voice synthesis with the most natural results. Requires your own API key from <a href="https://elevenlabs.io">elevenlabs.io</a>.</p>
+    <p class="secondary">Standard: ~$1.80 per 10K chars. Turbo mode: ~$0.60 per 10K chars (faster, lower quality).</p>
+</div>
+
+<h2>Adding an API Key</h2>
+<ol>
+    <li>Open VoxClaw Settings (click menu bar icon &rsaquo; Settings)</li>
+    <li>In the Voice section, select OpenAI or ElevenLabs</li>
+    <li>Paste your API key when prompted</li>
+</ol>
+<p>Your API key is stored securely in your Mac's Keychain and is never sent to VoxClaw or any server other than the voice provider you chose.</p>
+
+<h2>Multi-Agent Voices</h2>
+<p>When multiple coding agents are sending responses, VoxClaw automatically assigns each project a distinct voice. This uses a deterministic hash of the project directory, so the same project always gets the same voice across sessions.</p>
+
+<h2>Speed Control</h2>
+<p>Adjust speech speed from 0.5x to 2.0x using the Speed slider in Settings. This works with all voice engines.</p>
+
+</body>
+</html>

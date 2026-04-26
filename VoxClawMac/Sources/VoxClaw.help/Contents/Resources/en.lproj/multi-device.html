@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="VoxClaw multi-device relay — Mac to Mac, Mac to iPhone">
+<meta name="keywords" content="VoxClaw, multi-device, relay, Bonjour, iPhone, peer">
+<title>Multi-Device — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Multi-Device</p>
+
+<h1>Multi-Device</h1>
+<p>VoxClaw can relay speech to other VoxClaw instances on your network. When your agent speaks on your Mac, your iPhone (or another Mac) can speak it too.</p>
+
+<h2>How It Works</h2>
+<p>VoxClaw uses Bonjour to discover other VoxClaw instances on your local network. When your Mac receives text from an agent, it relays the text to all enabled peer devices.</p>
+
+<h2>Setup</h2>
+<ol>
+    <li>Install VoxClaw on both devices</li>
+    <li>Make sure both devices are on the same Wi-Fi network</li>
+    <li>Open Settings &rsaquo; Peers on your Mac</li>
+    <li>Your other device should appear automatically via Bonjour</li>
+    <li>Toggle it on to enable relay</li>
+</ol>
+
+<h2>Peer Controls</h2>
+<p>In the Peers section of Settings:</p>
+<ul>
+    <li><strong>Toggle</strong> — enable or disable relay to each peer</li>
+    <li><strong>Test</strong> — send a test phrase to verify the connection</li>
+    <li><strong>Resolving...</strong> — the peer was discovered but its address hasn't resolved yet; wait a moment</li>
+</ul>
+
+<h2>Cross-Device Interruption</h2>
+<p>When you interrupt speech by typing on your Mac, VoxClaw sends an acknowledgment to all peer devices. They stop speaking and play the interrupt sound, keeping everything in sync.</p>
+
+</body>
+</html>

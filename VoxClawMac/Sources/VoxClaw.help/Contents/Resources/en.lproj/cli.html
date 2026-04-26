@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="VoxClaw CLI and integration methods">
+<meta name="keywords" content="VoxClaw, CLI, command line, URL scheme, curl, integration">
+<title>CLI &amp; Integrations — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; CLI &amp; Integrations</p>
+
+<h1>CLI &amp; Integrations</h1>
+<p>Beyond the Claude Code and Codex plugins, VoxClaw offers several ways to send text for speech.</p>
+
+<h2>Command Line</h2>
+<pre><code>voxclaw "Hello, world!"              # Read text aloud
+voxclaw --clipboard                  # Read from clipboard
+voxclaw --file article.txt           # Read from file
+echo "Hello" | voxclaw              # Read from stdin
+voxclaw --voice nova "Hello"         # OpenAI voice override
+voxclaw --rate 1.5 "Hello"          # 1.5x speech speed
+voxclaw -a "Hello"                   # Audio only (no overlay)</code></pre>
+
+<h2>URL Scheme</h2>
+<p>Trigger VoxClaw from any app that supports URL schemes:</p>
+<pre><code>open "voxclaw://read?text=Hello%20world"</code></pre>
+
+<h2>HTTP API</h2>
+<p>Send text to the local listener:</p>
+<pre><code>curl -X POST http://localhost:4140/read \
+  -d '{"text": "Hello from any tool"}'</code></pre>
+<p>See <a href="network.html">Network &amp; Remote</a> for full API details.</p>
+
+<h2>macOS Services Menu</h2>
+<p>Select text in any app, right-click, and choose Services &rsaquo; Read with VoxClaw.</p>
+
+<h2>Shortcuts</h2>
+<p>Use the Shortcuts app to create automations:</p>
+<pre><code>shortcuts run "Read with VoxClaw" --input-string "Hello"</code></pre>
+
+<h2>Save Audio to File</h2>
+<p>With OpenAI voices, save the audio instead of playing it:</p>
+<pre><code>voxclaw --output hello.mp3 "Hello world"</code></pre>
+
+</body>
+</html>

@@ -1,12 +1,11 @@
 #if os(macOS)
-import AVFoundation
 import AppKit
 import SwiftUI
 
 // MARK: - Step Enum
 
 enum OnboardingStep: Int, CaseIterable {
-    case welcome, apiKey, agentLocation, done
+    case welcome, connectAgent, apiKey, done
 }
 
 // MARK: - OnboardingView
@@ -16,26 +15,21 @@ struct OnboardingView: View {
 
     @State private var currentStep: OnboardingStep = .welcome
     @State private var stepIndex = 0
-    @State private var transitionEdge: Edge = .trailing
+    @State private var goingForward = true
 
     // Collected state
     @State private var apiKey = ""
     @State private var hasExistingKey = false
-    @State private var agentLocation: AgentLocation = .thisMac
-    @State private var networkEnabled = false
-    @State private var port: String = "4140"
     @State private var launchAtLogin = true
 
-    // Audio
-    @State private var narrator = OnboardingNarrator()
-    @State private var demoPlayer = VoiceDemoPlayer()
-    @State private var isPaused = false
+    // Agent tool detection
+    @State private var agentToolStatuses: [AgentToolDetector.Status] = []
 
     private var steps: [OnboardingStep] {
         if hasExistingKey {
-            return [.welcome, .done]
+            return [.welcome, .connectAgent, .done]
         } else {
-            return [.welcome, .apiKey, .agentLocation, .done]
+            return [.welcome, .connectAgent, .apiKey, .done]
         }
     }
 
@@ -46,32 +40,35 @@ struct OnboardingView: View {
             Group {
                 switch currentStep {
                 case .welcome:
-                    WelcomeStep(demoPlayer: demoPlayer, hasExistingKey: hasExistingKey, narrator: narrator)
+                    WelcomeStep()
+                case .connectAgent:
+                    ConnectAgentStep(statuses: agentToolStatuses)
                 case .apiKey:
                     APIKeyStep(apiKey: $apiKey)
-                case .agentLocation:
-                    AgentLocationStep(
-                        location: $agentLocation,
-                        networkEnabled: $networkEnabled,
-                        port: $port,
-                        launchAtLogin: $launchAtLogin
-                    )
                 case .done:
-                    SuccessStep(
-                        isRemote: agentLocation == .remoteMachine,
-                        port: port
+                    DoneStep(
+                        hasAPIKey: !apiKey.isEmpty,
+                        pluginInstalled: agentToolStatuses.contains(where: \.pluginInstalled),
+                        launchAtLogin: $launchAtLogin
                     )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.push(from: transitionEdge))
+            .id(currentStep)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .scale(scale: goingForward ? 1.04 : 0.96)),
+                removal: .opacity.combined(with: .scale(scale: goingForward ? 0.96 : 1.04))
+            ))
             .animation(.easeInOut(duration: 0.3), value: currentStep)
+
+            StepDots(count: steps.count, currentIndex: stepIndex)
+                .padding(.top, 8)
 
             NavBar(
                 step: currentStep,
-                isPaused: $isPaused,
                 isFirstStep: stepIndex == 0,
-                isRemoteDoneStep: currentStep == .done && agentLocation == .remoteMachine,
+                isLastStep: stepIndex == steps.count - 1,
+                canSkip: currentStep == .connectAgent || currentStep == .apiKey,
                 onBack: goBack,
                 onNext: goNext,
                 onDone: handleComplete
@@ -79,56 +76,24 @@ struct OnboardingView: View {
             .padding(.bottom, 20)
         }
         .padding(.horizontal, 32)
-        .frame(width: 500, height: 440)
+        .frame(width: 520, height: 540)
+        .focusEffectDisabled()
         .task {
-            demoPlayer.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
-            narrator.pauseExternalAudioDuringSpeech = settings.pauseOtherAudioDuringSpeech
+            agentToolStatuses = AgentToolDetector.detect()
 
-            // Short flow when a key is already saved.
             let existingKey = (try? KeychainHelper.readPersistedAPIKey()) ?? settings.openAIAPIKey
-            let isPersistedKey = !existingKey.isEmpty
+            hasExistingKey = !existingKey.isEmpty
+            if hasExistingKey { apiKey = existingKey }
 
-            if isPersistedKey {
-                apiKey = existingKey
-                hasExistingKey = true
-                Log.onboarding.info("Existing API key found, using short flow")
-                narrator.speak(
-                    text: "Hey! Welcome to VoxClaw — your agent can finally talk! Let's go!",
-                    apiKey: existingKey
-                )
-            } else {
-                hasExistingKey = false
-                demoPlayer.playDemo()
-            }
-        }
-        .onChange(of: narrator.didFailOpenAI) { _, failed in
-            if failed && hasExistingKey {
-                Log.onboarding.info("OpenAI narrator failed, switching to full onboarding flow")
-                hasExistingKey = false
-                narrator.stop()
-                demoPlayer.playDemo()
-            }
+            try? await Task.sleep(for: .milliseconds(600))
+            speakDemoWithPrerecorded(resource: "onboarding-openai", ext: "mp3")
         }
         .onChange(of: currentStep) { _, newStep in
             handleStepChange(newStep)
         }
         .onChange(of: apiKey) { _, newKey in
-            // Persist key immediately so it survives window close
             if !newKey.isEmpty {
                 settings.openAIAPIKey = newKey
-                // Auto-advance when a valid-looking key is entered on the API key step
-                if currentStep == .apiKey && newKey.hasPrefix("sk-") && newKey.count > 20 {
-                    goNext()
-                }
-            }
-        }
-        .onChange(of: isPaused) { _, paused in
-            if paused {
-                demoPlayer.pause()
-                narrator.pause()
-            } else {
-                demoPlayer.resume()
-                narrator.resume()
             }
         }
     }
@@ -137,42 +102,34 @@ struct OnboardingView: View {
         stopAllAudio()
         guard stepIndex > 0 else { return }
         stepIndex -= 1
-        transitionEdge = .leading
-        currentStep = steps[stepIndex]
+        goingForward = false
+        withAnimation(.easeInOut(duration: 0.35)) {
+            currentStep = steps[stepIndex]
+        }
     }
 
     private func goNext() {
         stopAllAudio()
         guard stepIndex < steps.count - 1 else { return }
         stepIndex += 1
-        transitionEdge = .trailing
-        currentStep = steps[stepIndex]
+        goingForward = true
+        withAnimation(.easeInOut(duration: 0.35)) {
+            currentStep = steps[stepIndex]
+        }
     }
 
     private func stopAllAudio() {
-        demoPlayer.stop()
-        narrator.stop()
+        ackDemo()
     }
 
     private func handleComplete() {
         stopAllAudio()
 
-        if agentLocation == .remoteMachine {
-            let handoff = makeAgentHandoffText(port: port)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(handoff, forType: .string)
-        }
-
         if !apiKey.isEmpty {
             settings.openAIAPIKey = apiKey
             settings.voiceEngine = .openai
         }
-        if agentLocation == .remoteMachine && networkEnabled {
-            settings.networkListenerEnabled = true
-            if let p = UInt16(port), p > 0 {
-                settings.networkListenerPort = p
-            }
-        }
+        settings.networkListenerEnabled = true
         settings.launchAtLogin = launchAtLogin
         settings.hasCompletedOnboarding = true
 
@@ -180,34 +137,44 @@ struct OnboardingView: View {
         NSApp.keyWindow?.close()
     }
 
-    private func makeAgentHandoffText(port: String) -> String {
-        let lanIP = NetworkListener.localIPAddress()
-        let baseURL = lanIP.map { "http://\($0):\(port)" }
-            ?? "http://<lan-ip>:\(port)"
-        return AgentHandoffPrompt.make(baseURL: baseURL)
-    }
-
     private func handleStepChange(_ step: OnboardingStep) {
-        isPaused = false
-
         switch step {
         case .welcome:
-            if hasExistingKey {
-                narrator.speak(
-                    text: "Hey! Welcome to VoxClaw — your agent can finally talk! Let's go!",
-                    apiKey: apiKey
-                )
-            } else {
-                demoPlayer.playDemo()
-            }
-        case .apiKey, .agentLocation:
+            speakDemoWithPrerecorded(resource: "onboarding-openai", ext: "mp3")
+        case .connectAgent, .apiKey:
             break
         case .done:
-            narrator.speak(
-                text: "Let's F-ing go!",
-                apiKey: apiKey.isEmpty ? nil : apiKey
-            )
+            speakDemo("VoxClaw is ready. Let's go!")
         }
+    }
+
+    private func speakDemoWithPrerecorded(resource: String, ext: String) {
+        guard let url = Bundle.module.url(forResource: resource, withExtension: ext) else {
+            speakDemo("Welcome to VoxClaw. Your coding agent can finally talk.")
+            return
+        }
+        let displayText = "Hey, welcome to VoxClaw! This is what your coding agent sounds like when it talks to you. Pretty cool, right? You can choose from different voices, adjust the speed, and see every word highlighted as it's spoken."
+        let engine = PrerecordedSpeechEngine(audioURL: url)
+        SharedApp.coordinator.queue.enqueue(
+            displayText,
+            appState: SharedApp.appState,
+            settings: settings,
+            engineOverride: engine,
+            projectId: "onboarding"
+        )
+    }
+
+    private func speakDemo(_ text: String) {
+        SharedApp.coordinator.queue.enqueue(
+            text,
+            appState: SharedApp.appState,
+            settings: settings,
+            projectId: "onboarding"
+        )
+    }
+
+    private func ackDemo() {
+        SharedApp.coordinator.queue.handleAck(projectId: "onboarding", appState: SharedApp.appState)
     }
 }
 
@@ -220,9 +187,10 @@ private struct StepDots: View {
     var body: some View {
         HStack(spacing: 8) {
             ForEach(0..<count, id: \.self) { index in
-                Circle()
-                    .fill(index == currentIndex ? Color.accentColor : Color.secondary.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                Capsule()
+                    .fill(index == currentIndex ? Color.accentColor : Color.secondary.opacity(0.2))
+                    .frame(width: index == currentIndex ? 20 : 8, height: 8)
+                    .animation(.easeInOut(duration: 0.25), value: currentIndex)
             }
         }
     }
@@ -232,9 +200,9 @@ private struct StepDots: View {
 
 private struct NavBar: View {
     let step: OnboardingStep
-    @Binding var isPaused: Bool
     let isFirstStep: Bool
-    let isRemoteDoneStep: Bool
+    let isLastStep: Bool
+    let canSkip: Bool
     let onBack: () -> Void
     let onNext: () -> Void
     let onDone: () -> Void
@@ -259,32 +227,20 @@ private struct NavBar: View {
 
             Spacer()
 
-            // Play/pause button — only on steps with audio
-            if step == .welcome {
-                Button {
-                    isPaused.toggle()
-                } label: {
-                    Image(systemName: isPaused ? "play.fill" : "pause.fill")
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
-                .help(isPaused ? "Resume" : "Pause")
-                .accessibilityLabel(isPaused ? "Resume" : "Pause")
-                .accessibilityIdentifier(AccessibilityID.Onboarding.pauseButton)
-                .padding(.trailing, 8)
-            }
-
             if isFirstStep {
                 prominentActionButton(title: "Get Started", action: onNext)
                     .accessibilityIdentifier(AccessibilityID.Onboarding.getStartedButton)
             } else if step == .done {
-                prominentActionButton(
-                    title: isRemoteDoneStep ? "Copy Setup & Finish" : "Done",
-                    action: onDone
-                )
+                prominentActionButton(title: "Done", action: onDone)
                 .accessibilityIdentifier(AccessibilityID.Onboarding.finishButton)
             } else {
+                if canSkip {
+                    Button("Skip") { onNext() }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                        .padding(.trailing, 6)
+                }
                 prominentActionButton(title: "Continue", action: onNext)
                     .accessibilityIdentifier(AccessibilityID.Onboarding.continueButton)
             }
@@ -312,65 +268,240 @@ private struct NavBar: View {
 // MARK: - Welcome Step
 
 private struct WelcomeStep: View {
-    let demoPlayer: VoiceDemoPlayer
-    let hasExistingKey: Bool
-    let narrator: OnboardingNarrator
-
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 24) {
             if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
                let icon = NSImage(contentsOf: iconURL) {
                 Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: 192, height: 192)
+                    .frame(width: 160, height: 160)
             }
 
-            Text("Welcome to VoxClaw")
-                .font(.title)
-                .fontWeight(.bold)
+            VStack(spacing: 8) {
+                Text("Welcome to VoxClaw")
+                    .font(.title)
+                    .fontWeight(.bold)
 
-            Text("Give your OpenClaw agent a voice,\nright here on your Mac.")
+                Text("Give your coding agent a voice,\nright here on your Mac.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+}
+
+// MARK: - Connect Agent Step
+
+private struct ConnectAgentStep: View {
+    let statuses: [AgentToolDetector.Status]
+    @State private var copiedCommand: AgentToolDetector.Tool?
+    @State private var expandedManual = false
+
+    private var installedTools: [AgentToolDetector.Status] {
+        statuses.filter(\.installed)
+    }
+
+    private var missingTools: [AgentToolDetector.Status] {
+        statuses.filter { !$0.installed }
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "puzzlepiece.extension.fill")
+                .font(.largeTitle)
+                .foregroundStyle(Color.accentColor)
+
+            Text("Connect Your Agent")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text("Install the VoxClaw plugin so your agent\nspeaks its responses aloud.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            if hasExistingKey {
-                // Existing key — just show a single waveform for live OpenAI speech
-                HStack(spacing: 6) {
-                    Image(systemName: "waveform")
-                        .symbolEffect(.variableColor.iterative.reversing, isActive: narrator.isSpeaking)
-                        .foregroundStyle(narrator.isSpeaking ? Color.accentColor : Color.secondary.opacity(0.3))
-                    Text("OpenAI")
-                        .font(.caption)
-                        .fontWeight(narrator.isSpeaking ? .bold : .regular)
-                        .foregroundStyle(narrator.isSpeaking ? Color.accentColor : .secondary)
-                }
-                .padding(.top, 4)
-            } else {
-                // No key — show both voice indicators for bundled demo
-                HStack(spacing: 24) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "waveform")
-                            .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingOpenAI)
-                            .foregroundStyle(demoPlayer.isPlayingOpenAI ? Color.accentColor : Color.secondary.opacity(0.3))
-                        Text("OpenAI")
-                            .font(.caption)
-                            .fontWeight(demoPlayer.isPlayingOpenAI ? .bold : .regular)
-                            .foregroundStyle(demoPlayer.isPlayingOpenAI ? Color.accentColor : .secondary)
+            VStack(spacing: 10) {
+                if installedTools.isEmpty {
+                    noToolsView
+                } else {
+                    ForEach(installedTools, id: \.tool) { status in
+                        toolCard(status)
                     }
-                    HStack(spacing: 6) {
-                        Image(systemName: "waveform")
-                            .symbolEffect(.variableColor.iterative.reversing, isActive: demoPlayer.isPlayingApple)
-                            .foregroundStyle(demoPlayer.isPlayingApple ? Color.accentColor : Color.secondary.opacity(0.3))
-                        Text("Apple")
+                    if !missingTools.isEmpty {
+                        Text("Also available:")
                             .font(.caption)
-                            .fontWeight(demoPlayer.isPlayingApple ? .bold : .regular)
-                            .foregroundStyle(demoPlayer.isPlayingApple ? Color.accentColor : .secondary)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
+                        ForEach(missingTools, id: \.tool) { status in
+                            missingToolRow(status)
+                        }
                     }
                 }
-                .padding(.top, 4)
             }
+
+            if !installedTools.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        expandedManual.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Other integration methods")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: expandedManual ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if expandedManual {
+                    manualIntegrationView
+                }
+            }
+
+            Text("You can always set this up later in Settings.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private var noToolsView: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(.secondary)
+                Text("No coding agents detected on this Mac")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("VoxClaw works with Claude Code and Codex.\nInstall one to get started:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 16) {
+                ForEach(AgentToolDetector.Tool.allCases, id: \.self) { tool in
+                    Link(destination: AgentToolDetector.downloadURL(for: tool)) {
+                        HStack(spacing: 6) {
+                            Image(systemName: AgentToolDetector.iconName(for: tool))
+                            Text("Get \(AgentToolDetector.displayName(for: tool))")
+                        }
+                        .font(.callout)
+                    }
+                }
+            }
+
+            Divider().padding(.horizontal, 20)
+
+            manualIntegrationView
+        }
+    }
+
+    private func toolCard(_ status: AgentToolDetector.Status) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AgentToolDetector.iconName(for: status.tool))
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(AgentToolDetector.displayName(for: status.tool))
+                        .font(.body)
+                        .fontWeight(.medium)
+                    if status.pluginInstalled {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    }
+                }
+                Group {
+                    if copiedCommand == status.tool {
+                        Text("Copied — paste in Terminal with ⌘V")
+                            .foregroundStyle(.green)
+                    } else if status.pluginInstalled {
+                        Text("VoxClaw plugin installed")
+                            .foregroundStyle(.green)
+                    } else {
+                        Text("Detected — plugin not yet installed")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+                .animation(.easeInOut(duration: 0.2), value: copiedCommand)
+            }
+
+            Spacer()
+
+            if status.pluginInstalled {
+                Text("Ready")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.green)
+            } else {
+                Button {
+                    let cmd = AgentToolDetector.installCommand(for: status.tool)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(cmd, forType: .string)
+                    copiedCommand = status.tool
+
+                    if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
+                        NSWorkspace.shared.openApplication(at: terminalURL, configuration: .init())
+                    }
+
+                    Task {
+                        try? await Task.sleep(for: .seconds(4))
+                        copiedCommand = nil
+                    }
+                } label: {
+                    Text(copiedCommand == status.tool ? "Copied!" : "Install")
+                        .font(.caption)
+                        .frame(minWidth: 56)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(12)
+        .modifier(GlassBackgroundModifier())
+    }
+
+    private func missingToolRow(_ status: AgentToolDetector.Status) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: AgentToolDetector.iconName(for: status.tool))
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 32)
+
+            Text(AgentToolDetector.displayName(for: status.tool))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Link("Download", destination: AgentToolDetector.downloadURL(for: status.tool))
+                .font(.caption)
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var manualIntegrationView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("You can also send text directly:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text("curl -X POST http://localhost:4140/read \\\n  -d '{\"text\": \"Hello from your agent\"}'")
+                .font(.system(.caption2, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(GlassBackgroundModifier())
         }
     }
 }
@@ -390,7 +521,7 @@ private struct APIKeyStep: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("For the natural voice you just heard,\nadd your OpenAI API key. Or skip to use\nyour Mac's built-in voice instead.")
+            Text("For natural-sounding voices, add your\nOpenAI API key. Your Mac's built-in voice\nworks great too — no key needed.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -439,410 +570,111 @@ private struct APIKeyStep: View {
     }
 }
 
-// MARK: - Agent Location
 
-enum AgentLocation {
-    case thisMac, remoteMachine
-}
+// MARK: - Done Step
 
-// MARK: - Agent Location Step
-
-private struct AgentLocationStep: View {
-    @Binding var location: AgentLocation
-    @Binding var networkEnabled: Bool
-    @Binding var port: String
+private struct DoneStep: View {
+    let hasAPIKey: Bool
+    let pluginInstalled: Bool
     @Binding var launchAtLogin: Bool
 
-    @State private var isEditingPort = false
+    @State private var appeared = false
+
+    private var isFullyReady: Bool {
+        pluginInstalled
+    }
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: location == .thisMac ? "laptopcomputer" : "network")
-                .font(.largeTitle)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 44, height: 44)
-                .contentTransition(.symbolEffect(.replace))
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.08))
+                    .frame(width: 72, height: 72)
+                    .scaleEffect(appeared ? 1.0 : 0.5)
+                    .opacity(appeared ? 1 : 0)
 
-            Text("Where's Your OpenClaw?")
-                .font(.title2)
-                .fontWeight(.semibold)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 40, weight: .regular))
+                    .foregroundStyle(.green)
+                    .scaleEffect(appeared ? 1.0 : 0.3)
+                    .opacity(appeared ? 1 : 0)
+            }
 
-            Text("VoxClaw receives text from your agent and speaks it aloud.")
+            Text("VoxClaw is Ready")
+                .font(.title)
+                .fontWeight(.bold)
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 8)
+
+            Text(isFullyReady
+                 ? "Start a coding session and your agent\nwill speak its responses."
+                 : "It's running in your menu bar.\nFinish setup anytime in Settings.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
-            VStack(spacing: 10) {
-                locationRow(
-                    icon: "laptopcomputer",
-                    title: "This Mac",
-                    subtitle: "Agent runs locally — no network needed",
-                    selected: location == .thisMac
-                ) {
-                    location = .thisMac
-                    networkEnabled = false
-                }
-                .accessibilityIdentifier(AccessibilityID.Onboarding.thisMacButton)
-
-                locationRow(
-                    icon: "network",
-                    title: "Another Machine",
-                    subtitle: "Network listener on — agent sends text over the network",
-                    selected: location == .remoteMachine
-                ) {
-                    location = .remoteMachine
-                    networkEnabled = true
-                }
-                .accessibilityIdentifier(AccessibilityID.Onboarding.remoteMachineButton)
+            VStack(alignment: .leading, spacing: 8) {
+                StatusRow(done: pluginInstalled, label: "Agent plugin connected",
+                          hint: "Set up in Settings", delay: 0.3, appeared: appeared)
+                StatusRow(done: hasAPIKey, label: "Voice engine configured",
+                          hint: "Using Apple Built-in (free)", delay: 0.45, appeared: appeared)
+                StatusRow(done: true, label: "Network listener enabled",
+                          hint: nil, delay: 0.6, appeared: appeared)
             }
+            .padding(14)
+            .modifier(GlassBackgroundModifier())
 
-            HStack {
-                Toggle("Launch at Login", isOn: $launchAtLogin)
-                    .accessibilityIdentifier(AccessibilityID.Onboarding.launchAtLoginToggle)
-                Spacer()
+            Toggle("Launch at Login", isOn: $launchAtLogin)
+                .font(.callout)
+                .padding(.horizontal, 4)
+                .opacity(appeared ? 1 : 0)
+                .animation(.easeOut(duration: 0.3).delay(0.7), value: appeared)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.45)) {
+                appeared = true
             }
         }
-        .alert("Network Listener Port", isPresented: $isEditingPort) {
-            TextField("Port", text: $port)
-                .accessibilityIdentifier(AccessibilityID.Onboarding.portField)
-            Button("OK") {}
-                .accessibilityIdentifier(AccessibilityID.Onboarding.portOKButton)
-            Button("Cancel", role: .cancel) {}
-                .accessibilityIdentifier(AccessibilityID.Onboarding.portCancelButton)
-        } message: {
-            Text("Enter the port VoxClaw should listen on.")
-        }
-    }
-
-    private func locationRow(
-        icon: String,
-        title: String,
-        subtitle: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(selected ? Color.accentColor : .secondary)
-                    .frame(width: 32)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .fontWeight(.medium)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.3))
-                    .font(.title3)
-            }
-            .padding(10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .modifier(GlassInteractiveModifier())
     }
 }
 
-// MARK: - Success Step
+private struct StatusRow: View {
+    let done: Bool
+    let label: String
+    let hint: String?
+    let delay: Double
+    let appeared: Bool
 
-private struct SuccessStep: View {
-    let isRemote: Bool
-    let port: String
-
-    private var agentHandoffText: String {
-        let lanIP = NetworkListener.localIPAddress()
-        let baseURL = lanIP.map { "http://\($0):\(port)" }
-            ?? "http://<lan-ip>:\(port)"
-        return AgentHandoffPrompt.make(baseURL: baseURL)
-    }
+    @State private var visible = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(.largeTitle, weight: .regular))
-                .imageScale(.large)
-                .foregroundStyle(.green)
-
-            Text("You're All Set")
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text("VoxClaw is ready to give your agent a voice.")
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: done ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(done ? .green : .secondary)
                 .font(.body)
-                .foregroundStyle(.secondary)
+                .frame(width: 20)
 
-            if isRemote {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Send text from your agent:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text("curl -X POST http://<lan-ip>:\(port)/read \\\n  -d '{\"text\": \"Hello from the network\"}'")
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                    Text("Or paste this setup pointer to your agent:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Text(agentHandoffText)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.quaternary.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .padding(.top, 4)
-            }
-        }
-    }
-}
-
-// MARK: - Voice Demo Player
-
-@MainActor @Observable
-final class VoiceDemoPlayer {
-    var isPlayingOpenAI = false
-    var isPlayingApple = false
-    var isPlaying: Bool { isPlayingOpenAI || isPlayingApple }
-    var pauseExternalAudioDuringSpeech = true
-
-    private var player: AVAudioPlayer?
-    private var playerDelegate: AudioFinishDelegate?
-    private var synthesizer = AVSpeechSynthesizer()
-    private var synthDelegate: SynthFinishDelegate?
-    private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
-    private var pausedExternalPlayback: PlaybackSnapshot?
-
-    private let appleDemoText = "Or you could listen to me instead. The built-in Mac voice. I work, but... I kind of suck. You may want that OpenAI key."
-
-    func playDemo() {
-        stop()
-        beginExternalAudioPauseWindow()
-        playOpenAI()
-    }
-
-    func pause() {
-        if isPlayingOpenAI {
-            player?.pause()
-        } else if isPlayingApple {
-            synthesizer.pauseSpeaking(at: .word)
-        }
-    }
-
-    func resume() {
-        if isPlayingOpenAI {
-            player?.play()
-        } else if isPlayingApple {
-            synthesizer.continueSpeaking()
-        }
-    }
-
-    func stop() {
-        player?.stop()
-        player = nil
-        playerDelegate = nil
-        synthesizer.stopSpeaking(at: .immediate)
-        isPlayingOpenAI = false
-        isPlayingApple = false
-        endExternalAudioPauseWindow()
-    }
-
-    private func playOpenAI() {
-        guard let url = Bundle.module.url(forResource: "onboarding-openai", withExtension: "mp3") else {
-            Log.onboarding.error("Onboarding OpenAI sample not found in bundle")
-            playApple()
-            return
-        }
-
-        do {
-            player = try AVAudioPlayer(contentsOf: url)
-            let delegate = AudioFinishDelegate { [weak self] in
-                Task { @MainActor in
-                    self?.isPlayingOpenAI = false
-                    self?.playApple()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.callout)
+                    .fontWeight(done ? .medium : .regular)
+                    .foregroundStyle(done ? .primary : .secondary)
+                if !done, let hint {
+                    Text(hint)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
-            playerDelegate = delegate
-            player?.delegate = delegate
-            player?.play()
-            isPlayingOpenAI = true
-        } catch {
-            Log.onboarding.error("Failed to play OpenAI sample: \(error)")
-            playApple()
         }
-    }
-
-    private func playApple() {
-        let utterance = AVSpeechUtterance(string: appleDemoText)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-
-        let delegate = SynthFinishDelegate { [weak self] in
-            Task { @MainActor in
-                self?.isPlayingApple = false
-                self?.endExternalAudioPauseWindow()
-            }
-        }
-        synthDelegate = delegate
-        synthesizer.delegate = delegate
-        synthesizer.speak(utterance)
-        isPlayingApple = true
-    }
-
-    private func beginExternalAudioPauseWindow() {
-        guard pauseExternalAudioDuringSpeech else { return }
-        pausedExternalPlayback = playbackController.pauseIfPlaying()
-    }
-
-    private func endExternalAudioPauseWindow() {
-        guard let pausedExternalPlayback else { return }
-        playbackController.resume(pausedExternalPlayback)
-        self.pausedExternalPlayback = nil
-    }
-}
-
-// MARK: - OnboardingNarrator
-
-@MainActor @Observable
-final class OnboardingNarrator: NSObject {
-    var isSpeaking = false
-    var didFailOpenAI = false
-    var pauseExternalAudioDuringSpeech = true
-
-    private var player: AVAudioPlayer?
-    private var playerDelegate: AudioFinishDelegate?
-    private var synthesizer = AVSpeechSynthesizer()
-    private var synthDelegate: SynthFinishDelegate?
-    private var fetchTask: Task<Void, Never>?
-    private let playbackController: any ExternalPlaybackControlling = ExternalPlaybackController()
-    private var pausedExternalPlayback: PlaybackSnapshot?
-
-    func speak(text: String, apiKey: String?) {
-        stop()
-        didFailOpenAI = false
-        beginExternalAudioPauseWindow()
-
-        if let apiKey, !apiKey.isEmpty {
-            speakWithOpenAI(text: text, apiKey: apiKey)
-        } else {
-            speakWithApple(text: text)
-        }
-    }
-
-    func pause() {
-        if player?.isPlaying == true {
-            player?.pause()
-        } else {
-            synthesizer.pauseSpeaking(at: .word)
-        }
-    }
-
-    func resume() {
-        if let player, !player.isPlaying, player.currentTime > 0 {
-            player.play()
-        } else {
-            synthesizer.continueSpeaking()
-        }
-    }
-
-    func stop() {
-        fetchTask?.cancel()
-        fetchTask = nil
-        player?.stop()
-        player = nil
-        synthesizer.stopSpeaking(at: .immediate)
-        isSpeaking = false
-        endExternalAudioPauseWindow()
-    }
-
-    private func speakWithOpenAI(text: String, apiKey: String) {
-        isSpeaking = true
-
-        fetchTask = Task {
-            do {
-                guard let url = URL(string: "https://api.openai.com/v1/audio/speech") else { return }
-                var request = URLRequest(url: url)
-                request.httpMethod = "POST"
-                request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
-                let body: [String: Any] = [
-                    "model": "gpt-4o-mini-tts",
-                    "input": text,
-                    "voice": "onyx",
-                    "response_format": "mp3",
-                    "instructions": "You are genuinely PUMPED. Like a best friend who just watched someone nail something incredible. Big grin on your face, voice rising with real excitement — not screaming, but that infectious energy where you can HEAR the smile. Punchy, fast, celebratory. Think sports commentator after a buzzer-beater, or a hype man gassing up his crew. Let the energy BUILD through the line and absolutely PEAK on the last two words.",
-                ]
-                request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-                let (data, response) = try await URLSession.shared.data(for: request)
-
-                guard !Task.isCancelled else { return }
-                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    Log.onboarding.error("Narrator OpenAI error (status \(statusCode, privacy: .public)), falling back to Apple")
-                    didFailOpenAI = true
-                    speakWithApple(text: text)
-                    return
+        .opacity(visible ? 1 : 0)
+        .offset(x: visible ? 0 : -8)
+        .onChange(of: appeared) { _, show in
+            if show {
+                withAnimation(.easeOut(duration: 0.3).delay(delay)) {
+                    visible = true
                 }
-
-                player = try AVAudioPlayer(data: data)
-                let delegate = AudioFinishDelegate { [weak self] in
-                    Task { @MainActor in
-                        self?.isSpeaking = false
-                        self?.endExternalAudioPauseWindow()
-                    }
-                }
-                playerDelegate = delegate
-                player?.delegate = delegate
-                player?.play()
-            } catch {
-                guard !Task.isCancelled else { return }
-                Log.onboarding.error("Narrator fetch error: \(error), falling back to Apple")
-                didFailOpenAI = true
-                speakWithApple(text: text)
             }
         }
-    }
-
-    private func speakWithApple(text: String) {
-        isSpeaking = true
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-
-        let delegate = SynthFinishDelegate { [weak self] in
-            Task { @MainActor in
-                self?.isSpeaking = false
-                self?.endExternalAudioPauseWindow()
-            }
-        }
-        synthDelegate = delegate
-        synthesizer.delegate = delegate
-        synthesizer.speak(utterance)
-    }
-
-    private func beginExternalAudioPauseWindow() {
-        guard pauseExternalAudioDuringSpeech else { return }
-        pausedExternalPlayback = playbackController.pauseIfPlaying()
-    }
-
-    private func endExternalAudioPauseWindow() {
-        guard let pausedExternalPlayback else { return }
-        playbackController.resume(pausedExternalPlayback)
-        self.pausedExternalPlayback = nil
     }
 }
 
@@ -862,35 +694,4 @@ private struct GlassBackgroundModifier: ViewModifier {
     }
 }
 
-private struct GlassInteractiveModifier: ViewModifier {
-    func body(content: Content) -> some View {
-#if compiler(>=6.2)
-        if #available(macOS 26, *) {
-            content.glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
-        } else {
-            content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-        }
-#else
-        content.background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
-#endif
-    }
-}
-
-// MARK: - Audio Delegates
-
-private final class AudioFinishDelegate: NSObject, AVAudioPlayerDelegate, Sendable {
-    let onFinish: @Sendable () -> Void
-    init(onFinish: @escaping @Sendable () -> Void) { self.onFinish = onFinish }
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        onFinish()
-    }
-}
-
-private final class SynthFinishDelegate: NSObject, AVSpeechSynthesizerDelegate, Sendable {
-    let onFinish: @Sendable () -> Void
-    init(onFinish: @escaping @Sendable () -> Void) { self.onFinish = onFinish }
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        onFinish()
-    }
-}
 #endif

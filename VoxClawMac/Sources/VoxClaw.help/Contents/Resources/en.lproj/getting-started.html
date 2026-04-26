@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="Get started with VoxClaw in 30 seconds">
+<meta name="keywords" content="VoxClaw, setup, getting started, install">
+<title>Getting Started — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Getting Started</p>
+
+<h1>Getting Started</h1>
+<p>VoxClaw sits in your menu bar, waiting for your coding agent to send text. When it does, VoxClaw speaks it aloud with a floating teleprompter overlay that highlights each word in sync.</p>
+
+<h2>Quick Setup</h2>
+<ol>
+    <li><strong>Launch VoxClaw.</strong> It appears in your menu bar as a small icon.</li>
+    <li><strong>Connect your agent.</strong> Install the VoxClaw plugin for <a href="claude-code.html">Claude Code</a> or <a href="codex.html">Codex</a>. Your agent will automatically speak its responses through VoxClaw.</li>
+    <li><strong>Choose a voice.</strong> VoxClaw works immediately with your Mac's built-in voice (free, no setup). For more natural voices, add an <a href="voices.html">OpenAI or ElevenLabs API key</a> in Settings.</li>
+</ol>
+
+<h2>How It Works</h2>
+<p>VoxClaw runs a local HTTP listener on port 4140. When your agent finishes a response, the VoxClaw plugin sends the text to this listener. VoxClaw then speaks it aloud and shows the teleprompter overlay.</p>
+
+<p>If you start typing your next message before VoxClaw finishes reading, it stops automatically — no interruption needed.</p>
+
+<h2>Menu Bar Controls</h2>
+<p>Click the VoxClaw icon in your menu bar to:</p>
+<ul>
+    <li><strong>Pause / Resume</strong> current speech</li>
+    <li><strong>Stop</strong> playback entirely</li>
+    <li><strong>Read Clipboard</strong> — speak whatever is on your clipboard</li>
+    <li><strong>Settings</strong> — configure voice, overlay appearance, and integrations</li>
+</ul>
+
+<div class="note">VoxClaw uses Apple's text-to-speech by default, which requires no API key and processes everything on your device.</div>
+
+</body>
+</html>

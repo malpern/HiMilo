@@ -110,13 +110,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SharedApp.appState.browserControlWarning = "Browser extension support is not installed yet. Open Settings to install or refresh it."
         }
 
-        if SharedApp.settings.networkListenerEnabled {
-            SharedApp.coordinator.startListening(
-                appState: SharedApp.appState,
-                settings: SharedApp.settings,
-                port: SharedApp.settings.networkListenerPort
-            )
-        }
+        SharedApp.coordinator.startListening(
+            appState: SharedApp.appState,
+            settings: SharedApp.settings,
+            port: SharedApp.settings.networkListenerPort
+        )
 
         if SharedApp.settings.hasCompletedOnboarding {
             showSplash()
@@ -124,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 540),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false

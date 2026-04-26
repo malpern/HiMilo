@@ -380,6 +380,9 @@ struct SettingsView: View {
                 .accessibilityIdentifier(AccessibilityID.Settings.rememberOverlayPositionToggle)
             Toggle("Audio only (hide teleprompter overlay)", isOn: $settings.audioOnly)
                 .accessibilityIdentifier(AccessibilityID.Settings.audioOnlyToggle)
+            Button("VoxClaw Help") {
+                NSHelpManager.shared.openHelpAnchor("", inBook: "VoxClaw Help")
+            }
         }
     }
 

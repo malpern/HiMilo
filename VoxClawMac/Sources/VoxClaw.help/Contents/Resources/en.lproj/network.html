@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="VoxClaw network listener and remote agent setup">
+<meta name="keywords" content="VoxClaw, network, remote, listener, HTTP, port">
+<title>Network &amp; Remote — VoxClaw Help</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Network &amp; Remote</p>
+
+<h1>Network &amp; Remote Setup</h1>
+<p>VoxClaw includes a local HTTP listener that receives text from your coding agent. This is how the Claude Code and Codex plugins communicate with VoxClaw.</p>
+
+<h2>Local Use (Default)</h2>
+<p>When your agent runs on the same Mac as VoxClaw, everything works over <code>localhost:4140</code>. The network listener is enabled automatically when you install a plugin.</p>
+
+<h2>Remote Agent</h2>
+<p>If your agent runs on a different machine (e.g., a Mac Mini or server), VoxClaw can listen for text over the local network:</p>
+<ol>
+    <li>Enable the network listener in Settings</li>
+    <li>Note your Mac's local IP address (shown in Settings)</li>
+    <li>Configure your agent to send text to <code>http://&lt;your-ip&gt;:4140/read</code></li>
+</ol>
+
+<h2>HTTP API</h2>
+<div class="card">
+    <h3>POST /read</h3>
+    <p>Send text to be spoken aloud.</p>
+    <pre><code>curl -X POST http://localhost:4140/read \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Hello from your agent"}'</code></pre>
+</div>
+
+<div class="card">
+    <h3>POST /ack</h3>
+    <p>Acknowledge the current reading (stop it).</p>
+    <pre><code>curl -X POST http://localhost:4140/ack \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id": "/path/to/project"}'</code></pre>
+</div>
+
+<div class="card">
+    <h3>GET /status</h3>
+    <p>Check if VoxClaw is running and its current state.</p>
+    <pre><code>curl http://localhost:4140/status</code></pre>
+</div>
+
+<h2>Custom Port</h2>
+<p>Change the listener port in Settings or with the <code>VOXCLAW_PORT</code> environment variable. The default is 4140.</p>
+
+<h2>Firewall</h2>
+<p>If your agent is on another machine, make sure your Mac's firewall allows incoming connections on the VoxClaw port. macOS may prompt you to allow this when you first enable the listener.</p>
+
+</body>
+</html>
