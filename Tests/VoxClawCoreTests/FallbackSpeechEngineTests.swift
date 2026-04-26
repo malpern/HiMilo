@@ -47,6 +47,23 @@ private final class TestSessionDelegate: SpeechEngineDelegate {
 
 @MainActor
 struct FallbackSpeechEngineTests {
+    @Test func usesPrimaryWhenItSucceeds() async throws {
+        let primary = TestSpeechEngine()
+        primary.finishOnStart = true
+
+        let fallback = TestSpeechEngine()
+        let engine = FallbackSpeechEngine(primary: primary, fallback: fallback)
+        let delegate = TestSessionDelegate()
+        engine.delegate = delegate
+
+        await engine.start(text: "hello", words: ["hello"])
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(primary.startCount == 1)
+        #expect(fallback.startCount == 0)
+        #expect(delegate.didFinish)
+    }
+
     @Test func fallsBackWhenPrimaryFails() async throws {
         let primary = TestSpeechEngine()
         primary.shouldFailOnStart = true

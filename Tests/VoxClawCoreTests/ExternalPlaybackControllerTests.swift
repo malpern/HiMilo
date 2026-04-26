@@ -3,132 +3,85 @@ import Foundation
 import Testing
 
 #if os(macOS)
-private struct MockAppleScriptRunner: AppleScriptRunning {
-    let responder: (String) -> String?
+private struct MockBrowserControlBridge: BrowserControlBridging {
+    var pauseResponse: BrowserControlMessage
+    var resumeResponse: BrowserControlMessage = BrowserControlMessage(type: .resumeResult, ok: true)
+    var resumedSnapshots: LockedSnapshots = LockedSnapshots()
 
-    func run(_ source: String) -> String? {
-        responder(source)
+    func pauseIfPlaying() -> BrowserControlMessage {
+        pauseResponse
+    }
+
+    func resume(_ snapshot: PlaybackSnapshot) -> BrowserControlMessage {
+        resumedSnapshots.append(snapshot)
+        return resumeResponse
+    }
+}
+
+private final class LockedSnapshots: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: [PlaybackSnapshot] = []
+
+    func append(_ snapshot: PlaybackSnapshot) {
+        lock.lock()
+        value.append(snapshot)
+        lock.unlock()
+    }
+
+    func read() -> [PlaybackSnapshot] {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
     }
 }
 
 @MainActor
 struct ExternalPlaybackControllerTests {
-    @Test func pauseIfPlayingReturnsNilWhenNoYouTubeTabsArePlaying() {
-        let runner = MockAppleScriptRunner { source in
-            if source.contains("contains \"Google Chrome\"") || source.contains("contains \"Arc\"") {
-                return "true"
-            }
-            if source.contains("tell application \"Google Chrome\""), source.contains("set outputLines") {
-                return "1\t1\thttps://example.com\r1\t2\thttps://www.youtube.com/watch?v=idle"
-            }
-            if source.contains("tell application \"Arc\""), source.contains("set outputLines") {
-                return ""
-            }
-            if source.contains("execute tab 2 of window 1 javascript"), source.contains("video.readyState < 2") {
-                return "paused"
-            }
-            Issue.record("Unexpected script: \(source)")
-            return nil
-        }
-        let controller = ExternalPlaybackController(scriptRunner: runner)
-
-        let snapshot = controller.pauseIfPlaying()
-
-        #expect(snapshot == nil)
-    }
-
-    @Test func pauseIfPlayingCapturesPlayingChromeAndArcTabs() {
-        let runner = MockAppleScriptRunner { source in
-            if source.contains("contains \"Google Chrome\"") || source.contains("contains \"Arc\"") {
-                return "true"
-            }
-            if source.contains("tell application \"Google Chrome\""), source.contains("set outputLines") {
-                return "1\t1\thttps://www.youtube.com/watch?v=chrome\r1\t2\thttps://example.com"
-            }
-            if source.contains("tell application \"Arc\""), source.contains("set outputLines") {
-                return "2\t3\thttps://youtu.be/arc"
-            }
-            if source.contains("execute tab 1 of window 1 javascript"), source.contains("video.readyState < 2") {
-                return "playing"
-            }
-            if source.contains("execute tab 1 of window 1 javascript"), source.contains("video.pause()") {
-                return "paused"
-            }
-            if source.contains("execute tab 3 of window 2 javascript"), source.contains("video.readyState < 2") {
-                return "playing"
-            }
-            if source.contains("execute tab 3 of window 2 javascript"), source.contains("video.pause()") {
-                return "paused"
-            }
-            Issue.record("Unexpected script: \(source)")
-            return nil
-        }
-        let controller = ExternalPlaybackController(scriptRunner: runner)
-
-        let snapshot = controller.pauseIfPlaying()
-
-        #expect(snapshot?.pausedTabs == [
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 1, url: "https://www.youtube.com/watch?v=chrome"),
-            PausedBrowserTab(browserName: "Arc", windowIndex: 2, tabIndex: 3, url: "https://youtu.be/arc"),
-        ])
-    }
-
-    @Test func pauseIfPlayingSkipsTabsThatFailToPause() {
-        let runner = MockAppleScriptRunner { source in
-            if source.contains("contains \"Google Chrome\"") {
-                return "true"
-            }
-            if source.contains("contains \"Arc\"") {
-                return "false"
-            }
-            if source.contains("tell application \"Google Chrome\""), source.contains("set outputLines") {
-                return "1\t1\thttps://www.youtube.com/watch?v=chrome"
-            }
-            if source.contains("execute tab 1 of window 1 javascript"), source.contains("video.readyState < 2") {
-                return "playing"
-            }
-            if source.contains("execute tab 1 of window 1 javascript"), source.contains("video.pause()") {
-                return "failed"
-            }
-            Issue.record("Unexpected script: \(source)")
-            return nil
-        }
-        let controller = ExternalPlaybackController(scriptRunner: runner)
-
-        let snapshot = controller.pauseIfPlaying()
-
-        #expect(snapshot == nil)
-    }
-
-    @Test func resumeOnlyTargetsTabsThatStillMatchOriginalURL() {
-        var resumedScripts: [String] = []
-        let runner = MockAppleScriptRunner { source in
-            if source.contains("return URL of tab 1 of window 1") {
-                return "https://www.youtube.com/watch?v=same"
-            }
-            if source.contains("return URL of tab 2 of window 1") {
-                return "https://news.ycombinator.com/"
-            }
-            if source.contains("contains \"Google Chrome\"") {
-                return "true"
-            }
-            if source.contains("execute tab"), source.contains("video.play()") {
-                resumedScripts.append(source)
-                return "resume-requested"
-            }
-            Issue.record("Unexpected script: \(source)")
-            return nil
-        }
-        let controller = ExternalPlaybackController(scriptRunner: runner, supportedBrowsers: ["Google Chrome"])
+    @Test func pauseIfPlayingReturnsSnapshotFromBridge() {
         let snapshot = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 1, url: "https://www.youtube.com/watch?v=same"),
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 2, url: "https://www.youtube.com/watch?v=other"),
+            PausedBrowserTab(browserName: "Google Chrome Canary", windowID: 1, tabID: 33, url: "https://www.youtube.com/watch?v=abc")
         ])
+        let controller = ExternalPlaybackController(
+            bridge: MockBrowserControlBridge(
+                pauseResponse: BrowserControlMessage(type: .pauseResult, snapshot: snapshot)
+            )
+        )
+
+        let result = controller.pauseIfPlaying()
+
+        #expect(result == snapshot)
+        #expect(SharedApp.appState.browserControlWarning == nil)
+    }
+
+    @Test func pauseIfPlayingPublishesWarningsFromBridge() {
+        let controller = ExternalPlaybackController(
+            bridge: MockBrowserControlBridge(
+                pauseResponse: BrowserControlMessage(
+                    type: .error,
+                    ok: false,
+                    warning: "Load the VoxClaw browser extension in Chrome or Chrome Canary."
+                )
+            )
+        )
+
+        let result = controller.pauseIfPlaying()
+
+        #expect(result == nil)
+        #expect(SharedApp.appState.browserControlWarning == "Load the VoxClaw browser extension in Chrome or Chrome Canary.")
+    }
+
+    @Test func resumeForwardsSnapshotToBridge() {
+        let snapshot = PlaybackSnapshot(pausedTabs: [
+            PausedBrowserTab(browserName: "Google Chrome Canary", windowID: 2, tabID: 1, url: "https://www.youtube.com/watch?v=resume")
+        ])
+        let bridge = MockBrowserControlBridge(
+            pauseResponse: BrowserControlMessage(type: .pauseResult, snapshot: nil)
+        )
+        let controller = ExternalPlaybackController(bridge: bridge)
 
         controller.resume(snapshot)
 
-        #expect(resumedScripts.count == 1)
-        #expect(resumedScripts[0].contains("execute tab 1 of window 1 javascript"))
+        #expect(bridge.resumedSnapshots.read() == [snapshot])
     }
 }
 #endif

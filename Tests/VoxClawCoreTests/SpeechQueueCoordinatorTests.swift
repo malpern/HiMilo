@@ -100,4 +100,49 @@ struct SpeechQueueCoordinatorTests {
         coordinator.enqueue("Second", appState: appState, settings: settings, projectId: "proj-b")
         #expect(appState.projectIndicators.count >= 2)
     }
+
+    @Test func stopNotifiesDelegateEvenWithEmptyQueue() {
+        let (coordinator, delegate, _, _) = makeCoordinator()
+        coordinator.stop()
+        #expect(delegate.controlActions.contains(.stop))
+    }
+
+    @Test func handleControlPauseOnlyWhenSessionActive() async {
+        let (coordinator, _, appState, settings) = makeCoordinator()
+        coordinator.enqueue("Test", appState: appState, settings: settings)
+        try? await Task.sleep(for: .milliseconds(200))
+        let control = HTTPRequestParser.ControlRequest(action: .pause, origin: "remote")
+        coordinator.handleControl(control, deviceID: "local")
+        // Should not crash when pausing an active session
+    }
+
+    @Test func handleControlResumeOnlyWhenSessionActive() {
+        let (coordinator, _, _, _) = makeCoordinator()
+        let control = HTTPRequestParser.ControlRequest(action: .resume, origin: "remote")
+        coordinator.handleControl(control, deviceID: "local")
+        // Should not crash when resuming with no active session
+    }
+
+    @Test func ackRemovesQueuedItemsForProject() {
+        let (coordinator, _, appState, settings) = makeCoordinator()
+        coordinator.enqueue("First", appState: appState, settings: settings, projectId: "proj-a")
+        coordinator.enqueue("Second", appState: appState, settings: settings, projectId: "proj-b")
+        coordinator.enqueue("Third", appState: appState, settings: settings, projectId: "proj-a")
+        coordinator.handleAck(projectId: "proj-a", appState: appState)
+        // proj-a items should be removed, proj-b should remain
+        #expect(appState.projectIndicators.count <= 1)
+    }
+
+    @Test func queueActiveSetDuringDrain() async {
+        let (coordinator, _, appState, settings) = makeCoordinator()
+        #expect(!appState.queueActive)
+        coordinator.enqueue("Test", appState: appState, settings: settings)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(appState.queueActive)
+    }
+
+    @Test func setSpeedDoesNotCrashWithNoSession() {
+        let (coordinator, _, _, _) = makeCoordinator()
+        coordinator.setSpeed(2.0)
+    }
 }

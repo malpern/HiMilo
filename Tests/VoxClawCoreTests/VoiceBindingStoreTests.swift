@@ -54,6 +54,21 @@ struct VoiceBindingStoreTests {
         #expect(loaded.openai == "alloy")
     }
 
+    @Test func corruptFileBacksUpAndReturnsEmpty() async {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voxclaw-store-tests-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let file = tempDir.appendingPathComponent("bindings.json")
+        try? "not valid json{{{".write(to: file, atomically: true, encoding: .utf8)
+
+        let store = VoiceBindingStore(fileURL: file)
+        let result = await store.load()
+        #expect(result.projects.isEmpty)
+
+        let backup = file.appendingPathExtension("bak")
+        #expect(FileManager.default.fileExists(atPath: backup.path))
+    }
+
     @Test func bindingCountTallies() async {
         let (store, _) = makeStore()
         var b = VoiceBinding()

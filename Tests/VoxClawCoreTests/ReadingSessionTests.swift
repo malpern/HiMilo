@@ -177,7 +177,7 @@ struct ReadingSessionTests {
         let engine = MockSpeechEngine()
         let controller = MockPlaybackController()
         controller.snapshotToReturn = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 2, url: "https://www.youtube.com/watch?v=123")
+            PausedBrowserTab(browserName: "Google Chrome", windowID: 1, tabID: 2, url: "https://www.youtube.com/watch?v=123")
         ])
 
         engine.onStart = {
@@ -203,7 +203,7 @@ struct ReadingSessionTests {
         let engine = MockSpeechEngine()
         let controller = MockPlaybackController()
         let snapshot = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 1, tabIndex: 2, url: "https://www.youtube.com/watch?v=123")
+            PausedBrowserTab(browserName: "Google Chrome", windowID: 1, tabID: 2, url: "https://www.youtube.com/watch?v=123")
         ])
         controller.snapshotToReturn = snapshot
 
@@ -226,7 +226,7 @@ struct ReadingSessionTests {
         let engine = MockSpeechEngine()
         let controller = MockPlaybackController()
         let snapshot = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Arc", windowIndex: 1, tabIndex: 5, url: "https://youtu.be/abc")
+            PausedBrowserTab(browserName: "Arc", windowID: 1, tabID: 5, url: "https://youtu.be/abc")
         ])
         controller.snapshotToReturn = snapshot
 
@@ -249,7 +249,7 @@ struct ReadingSessionTests {
         let engine = MockSpeechEngine()
         let controller = MockPlaybackController()
         let snapshot = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Google Chrome", windowIndex: 2, tabIndex: 1, url: "https://www.youtube.com/watch?v=xyz")
+            PausedBrowserTab(browserName: "Google Chrome", windowID: 2, tabID: 1, url: "https://www.youtube.com/watch?v=xyz")
         ])
         controller.snapshotToReturn = snapshot
 
@@ -272,7 +272,7 @@ struct ReadingSessionTests {
         let engine = MockSpeechEngine()
         let controller = MockPlaybackController()
         let snapshot = PlaybackSnapshot(pausedTabs: [
-            PausedBrowserTab(browserName: "Arc", windowIndex: 3, tabIndex: 4, url: "https://www.youtube.com/watch?v=oops")
+            PausedBrowserTab(browserName: "Arc", windowID: 3, tabID: 4, url: "https://www.youtube.com/watch?v=oops")
         ])
         controller.snapshotToReturn = snapshot
 
@@ -306,5 +306,79 @@ struct ReadingSessionTests {
         engine.simulateFinish()
 
         #expect(controller.resumedSnapshots.isEmpty)
+    }
+
+    @Test func pauseForBlockerSetsFlag() async {
+        let appState = AppState()
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+        await session.start(text: "hello world")
+
+        session.pauseForBlocker()
+        #expect(engine.pauseCalled)
+        #expect(appState.isPaused)
+    }
+
+    @Test func resumeFromBlockerOnlyWhenBlockerPaused() async {
+        let appState = AppState()
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+        await session.start(text: "hello world")
+
+        // Manual pause — not blocker-initiated
+        session.togglePause()
+        #expect(appState.isPaused)
+
+        // resumeFromBlocker should NOT resume a manual pause
+        session.resumeFromBlocker()
+        #expect(appState.isPaused)
+    }
+
+    @Test func resumeFromBlockerWorksAfterBlockerPause() async {
+        let appState = AppState()
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+        await session.start(text: "hello world")
+
+        session.pauseForBlocker()
+        #expect(appState.isPaused)
+
+        session.resumeFromBlocker()
+        #expect(!appState.isPaused)
+        #expect(engine.resumeCalled)
+    }
+
+    @Test func waitUntilFinishedReturnsOnEngineFinish() async {
+        let appState = AppState()
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+        await session.start(text: "hello")
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(100))
+            engine.simulateFinish()
+        }
+
+        await session.waitUntilFinished()
+        #expect(session.hasFinished)
+    }
+
+    @Test func keepPanelOnFinishClearsWordsButStaysFinalized() async {
+        let appState = AppState()
+        let engine = MockSpeechEngine()
+        let session = ReadingSession(appState: appState, engine: engine)
+        session.keepPanelOnFinish = true
+        await session.start(text: "hello world test")
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            engine.simulateFinish()
+        }
+
+        await session.waitUntilFinished()
+        // Words should be cleared but session is finalized
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(appState.words.isEmpty)
+        #expect(session.hasFinished)
     }
 }
