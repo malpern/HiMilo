@@ -45,6 +45,9 @@ public final class AppState {
     /// distinct projects have spoken within the activity window so single-
     /// project use stays uncluttered. Animated by FloatingPanelView.
     public var projectIndicators: [ProjectIndicator] = []
+    /// True while the queue coordinator is draining (even between items).
+    /// Used by iOS to keep the teleprompter visible across queue transitions.
+    public var queueActive: Bool = false
     public var isListening: Bool = false
     public var feedbackText: String? = nil
     public var browserControlWarning: String? = nil

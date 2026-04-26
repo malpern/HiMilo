@@ -17,12 +17,7 @@ struct TeleprompterView: View {
             appearance.backgroundColor.color
                 .ignoresSafeArea()
 
-            if appState.sessionState == .loading {
-                ProgressView()
-                    .tint(.white)
-                    .scaleEffect(1.5)
-            } else {
-                ScrollViewReader { proxy in
+            ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         FlowLayout(hSpacing: appearance.wordSpacing, vSpacing: appearance.effectiveLineSpacing) {
                             ForEach(appState.words.indices, id: \.self) { index in
@@ -46,6 +41,7 @@ struct TeleprompterView: View {
                         .padding(.horizontal, appearance.horizontalPadding)
                         .padding(.vertical, appearance.verticalPadding + 60)
                     }
+                    .opacity(appState.contentFadedOut ? 0 : 1)
                     .clipped()
                     .onChange(of: appState.currentWordIndex) { _, newIndex in
                         withAnimation(.easeOut(duration: 0.15)) {
@@ -53,7 +49,6 @@ struct TeleprompterView: View {
                         }
                     }
                 }
-            }
 
             // Preset name toast
             if let toast = presetNameToast {
@@ -78,9 +73,9 @@ struct TeleprompterView: View {
                         HStack(spacing: 5) {
                             Circle()
                                 .fill(indicator.color.opacity(0.8))
-                                .frame(width: 6, height: 6)
+                                .frame(width: 8, height: 8)
                             Text(indicator.name)
-                                .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular, design: .rounded))
+                                .font(.system(size: 15, weight: idx == 0 ? .semibold : .regular, design: .rounded))
                                 .foregroundStyle(.white.opacity(idx == 0 ? 0.70 : 0.35))
                         }
                         .transition(.asymmetric(

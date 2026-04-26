@@ -166,7 +166,11 @@ public final class SpeechQueueCoordinator {
     private func drainQueue(appState: AppState, settings: SettingsManager) async {
         guard !isDrainingQueue else { return }
         isDrainingQueue = true
-        defer { isDrainingQueue = false }
+        appState.queueActive = true
+        defer {
+            isDrainingQueue = false
+            appState.queueActive = false
+        }
 
         #if os(macOS)
         var sharedPanel: PanelController?
