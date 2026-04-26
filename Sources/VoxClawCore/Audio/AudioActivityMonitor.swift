@@ -1,4 +1,4 @@
-#if os(macOS)
+#if os(macOS) && !APPSTORE
 import Foundation
 import CoreAudio
 import os

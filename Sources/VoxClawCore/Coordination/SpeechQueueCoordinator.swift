@@ -232,7 +232,7 @@ public final class SpeechQueueCoordinator {
             Log.session.info("Queue draining item: chars=\(item.text.count, privacy: .public), remaining=\(self.speechQueue.count, privacy: .public), silent=\(goSilent, privacy: .public)")
             await session.start(text: item.text)
 
-            #if os(macOS)
+            #if os(macOS) && !APPSTORE
             let monitorTask = goSilent ? nil : Task { @MainActor [weak self, weak session] in
                 await self?.monitorBlockersDuringSpeech(session: session)
             }
@@ -252,7 +252,7 @@ public final class SpeechQueueCoordinator {
 
             await session.waitUntilFinished()
             ackTask.cancel()
-            #if os(macOS)
+            #if os(macOS) && !APPSTORE
             monitorTask?.cancel()
             #endif
             isCurrentItemAcked = false
@@ -296,7 +296,7 @@ public final class SpeechQueueCoordinator {
         return true
     }
 
-    #if os(macOS)
+    #if os(macOS) && !APPSTORE
     private func monitorBlockersDuringSpeech(session: ReadingSession?) async {
         var consecutiveBlockerPolls = 0
         while !Task.isCancelled {

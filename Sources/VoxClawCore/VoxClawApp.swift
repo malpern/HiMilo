@@ -28,6 +28,9 @@ public struct VoxClawLauncher {
 
     @MainActor
     private static func terminateOtherMenuBarInstances(currentPID: Int32) -> Int {
+        #if APPSTORE
+        return 0
+        #else
         let bundleID = Bundle.main.bundleIdentifier ?? "com.malpern.voxclaw"
         let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
         var terminatedCount = 0
@@ -42,6 +45,7 @@ public struct VoxClawLauncher {
             }
         }
         return terminatedCount
+        #endif
     }
 }
 
@@ -522,7 +526,7 @@ final class AppCoordinator: SpeechQueueDelegate {
         return nil
     }
 
-    #if os(macOS)
+    #if os(macOS) && !APPSTORE
     func currentBlockers() -> [String] {
         var blockers = AudioActivityMonitor.activeDeferListBundleIDs()
         if AudioActivityMonitor.isAnyProcessUsingMicrophone() {

@@ -1,4 +1,4 @@
-#if os(macOS)
+#if os(macOS) && !APPSTORE
 @testable import VoxClawCore
 import CoreAudio
 import Testing
