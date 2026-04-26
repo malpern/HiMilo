@@ -2,9 +2,15 @@
 import SwiftUI
 
 struct AboutView: View {
+    private var appIcon: NSImage? {
+        NSApp.applicationIconImage
+            ?? NSImage(named: "AppIcon")
+            ?? (Bundle.main.image(forResource: "AppIcon") as NSImage?)
+    }
+
     var body: some View {
         VStack(spacing: 16) {
-            if let icon = NSApp.applicationIconImage {
+            if let icon = appIcon {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: 80, height: 80)

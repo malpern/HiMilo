@@ -2,9 +2,15 @@
 import SwiftUI
 
 struct SplashView: View {
+    private var appIcon: NSImage? {
+        NSApp.applicationIconImage
+            ?? NSImage(named: "AppIcon")
+            ?? (Bundle.main.image(forResource: "AppIcon") as NSImage?)
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            if let icon = NSApp.applicationIconImage {
+            if let icon = appIcon {
                 Image(nsImage: icon)
                     .resizable()
                     .frame(width: 128, height: 128)
