@@ -158,11 +158,11 @@ public final class SettingsManager {
     /// Peer IDs (from DiscoveredPeer.id) that should receive relayed speech.
     /// Synced via iCloud KVS so any device can toggle speakers for all devices.
     /// The sentinel "__mute_local__" mutes local playback.
-    public var relayPeerIDs: Set<String> {
+    public var activeSpeakers: Set<String> {
         didSet {
-            let array = Array(relayPeerIDs)
-            UserDefaults.standard.set(array, forKey: "relayPeerIDs")
-            NSUbiquitousKeyValueStore.default.set(array, forKey: "relayPeerIDs")
+            let array = Array(activeSpeakers)
+            UserDefaults.standard.set(array, forKey: "activeSpeakers")
+            NSUbiquitousKeyValueStore.default.set(array, forKey: "activeSpeakers")
         }
     }
 
@@ -328,10 +328,13 @@ public final class SettingsManager {
             self.rememberOverlayPosition = UserDefaults.standard.bool(forKey: "rememberOverlayPosition")
         }
 
-        if let kvsRelay = kvs.array(forKey: "relayPeerIDs") as? [String] {
-            self.relayPeerIDs = Set(kvsRelay)
+        if let kvsRelay = kvs.array(forKey: "activeSpeakers") as? [String] {
+            self.activeSpeakers = Set(kvsRelay)
+        } else if let legacy = UserDefaults.standard.stringArray(forKey: "relayPeerIDs") {
+            self.activeSpeakers = Set(legacy)
+            UserDefaults.standard.removeObject(forKey: "relayPeerIDs")
         } else {
-            self.relayPeerIDs = Set(UserDefaults.standard.stringArray(forKey: "relayPeerIDs") ?? [])
+            self.activeSpeakers = Set(UserDefaults.standard.stringArray(forKey: "activeSpeakers") ?? [])
         }
 
         if UserDefaults.standard.object(forKey: "savedOverlayOriginX") != nil {
@@ -578,11 +581,11 @@ public final class SettingsManager {
                     }
                 }
 
-                if changedKeys.contains("relayPeerIDs"),
-                   let array = kvs.array(forKey: "relayPeerIDs") as? [String] {
+                if changedKeys.contains("activeSpeakers"),
+                   let array = kvs.array(forKey: "activeSpeakers") as? [String] {
                     let newSet = Set(array)
-                    if newSet != self.relayPeerIDs {
-                        self.relayPeerIDs = newSet
+                    if newSet != self.activeSpeakers {
+                        self.activeSpeakers = newSet
                         Log.settings.info("Relay peer IDs updated from iCloud KVS")
                     }
                 }

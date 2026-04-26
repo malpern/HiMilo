@@ -269,7 +269,7 @@ visible:
 - **Multiple devices:** ALL devices get a switch, including "This Mac."
   The user can mute local playback and have speech play only on the
   iPhone (or vice versa, or both). Uses a `__mute_local__` sentinel
-  in `relayPeerIDs` to track local mute.
+  in `activeSpeakers` to track local mute.
 
 ---
 

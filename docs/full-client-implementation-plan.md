@@ -43,7 +43,7 @@ activeSpeakers: ["macbook-air-m4", "iphone"]
 - Each device checks if its own ID is in activeSpeakers before
   playing locally
 
-Replaces the current per-device `relayPeerIDs` and `__mute_local__`
+Replaces the current per-device `activeSpeakers` and `__mute_local__`
 sentinel. Simpler model: one list of active speakers, not a per-device
 relay graph.
 
@@ -160,12 +160,12 @@ TeleprompterView gains ~30 lines for badges.
 
 ### Phase C: Active speakers via iCloud KVS
 
-**Goal:** replace per-device `relayPeerIDs` with a shared
+**Goal:** replace per-device `activeSpeakers` with a shared
 `activeSpeakers` set synced via iCloud.
 
 **SettingsManager changes:**
 - New property: `activeSpeakers: Set<String>` (KVS-synced)
-- Remove `relayPeerIDs` (or migrate: if relayPeerIDs exist, convert
+- Remove `activeSpeakers` (or migrate: if activeSpeakers exist, convert
   to activeSpeakers on first launch, then delete)
 - Each device generates a stable device ID (persisted in UserDefaults):
   `UIDevice.current.name` on iOS, `Host.current().localizedName` on
@@ -182,7 +182,7 @@ TeleprompterView gains ~30 lines for badges.
 - Toast on toggle ("Speaking on iPhone" / "Muted on iPhone")
 
 **AppCoordinator/Relay changes:**
-- `relayToPeers` checks `activeSpeakers` instead of `relayPeerIDs`
+- `relayToPeers` checks `activeSpeakers` instead of `activeSpeakers`
 - Local playback checks if own device ID is in `activeSpeakers`
 - Remove `__mute_local__` sentinel
 
@@ -210,7 +210,7 @@ speakers.
 - iOS should also relay control when user pauses on iPhone
   (currently only Mac relays)
 - Both devices should relay to all `activeSpeakers` peers, not just
-  the old `relayPeerIDs`
+  the old `activeSpeakers`
 - Control relay uses the same `activeSpeakers` set
 
 **Edge cases to handle:**

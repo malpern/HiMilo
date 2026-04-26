@@ -86,24 +86,24 @@ public struct PeerSpeakerList: View {
         Toggle(isOn: Binding(
             get: {
                 isLocal
-                    ? !settings.relayPeerIDs.contains("__mute_local__")
-                    : settings.relayPeerIDs.contains(peer.id)
+                    ? !settings.activeSpeakers.contains("__mute_local__")
+                    : settings.activeSpeakers.contains(peer.id)
             },
             set: { enabled in
                 if isLocal {
                     if enabled {
-                        settings.relayPeerIDs.remove("__mute_local__")
+                        settings.activeSpeakers.remove("__mute_local__")
                         showToast("Speaking on \(peer.name)")
                     } else {
-                        settings.relayPeerIDs.insert("__mute_local__")
+                        settings.activeSpeakers.insert("__mute_local__")
                         showToast("Muted on \(peer.name)")
                     }
                 } else {
                     if enabled {
-                        settings.relayPeerIDs.insert(peer.id)
+                        settings.activeSpeakers.insert(peer.id)
                         showToast("Also speaking on \(peer.name)")
                     } else {
-                        settings.relayPeerIDs.remove(peer.id)
+                        settings.activeSpeakers.remove(peer.id)
                         showToast("Stopped speaking on \(peer.name)")
                     }
                 }

@@ -82,7 +82,7 @@ final class iOSCoordinator: SpeechQueueDelegate {
     }
 
     func onControlAction(_ action: HTTPRequestParser.ControlAction) {
-        let relayIDs = SettingsManager().relayPeerIDs
+        let relayIDs = SettingsManager().activeSpeakers
         guard !relayIDs.isEmpty else { return }
         for peer in peerBrowser.peers {
             guard relayIDs.contains(peer.id), let baseURL = peer.baseURL else { continue }

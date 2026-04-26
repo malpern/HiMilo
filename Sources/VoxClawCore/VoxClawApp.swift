@@ -425,7 +425,7 @@ final class AppCoordinator: SpeechQueueDelegate {
         var resolvedRequest = request
         resolvedRequest.voice = resolvedVoice
 
-        let localMuted = settings.relayPeerIDs.contains("__mute_local__") && !resolvedRequest.forceLocal
+        let localMuted = settings.activeSpeakers.contains("__mute_local__") && !resolvedRequest.forceLocal
         if !localMuted {
             await readText(
                 resolvedRequest.text,
@@ -443,7 +443,7 @@ final class AppCoordinator: SpeechQueueDelegate {
     }
 
     private func relayToPeers(request: ReadRequest, settings: SettingsManager) {
-        let relayIDs = settings.relayPeerIDs
+        let relayIDs = settings.activeSpeakers
         guard !relayIDs.isEmpty else { return }
 
         for peer in peerBrowser.peers {
@@ -543,7 +543,7 @@ final class AppCoordinator: SpeechQueueDelegate {
     }
 
     private func relayAck(projectId: String, settings: SettingsManager) {
-        let relayIDs = settings.relayPeerIDs
+        let relayIDs = settings.activeSpeakers
         guard !relayIDs.isEmpty else { return }
 
         for peer in peerBrowser.peers {
@@ -609,7 +609,7 @@ final class AppCoordinator: SpeechQueueDelegate {
 
     /// Relay a control action to all relay peers.
     func relayControl(action: HTTPRequestParser.ControlAction, settings: SettingsManager) {
-        let relayIDs = settings.relayPeerIDs
+        let relayIDs = settings.activeSpeakers
         guard !relayIDs.isEmpty else { return }
 
         for peer in peerBrowser.peers {
