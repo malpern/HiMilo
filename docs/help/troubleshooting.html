@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Troubleshooting — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">Troubleshooting</span>
+</nav>
+
+<div class="article">
+    <h1>Troubleshooting</h1>
+    <p class="subtitle">Common issues and how to fix them.</p>
+
+
+    <div class="card">
+        <h3>Not speaking</h3>
+        <ul>
+            <li>VoxClaw running? (check menu bar)</li>
+            <li>Listener active? <code>curl http://localhost:4140/status</code></li>
+            <li>Volume up?</li>
+            <li>API key valid? (if using OpenAI/ElevenLabs)</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>Agent not triggering speech</h3>
+        <ul>
+            <li>Restart your session after installing the plugin</li>
+            <li>Check for <code>voxclaw</code> in <code>~/.claude/settings.json</code> or <code>~/.codex/config.toml</code></li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>Peer not appearing</h3>
+        <ul>
+            <li>Same Wi-Fi?</li>
+            <li>VoxClaw running on both?</li>
+            <li>Wait a few seconds for Bonjour</li>
+        </ul>
+    </div>
+
+    <h2>Logs</h2>
+    <pre><code>log stream --predicate 'subsystem == "com.malpern.voxclaw"' --level debug</code></pre>
+
+    <p><a href="https://github.com/malpern/VoxClaw/issues">Open an issue on GitHub</a></p>
+
+
+    <div class="article-nav">
+        <a href="privacy.html">&larr; Privacy</a>
+        <a href="./">All Topics</a>
+        <a href="getting-started.html">Getting Started &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>

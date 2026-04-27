@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI &amp; Integrations — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">CLI &amp; Integrations</span>
+</nav>
+
+<div class="article">
+    <h1>CLI &amp; Integrations</h1>
+    <p class="subtitle">Multiple ways to send text beyond agent plugins.</p>
+
+
+    <h2>Command Line</h2>
+    <pre><code>voxclaw "Hello, world!"
+voxclaw --clipboard
+voxclaw --file article.txt
+echo "Hello" | voxclaw
+voxclaw --voice nova "Hello"
+voxclaw --rate 1.5 "Hello"
+voxclaw -a "Hello"</code></pre>
+
+    <h2>URL Scheme</h2>
+    <pre><code>open "voxclaw://read?text=Hello%20world"</code></pre>
+
+    <h2>Services</h2>
+    <p>Select text &rsaquo; right-click &rsaquo; Services &rsaquo; Read with VoxClaw.</p>
+
+    <h2>Shortcuts</h2>
+    <pre><code>shortcuts run "Read with VoxClaw" --input-string "Hello"</code></pre>
+
+
+    <div class="article-nav">
+        <a href="multi-device.html">&larr; Multi-Device</a>
+        <a href="./">All Topics</a>
+        <a href="privacy.html">Privacy &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>

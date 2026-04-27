@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">Getting Started</span>
+</nav>
+
+<div class="article">
+    <h1>Getting Started</h1>
+    <p class="subtitle">VoxClaw sits in your menu bar, waiting for your coding agent to send text.</p>
+
+
+    <h2>Quick Setup</h2>
+    <ol>
+        <li><strong>Launch VoxClaw.</strong> It appears in your menu bar.</li>
+        <li><strong>Connect your agent.</strong> Install the plugin for <a href="claude-code.html">Claude Code</a> or <a href="codex.html">Codex</a>.</li>
+        <li><strong>Choose a voice.</strong> Works with your Mac's built-in voice. Add an <a href="voices.html">OpenAI or ElevenLabs key</a> for natural voices.</li>
+    </ol>
+
+    <h2>How It Works</h2>
+    <p>VoxClaw runs a local HTTP listener on port 4140. When your agent finishes a response, the plugin sends text to this listener. VoxClaw speaks it aloud with a synchronized teleprompter overlay.</p>
+    <p>Start typing before it finishes and it stops automatically.</p>
+
+    <h2>Menu Bar</h2>
+    <ul>
+        <li><strong>Pause / Resume</strong> current speech</li>
+        <li><strong>Stop</strong> playback</li>
+        <li><strong>Read Clipboard</strong> — speak clipboard contents</li>
+        <li><strong>Settings</strong> — voice, overlay, integrations</li>
+    </ul>
+
+    <div class="tip"><strong>Tip:</strong> Apple's built-in voice works with no API key — everything on-device.</div>
+
+
+    <div class="article-nav">
+        <a href="troubleshooting.html">&larr; Troubleshooting</a>
+        <a href="./">All Topics</a>
+        <a href="claude-code.html">Claude Code &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>

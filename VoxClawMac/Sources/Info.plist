@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.2.1</string>
 	<key>CFBundleVersion</key>
-	<string>4</string>
+	<string>6</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -45,10 +45,6 @@
 	<string>VoxClaw uses on-device speech recognition to synchronize word highlighting with audio playback.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>VoxClaw pauses media playback in other apps while speaking, then resumes when done.</string>
-	<key>CFBundleHelpBookFolder</key>
-	<string>VoxClaw.help</string>
-	<key>CFBundleHelpBookName</key>
-	<string>VoxClaw Help</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

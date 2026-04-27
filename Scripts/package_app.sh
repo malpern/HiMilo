@@ -69,6 +69,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <array><string>MacOSX</string></array>
     <key>NSHumanReadableCopyright</key><string>Copyright 2026 Michael Alpern. All rights reserved.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>VoxClaw uses on-device speech recognition to synchronize word highlighting with audio playback.</string>
+    <key>NSAppleEventsUsageDescription</key><string>VoxClaw uses Apple Events to pause and resume playback in supported browser tabs before and after it speaks.</string>
     <key>BuildTimestamp</key><string>${BUILD_TIMESTAMP}</string>
     <key>GitCommit</key><string>${GIT_COMMIT}</string>
     <key>CFBundleURLTypes</key>
@@ -143,6 +144,12 @@ ICON_SOURCE="$ROOT/Sources/VoxClawCore/Resources/AppIcon.icns"
 if [[ -f "$ICON_SOURCE" ]]; then
   cp "$ICON_SOURCE" "$APP/Contents/Resources/AppIcon.icns"
 fi
+
+EXTENSION_SOURCE="$ROOT/BrowserExtension"
+if [[ -d "$EXTENSION_SOURCE" ]]; then
+  cp -R "$EXTENSION_SOURCE" "$APP/Contents/Resources/ChromeExtension"
+fi
+
 
 # Copy any SwiftPM resource bundles.
 PREFERRED_BUILD_DIR="$(dirname "$(build_product_path "$APP_NAME" "${ARCH_LIST[0]}")")"

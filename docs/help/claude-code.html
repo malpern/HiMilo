@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Setup — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">Claude Code Setup</span>
+</nav>
+
+<div class="article">
+    <h1>Claude Code Setup</h1>
+    <p class="subtitle">Make every response spoken aloud automatically.</p>
+
+
+    <h2>Install via Marketplace</h2>
+    <pre><code>claude plugin marketplace add malpern/VoxClaw
+claude plugin install voxclaw</code></pre>
+
+    <h2>Manual Install</h2>
+    <pre><code>git clone https://github.com/malpern/VoxClaw.git
+bash VoxClaw/plugins/voxclaw/setup-claude-code.sh</code></pre>
+
+    <h2>What It Does</h2>
+    <div class="card">
+        <h3>Stop Hook</h3>
+        <p>Extracts the response, strips markdown, sends to VoxClaw to speak.</p>
+    </div>
+    <div class="card">
+        <h3>UserPromptSubmit Hook</h3>
+        <p>Tells VoxClaw to stop reading when you send a new message.</p>
+    </div>
+
+    <h2>Multi-Agent Voices</h2>
+    <p>Multiple sessions in different directories each get a distinct voice. Responses queue — one speaks at a time.</p>
+
+    <div class="tip"><strong>Note:</strong> Restart running sessions to load new hooks.</div>
+
+
+    <div class="article-nav">
+        <a href="getting-started.html">&larr; Getting Started</a>
+        <a href="./">All Topics</a>
+        <a href="codex.html">Codex &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>

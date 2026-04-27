@@ -90,7 +90,7 @@ struct MenuBarView: View {
             .accessibilityIdentifier(AccessibilityID.MenuBar.about)
 
             Button("VoxClaw Help") {
-                NSHelpManager.shared.openHelpAnchor("", inBook: "VoxClaw Help")
+                NSWorkspace.shared.open(URL(string: "https://malpern.github.io/VoxClaw/help/")!)
             }
             .accessibilityIdentifier(AccessibilityID.MenuBar.help)
 

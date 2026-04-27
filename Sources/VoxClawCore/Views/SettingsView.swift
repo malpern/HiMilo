@@ -21,98 +21,70 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            Form {
+            VStack(alignment: .leading, spacing: 20) {
                 agentSetupSection
-                overlayAppearanceSection
                 voiceSection
+                overlayAppearanceSection
                 controlsSection
                 peersSection
             }
-            .formStyle(.grouped)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
         }
-        .frame(width: 520, height: 720)
+        .frame(width: 420, height: 560)
         .onAppear { peerBrowser.start() }
     }
 
     private var agentSetupSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Tell your agent how to use VoxClaw to get a voice.")
-                    .font(.headline)
-
-                HStack(alignment: .center, spacing: 12) {
-                    Button {
-                        if !settings.networkListenerEnabled {
-                            settings.networkListenerEnabled = true
-                        }
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(agentHandoffText, forType: .string)
-                        copiedAgentHandoff = true
-                        Task {
-                            try? await Task.sleep(for: .seconds(1.5))
-                            copiedAgentHandoff = false
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("🦞")
-                            Text(primaryAgentActionTitle)
-                        }
+        SettingsSection("Agent") {
+            HStack {
+                Button {
+                    if !settings.networkListenerEnabled {
+                        settings.networkListenerEnabled = true
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(websiteRed)
-                    .accessibilityIdentifier(AccessibilityID.Settings.copyAgentSetup)
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showInstructions.toggle()
-                        }
-                    } label: {
-                        Image(systemName: showInstructions ? "eye" : "eye.slash")
-                            .foregroundStyle(.secondary)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(agentHandoffText, forType: .string)
+                    copiedAgentHandoff = true
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.5))
+                        copiedAgentHandoff = false
                     }
-                    .buttonStyle(.plain)
-                    .help(showInstructions ? "Hide instructions" : "Show instructions")
-                    .accessibilityIdentifier(AccessibilityID.Settings.showInstructions)
+                } label: {
+                    Text(copiedAgentHandoff ? "Copied!" : primaryAgentActionTitle)
+                        .frame(minWidth: 140)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(websiteRed)
+                .accessibilityIdentifier(AccessibilityID.Settings.copyAgentSetup)
 
-                if copiedAgentHandoff {
-                    Label("Copied. Paste this into OpenClaw.", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                } else if !settings.networkListenerEnabled {
-                    Label("This will enable listener and copy setup text.", systemImage: "info.circle")
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        showInstructions.toggle()
+                    }
+                } label: {
+                    Text(showInstructions ? "Hide" : "Show")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(AccessibilityID.Settings.showInstructions)
+            }
 
-                if showInstructions {
-                    ZStack(alignment: .topTrailing) {
-                        Text(agentHandoffText)
-                            .font(.system(.caption, design: .monospaced))
-                            .textSelection(.enabled)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .applyAgentHandoffGlass(cornerRadius: 6)
-
-                        Button {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(agentHandoffText, forType: .string)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Copy to clipboard")
-                        .padding(8)
-                    }
-                }
+            if showInstructions {
+                Text(agentHandoffText)
+                    .font(.system(.caption2, design: .monospaced))
+                    .textSelection(.enabled)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .applyAgentHandoffGlass(cornerRadius: 6)
             }
         }
     }
 
     private var voiceSection: some View {
-        Section("Voice") {
+        SettingsSection("Voice") {
             Picker("Engine", selection: $settings.voiceEngine) {
                 Text("Apple").tag(VoiceEngineType.apple)
                 Text("OpenAI  $").tag(VoiceEngineType.openai)
@@ -320,31 +292,41 @@ struct SettingsView: View {
     }
 
     private var overlayAppearanceSection: some View {
-        Section {
-            OverlayAppearanceSettingsView(settings: settings)
-        }
+        OverlayAppearanceSettingsView(settings: settings)
     }
 
     private var controlsSection: some View {
-        Section("Controls") {
+        SettingsSection("Options") {
             Toggle("Pause YouTube while speaking", isOn: $settings.pauseOtherAudioDuringSpeech)
                 .accessibilityIdentifier(AccessibilityID.Settings.pauseOtherAudioToggle)
             if settings.pauseOtherAudioDuringSpeech {
-                Text("Install the VoxClaw Chrome extension to pause YouTube videos automatically.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Requires the VoxClaw browser extension.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Link("Chrome Web Store", destination: URL(string: "https://voxclaw.com/chrome")!)
+                            .font(.caption)
+                        Link("Safari Extension", destination: URL(string: "https://voxclaw.com/safari")!)
+                            .font(.caption)
+                    }
+                }
             }
-            Toggle("Enable Network Listener", isOn: $settings.networkListenerEnabled)
+            Toggle("Network listener", isOn: $settings.networkListenerEnabled)
                 .accessibilityIdentifier(AccessibilityID.Settings.networkListenerToggle)
-            Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+            Toggle("Launch at login", isOn: $settings.launchAtLogin)
                 .accessibilityIdentifier(AccessibilityID.Settings.launchAtLoginToggle)
             Toggle("Remember overlay position", isOn: $settings.rememberOverlayPosition)
                 .accessibilityIdentifier(AccessibilityID.Settings.rememberOverlayPositionToggle)
-            Toggle("Audio only (hide teleprompter overlay)", isOn: $settings.audioOnly)
+            Toggle("Audio only", isOn: $settings.audioOnly)
                 .accessibilityIdentifier(AccessibilityID.Settings.audioOnlyToggle)
+
             Button("VoxClaw Help") {
-                NSHelpManager.shared.openHelpAnchor("", inBook: "VoxClaw Help")
+                NSWorkspace.shared.open(URL(string: "https://malpern.github.io/VoxClaw/help/")!)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .font(.callout)
         }
     }
 
@@ -511,6 +493,30 @@ struct SettingsView: View {
         ("D38z5RcWu1voky8WS1ja", "Fin"),
         ("z9fAnlkpzviPz146aGWa", "Glinda"),
     ]
+}
+
+private struct SettingsSection<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(.subheadline, weight: .medium))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .tracking(0.5)
+
+            VStack(alignment: .leading, spacing: 6) {
+                content
+            }
+        }
+    }
 }
 
 private extension View {

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex Setup — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">Codex Setup</span>
+</nav>
+
+<div class="article">
+    <h1>Codex Setup</h1>
+    <p class="subtitle">Connect VoxClaw to OpenAI's Codex CLI.</p>
+
+
+    <h2>Install</h2>
+    <pre><code>git clone https://github.com/malpern/VoxClaw.git
+bash VoxClaw/plugins/voxclaw/setup-codex.sh</code></pre>
+    <p>Copies hooks to <code>~/.codex/hooks/</code> and adds config to <code>~/.codex/config.toml</code>.</p>
+
+    <h2>Config Added</h2>
+    <pre><code>[[hooks.Stop]]
+hooks = [
+  { type = "command", command = "~/.codex/hooks/voxclaw-codex-stop-speak.sh" }
+]
+
+[[hooks.UserPromptSubmit]]
+hooks = [
+  { type = "command", command = "~/.codex/hooks/voxclaw-codex-ack.sh" }
+]</code></pre>
+
+    <div class="tip"><strong>Note:</strong> Restart running Codex sessions to load new hooks.</div>
+
+
+    <div class="article-nav">
+        <a href="claude-code.html">&larr; Claude Code</a>
+        <a href="./">All Topics</a>
+        <a href="voices.html">Voice Engines &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>

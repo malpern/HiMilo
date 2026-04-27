@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network &amp; Remote — VoxClaw Help</title>
+    <link rel="stylesheet" href="help.css">
+</head>
+<body>
+
+<nav class="topbar">
+    <a href="../" class="topbar-brand">
+        <img src="../voxclaw-hero.png" alt="VoxClaw" width="28" height="28">
+        <span>VoxClaw</span>
+    </a>
+    <span class="topbar-divider">/</span>
+    <a href="./" style="color: var(--text-muted); text-decoration: none;">Help</a>
+    <span class="topbar-divider">/</span>
+    <span class="topbar-section">Network &amp; Remote</span>
+</nav>
+
+<div class="article">
+    <h1>Network &amp; Remote</h1>
+    <p class="subtitle">The local HTTP listener powers all integrations.</p>
+
+
+    <h2>Local Use</h2>
+    <p>Agent on the same Mac? Everything works over <code>localhost:4140</code> automatically.</p>
+
+    <h2>API</h2>
+    <div class="card">
+        <h3>POST /read</h3>
+        <pre><code>curl -X POST http://localhost:4140/read \
+  -d '{"text": "Hello from your agent"}'</code></pre>
+    </div>
+    <div class="card">
+        <h3>POST /ack</h3>
+        <pre><code>curl -X POST http://localhost:4140/ack \
+  -d '{"project_id": "/path/to/project"}'</code></pre>
+    </div>
+    <div class="card">
+        <h3>GET /status</h3>
+        <pre><code>curl http://localhost:4140/status</code></pre>
+    </div>
+
+    <h2>Remote Agent</h2>
+    <p>Agent on another machine? Enable the listener in Settings and send to <code>http://&lt;your-ip&gt;:4140/read</code>.</p>
+
+
+    <div class="article-nav">
+        <a href="overlay.html">&larr; Teleprompter</a>
+        <a href="./">All Topics</a>
+        <a href="multi-device.html">Multi-Device &rarr;</a>
+    </div>
+</div>
+
+<footer>
+    <p>VoxClaw by Micah Alpern &middot; <a href="https://voxclaw.com">voxclaw.com</a></p>
+</footer>
+
+</body>
+</html>
