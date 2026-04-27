@@ -105,9 +105,8 @@ struct FloatingPanelView: View {
                             Circle()
                                 .fill(indicator.color.opacity(0.8))
                                 .frame(width: 6, height: 6)
-                            Text(indicator.name.uppercased())
-                                .font(.system(size: 9, weight: idx == 0 ? .bold : .medium, design: .rounded))
-                                .tracking(1.2)
+                            Text(indicator.name)
+                                .font(.system(size: 11, weight: idx == 0 ? .semibold : .regular, design: .rounded))
                                 .foregroundStyle(.white.opacity(idx == 0 ? 0.70 : 0.35))
                         }
                         .transition(.asymmetric(

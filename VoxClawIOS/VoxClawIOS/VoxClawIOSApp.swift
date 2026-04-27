@@ -13,6 +13,11 @@ struct VoxClawIOSApp: App {
             ContentView(appState: appState, settings: settings, coordinator: coordinator)
                 .task {
                     configureAudioSession()
+                    #if targetEnvironment(simulator)
+                    if settings.networkListenerPort == 4140 {
+                        settings.networkListenerPort = 4141
+                    }
+                    #endif
                     coordinator.startListening(appState: appState, settings: settings)
                     coordinator.observeAudioInterruptions(appState: appState)
                 }

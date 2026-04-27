@@ -14,13 +14,16 @@ public struct OverlayAppearanceSettingsView: View {
     ]
 
     public var body: some View {
-        Group {
-            Section("Style Presets") {
-                OverlayPresetGallery(settings: settings)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("OVERLAY")
+                .font(.system(.subheadline, weight: .medium))
+                .foregroundStyle(.secondary)
+                .tracking(0.5)
 
-            DisclosureGroup(isExpanded: $showCustomOptions, content: {
-                Section {
+            OverlayPresetGallery(settings: settings)
+
+            DisclosureGroup(isExpanded: $showCustomOptions) {
+                VStack(alignment: .leading, spacing: 6) {
                     Picker("Font", selection: fontFamilyBinding) {
                         ForEach(fontFamilies, id: \.self) { family in
                             Text(family).tag(family)
@@ -30,50 +33,54 @@ public struct OverlayAppearanceSettingsView: View {
 
                     HStack {
                         Text("Size: \(Int(settings.overlayAppearance.fontSize))pt")
+                            .frame(width: 80, alignment: .leading)
                         Slider(value: fontSizeBinding, in: 16...64, step: 1)
                             .accessibilityIdentifier(AccessibilityID.Appearance.fontSizeSlider)
                     }
 
                     HStack {
-                        Text("Line Height: \(String(format: "%.1f", settings.overlayAppearance.lineHeightMultiplier))x")
+                        Text("Line: \(String(format: "%.1f", settings.overlayAppearance.lineHeightMultiplier))x")
+                            .frame(width: 80, alignment: .leading)
                         Slider(value: lineHeightBinding, in: 1.0...2.5, step: 0.1)
                             .accessibilityIdentifier(AccessibilityID.Appearance.lineSpacingSlider)
                     }
 
                     HStack {
-                        Text("Padding: \(Int(settings.overlayAppearance.horizontalPadding))pt")
+                        Text("Pad: \(Int(settings.overlayAppearance.horizontalPadding))pt")
+                            .frame(width: 80, alignment: .leading)
                         Slider(value: paddingBinding, in: 0...60, step: 2)
                             .accessibilityIdentifier(AccessibilityID.Appearance.hPaddingSlider)
                     }
 
-                    ColorPicker("Text Color", selection: textColorBinding)
-                        .accessibilityIdentifier(AccessibilityID.Appearance.textColorPicker)
-
-                    ColorPicker("Highlight Color", selection: highlightColorBinding)
-                        .accessibilityIdentifier(AccessibilityID.Appearance.highlightColorPicker)
-
-                    ColorPicker("Background", selection: bgColorBinding)
-                        .accessibilityIdentifier(AccessibilityID.Appearance.bgColorPicker)
+                    HStack(spacing: 12) {
+                        ColorPicker("Text", selection: textColorBinding)
+                            .accessibilityIdentifier(AccessibilityID.Appearance.textColorPicker)
+                        ColorPicker("Highlight", selection: highlightColorBinding)
+                            .accessibilityIdentifier(AccessibilityID.Appearance.highlightColorPicker)
+                        ColorPicker("Bg", selection: bgColorBinding)
+                            .accessibilityIdentifier(AccessibilityID.Appearance.bgColorPicker)
+                    }
 
                     HStack {
-                        Text("Background Opacity: \(Int(settings.overlayAppearance.backgroundColor.opacity * 100))%")
+                        Text("Opacity: \(Int(settings.overlayAppearance.backgroundColor.opacity * 100))%")
+                            .frame(width: 80, alignment: .leading)
                         Slider(value: bgOpacityBinding, in: 0.1...1.0, step: 0.05)
                             .accessibilityIdentifier(AccessibilityID.Appearance.bgOpacitySlider)
                     }
-                }
 
-                Button("Reset to Defaults") {
-                    settings.overlayAppearance = .resetToDefaults()
+                    Button("Reset to Defaults") {
+                        settings.overlayAppearance = .resetToDefaults()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .accessibilityIdentifier(AccessibilityID.Appearance.resetButton)
                 }
-                .accessibilityIdentifier(AccessibilityID.Appearance.resetButton)
-            }, label: {
-                Button {
-                    withAnimation { showCustomOptions.toggle() }
-                } label: {
-                    Text("Customize")
-                }
-                .buttonStyle(.plain)
-            })
+                .padding(.top, 4)
+            } label: {
+                Text("Customize")
+                    .font(.callout)
+            }
         }
     }
 

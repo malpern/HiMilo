@@ -65,6 +65,10 @@ voxclaw --status                     # Check if listener is running
 
 - **Audio leads, visuals follow.** The voice sets the pace and tone of the experience. The overlay exists to support the audio, not the other way around. Never show the overlay before audio is ready to play. Don't let visual elements (loading states, animations, transitions) compete with or distract from the spoken word.
 
+## Agent Speech Convention
+
+When finishing a non-trivial task in this repo, pipe a 1–2 sentence spoken summary through `plugins/voxclaw/scripts/voxclaw-say --kind summary`. Lead with the outcome, then verification status, then any blocker. Use prose only — no code, file paths, or command names. Skip for pure Q&A or read-only exploration. The app's `agentSpeechMode` setting filters whether it actually speaks, so always emit; let the app decide.
+
 ## Key Conventions
 
 - Tests use Swift Testing framework (`@Test`, `#expect`)

@@ -12,30 +12,33 @@
 <p class="breadcrumb"><a href="index.html">VoxClaw Help</a> &rsaquo; Getting Started</p>
 
 <h1>Getting Started</h1>
-<p>VoxClaw sits in your menu bar, waiting for your coding agent to send text. When it does, VoxClaw speaks it aloud with a floating teleprompter overlay that highlights each word in sync.</p>
+<p class="page-subtitle">VoxClaw sits in your menu bar, waiting for your coding agent to send text. When it does, VoxClaw speaks it aloud with a floating teleprompter overlay.</p>
 
 <h2>Quick Setup</h2>
-<ol>
+<ol class="steps">
     <li><strong>Launch VoxClaw.</strong> It appears in your menu bar as a small icon.</li>
-    <li><strong>Connect your agent.</strong> Install the VoxClaw plugin for <a href="claude-code.html">Claude Code</a> or <a href="codex.html">Codex</a>. Your agent will automatically speak its responses through VoxClaw.</li>
-    <li><strong>Choose a voice.</strong> VoxClaw works immediately with your Mac's built-in voice (free, no setup). For more natural voices, add an <a href="voices.html">OpenAI or ElevenLabs API key</a> in Settings.</li>
+    <li><strong>Connect your agent.</strong> Install the VoxClaw plugin for <a href="claude-code.html">Claude Code</a> or <a href="codex.html">Codex</a>.</li>
+    <li><strong>Choose a voice.</strong> Works immediately with your Mac's built-in voice. For natural voices, add an <a href="voices.html">OpenAI or ElevenLabs API key</a> in Settings.</li>
 </ol>
 
 <h2>How It Works</h2>
-<p>VoxClaw runs a local HTTP listener on port 4140. When your agent finishes a response, the VoxClaw plugin sends the text to this listener. VoxClaw then speaks it aloud and shows the teleprompter overlay.</p>
+<p>VoxClaw runs a local HTTP listener on port 4140. When your agent finishes a response, the plugin sends the text to this listener. VoxClaw speaks it aloud and shows the teleprompter overlay with synchronized word highlighting.</p>
 
-<p>If you start typing your next message before VoxClaw finishes reading, it stops automatically — no interruption needed.</p>
+<p>If you start typing before VoxClaw finishes reading, it stops automatically.</p>
 
 <h2>Menu Bar Controls</h2>
-<p>Click the VoxClaw icon in your menu bar to:</p>
 <ul>
-    <li><strong>Pause / Resume</strong> current speech</li>
-    <li><strong>Stop</strong> playback entirely</li>
+    <li><strong>Pause / Resume</strong> — pause current speech</li>
+    <li><strong>Stop</strong> — stop playback entirely</li>
     <li><strong>Read Clipboard</strong> — speak whatever is on your clipboard</li>
-    <li><strong>Settings</strong> — configure voice, overlay appearance, and integrations</li>
+    <li><strong>Settings</strong> — voice, overlay, and integrations</li>
 </ul>
 
-<div class="note">VoxClaw uses Apple's text-to-speech by default, which requires no API key and processes everything on your device.</div>
+<div class="tip"><strong>Tip:</strong> VoxClaw uses Apple's text-to-speech by default — no API key needed, everything processed on-device.</div>
+
+<div class="help-footer">
+    <a href="index.html">&larr; VoxClaw Help</a>
+</div>
 
 </body>
 </html>

@@ -24,6 +24,8 @@ Run VoxClaw on your Mac and hear OpenClaw speak to you. When OpenClaw runs on an
 
 VoxClaw also includes an iPhone app in this repo (`VoxClawIOS/`) with the same core listener + teleprompter flow for iOS.
 
+For Codex plugin installation and marketplace distribution, use the separate [malpern/codex-marketplace](https://github.com/malpern/codex-marketplace) repository. This repository is the main product repo for the app, website assets, releases, and source code.
+
 ---
 
 A macOS menu bar app + CLI tool that reads text aloud using Apple TTS (default), OpenAI TTS (BYOK), or ElevenLabs TTS (BYOK), with an optional teleprompter-style floating overlay and synchronized word highlighting.
