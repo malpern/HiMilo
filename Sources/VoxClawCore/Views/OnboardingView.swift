@@ -323,45 +323,30 @@ private struct ConnectAgentStep: View {
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 10) {
-                if installedTools.isEmpty {
-                    noToolsView
-                } else {
-                    ForEach(installedTools, id: \.tool) { status in
-                        toolCard(status)
-                    }
-                    if !missingTools.isEmpty {
-                        Text("Also available:")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 2)
-                        ForEach(missingTools, id: \.tool) { status in
-                            missingToolRow(status)
-                        }
-                    }
+                ForEach(AgentToolDetector.Tool.allCases, id: \.self) { tool in
+                    let status = statuses.first(where: { $0.tool == tool })
+                    agentRow(tool: tool, pluginInstalled: status?.pluginInstalled ?? false)
                 }
             }
 
-            if !installedTools.isEmpty {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        expandedManual.toggle()
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Other integration methods")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Image(systemName: expandedManual ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expandedManual.toggle()
                 }
-                .buttonStyle(.plain)
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Other integration methods")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Image(systemName: expandedManual ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
 
-                if expandedManual {
-                    manualIntegrationView
-                }
+            if expandedManual {
+                manualIntegrationView
             }
 
             Text("You can always set this up later in Settings.")
@@ -370,66 +355,26 @@ private struct ConnectAgentStep: View {
         }
     }
 
-    private var noToolsView: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "info.circle")
-                    .foregroundStyle(.secondary)
-                Text("No coding agents detected on this Mac")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("VoxClaw works with Claude Code and Codex.\nInstall one to get started:")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            HStack(spacing: 16) {
-                ForEach(AgentToolDetector.Tool.allCases, id: \.self) { tool in
-                    Link(destination: AgentToolDetector.downloadURL(for: tool)) {
-                        HStack(spacing: 6) {
-                            Image(systemName: AgentToolDetector.iconName(for: tool))
-                            Text("Get \(AgentToolDetector.displayName(for: tool))")
-                        }
-                        .font(.callout)
-                    }
-                }
-            }
-
-            Divider().padding(.horizontal, 20)
-
-            manualIntegrationView
-        }
-    }
-
-    private func toolCard(_ status: AgentToolDetector.Status) -> some View {
+    private func agentRow(tool: AgentToolDetector.Tool, pluginInstalled: Bool) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: AgentToolDetector.iconName(for: status.tool))
+            Image(systemName: AgentToolDetector.iconName(for: tool))
                 .font(.title2)
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(AgentToolDetector.displayName(for: status.tool))
-                        .font(.body)
-                        .fontWeight(.medium)
-                    if status.pluginInstalled {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                    }
-                }
+                Text(AgentToolDetector.displayName(for: tool))
+                    .font(.body)
+                    .fontWeight(.medium)
                 Group {
-                    if copiedCommand == status.tool {
+                    if copiedCommand == tool {
                         Text("Copied — paste in Terminal with ⌘V")
                             .foregroundStyle(.green)
-                    } else if status.pluginInstalled {
+                    } else if pluginInstalled {
                         Text("VoxClaw plugin installed")
                             .foregroundStyle(.green)
                     } else {
-                        Text("Detected — plugin not yet installed")
+                        Text("Run this command in Terminal to connect")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -439,17 +384,15 @@ private struct ConnectAgentStep: View {
 
             Spacer()
 
-            if status.pluginInstalled {
-                Text("Ready")
-                    .font(.caption)
-                    .fontWeight(.medium)
+            if pluginInstalled {
+                Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
                 Button {
-                    let cmd = AgentToolDetector.installCommand(for: status.tool)
+                    let cmd = AgentToolDetector.installCommand(for: tool)
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(cmd, forType: .string)
-                    copiedCommand = status.tool
+                    copiedCommand = tool
 
                     if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
                         NSWorkspace.shared.openApplication(at: terminalURL, configuration: .init())
@@ -460,34 +403,15 @@ private struct ConnectAgentStep: View {
                         copiedCommand = nil
                     }
                 } label: {
-                    Text(copiedCommand == status.tool ? "Copied!" : "Install")
+                    Text(copiedCommand == tool ? "Copied!" : "Copy Install")
                         .font(.caption)
-                        .frame(minWidth: 56)
+                        .frame(minWidth: 70)
                 }
                 .buttonStyle(.borderedProminent)
             }
         }
         .padding(12)
         .modifier(GlassBackgroundModifier())
-    }
-
-    private func missingToolRow(_ status: AgentToolDetector.Status) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: AgentToolDetector.iconName(for: status.tool))
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 32)
-
-            Text(AgentToolDetector.displayName(for: status.tool))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Link("Download", destination: AgentToolDetector.downloadURL(for: status.tool))
-                .font(.caption)
-        }
-        .padding(.horizontal, 12)
     }
 
     private var manualIntegrationView: some View {

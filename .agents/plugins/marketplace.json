@@ -1,0 +1,20 @@
+{
+  "name": "VoxClaw Local Plugins",
+  "interface": {
+    "displayName": "VoxClaw Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "voxclaw",
+      "source": {
+        "source": "local",
+        "path": "./plugins/voxclaw"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
