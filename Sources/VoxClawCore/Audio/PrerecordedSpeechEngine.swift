@@ -1,6 +1,7 @@
 #if os(macOS)
 import AVFoundation
 import Foundation
+import os
 
 @MainActor
 final class PrerecordedSpeechEngine: NSObject, SpeechEngine {
@@ -18,6 +19,8 @@ final class PrerecordedSpeechEngine: NSObject, SpeechEngine {
         self.audioURL = audioURL
     }
 
+    private static let log = Logger(subsystem: "com.malpern.voxclaw", category: "prerecorded")
+
     func start(text: String, words: [String]) async {
         self.words = words
         state = .loading
@@ -31,14 +34,17 @@ final class PrerecordedSpeechEngine: NSObject, SpeechEngine {
 
             timings = WordTimingEstimator.estimate(words: words, totalDuration: p.duration)
 
-            p.play()
+            let started = p.play()
+            Self.log.info("AVAudioPlayer.play() returned \(started), duration=\(p.duration)")
             playbackStart = .now
             state = .playing
             delegate?.speechEngine(self, didChangeState: .playing)
             startDisplayLink()
         } catch {
+            Self.log.error("PrerecordedSpeechEngine failed: \(error.localizedDescription)")
             state = .error(error.localizedDescription)
             delegate?.speechEngine(self, didEncounterError: error)
+            delegate?.speechEngineDidFinish(self)
         }
     }
 

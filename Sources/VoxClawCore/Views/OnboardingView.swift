@@ -150,9 +150,11 @@ struct OnboardingView: View {
 
     private func speakDemoWithPrerecorded(resource: String, ext: String) {
         guard let url = Bundle.module.url(forResource: resource, withExtension: ext) else {
+            Log.onboarding.error("Prerecorded audio not found: \(resource).\(ext)")
             speakDemo("Welcome to VoxClaw. Your coding agent can finally talk.")
             return
         }
+        Log.onboarding.info("Playing prerecorded demo from \(url.path)")
         let displayText = "Hey, welcome to VoxClaw! This is what your coding agent sounds like when it talks to you. Pretty cool, right? You can choose from different voices, adjust the speed, and see every word highlighted as it's spoken."
         let engine = PrerecordedSpeechEngine(audioURL: url)
         SharedApp.coordinator.queue.enqueue(
@@ -368,13 +370,18 @@ private struct ConnectAgentStep: View {
                     .fontWeight(.medium)
                 Group {
                     if copiedCommand == tool {
+#if APPSTORE
+                        Text("Copied — open Terminal and paste with ⌘V")
+                            .foregroundStyle(.green)
+#else
                         Text("Copied — paste in Terminal with ⌘V")
                             .foregroundStyle(.green)
+#endif
                     } else if pluginInstalled {
                         Text("VoxClaw plugin installed")
                             .foregroundStyle(.green)
                     } else {
-                        Text("Run this command in Terminal to connect")
+                        Text("Copy command, then paste in Terminal")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -394,18 +401,20 @@ private struct ConnectAgentStep: View {
                     NSPasteboard.general.setString(cmd, forType: .string)
                     copiedCommand = tool
 
+#if !APPSTORE
                     if let terminalURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") {
                         NSWorkspace.shared.openApplication(at: terminalURL, configuration: .init())
                     }
+#endif
 
                     Task {
                         try? await Task.sleep(for: .seconds(4))
                         copiedCommand = nil
                     }
                 } label: {
-                    Text(copiedCommand == tool ? "Copied!" : "Copy Install")
+                    Text(copiedCommand == tool ? "Copied!" : "Copy Command")
                         .font(.caption)
-                        .frame(minWidth: 70)
+                        .frame(minWidth: 80)
                 }
                 .buttonStyle(.borderedProminent)
             }
