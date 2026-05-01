@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VoxClaw — Giving Your AI Agent a Voice</title>
+
+<meta name="description" content="A seven-chapter walkthrough of VoxClaw: from a simple TTS CLI to a multi-agent voice system with natural turn-taking.">
+<meta name="author" content="Micah Alpern">
+<link rel="canonical" href="https://malpern.github.io/VoxClaw/presentation.html">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="VoxClaw — Giving Your AI Agent a Voice">
+<meta property="og:description" content="From a curl command to eye contact. The story of building a voice for AI agents.">
+<meta property="og:url" content="https://malpern.github.io/VoxClaw/presentation.html">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="VoxClaw — Giving Your AI Agent a Voice">
+<meta name="twitter:description" content="From a curl command to eye contact. The story of building a voice for AI agents.">
+
+<style>
+  :root {
+    --bg: #141619;
+    --paper: #1c1f26;
+    --fg: #e6edf3;
+    --fg-muted: #8b949e;
+    --fg-quiet: #5a6068;
+    --rule: #2a2e36;
+
+    --red: #e04040;
+    --red-light: #f06050;
+    --red-dim: #8a2a2a;
+    --blue: #58a6ff;
+    --blue-dim: #1a3a5c;
+    --green: #56d364;
+    --amber: #e3b341;
+
+    --code-bg: #0d1117;
+    --code-fg: #e6edf3;
+    --code-rule: #21262d;
+
+    --serif: "New York", "Iowan Old Style", "Charter", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+    --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.72;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main { display: block; }
+  article.page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 72px 28px 120px;
+    text-wrap: pretty;
+    orphans: 3;
+    widows: 3;
+  }
+  article.page p { margin: 0 0 1.2em; }
+
+  /* ----- Hero ---------------------------------------------------------------- */
+  .hero {
+    position: relative;
+    margin: 0 -28px 72px;
+    padding: 96px 28px 72px;
+    background:
+      radial-gradient(ellipse at 22% 110%, rgba(224, 64, 64, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse at 78% 110%, rgba(88, 166, 255, 0.2) 0%, transparent 50%),
+      linear-gradient(180deg, #0d1117 0%, #141619 38%, #1c1f26 100%);
+    color: #f0f4f8;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .hero::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 120px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 39px, rgba(88,166,255,0.12) 39px 40px),
+      repeating-linear-gradient(180deg, transparent 0 19px, rgba(88,166,255,0.08) 19px 20px);
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .hero > * { position: relative; z-index: 1; }
+
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--red-light);
+    text-shadow: 0 0 12px rgba(240,96,80,0.4);
+    margin: 0 0 16px;
+  }
+
+  h1.title {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(42px, 7vw, 72px);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin: 0 0 28px;
+    text-wrap: balance;
+    background: linear-gradient(180deg, #ffffff 0%, #e6edf3 42%, #e04040 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+  }
+
+  .subtitle {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.55;
+    color: #c8d0d8;
+    max-width: 640px;
+    margin: 0 0 40px;
+    text-wrap: pretty;
+  }
+  .subtitle b { font-style: normal; font-weight: 700; color: #fff; }
+
+  .hero p.lede {
+    max-width: 640px;
+    font-size: 18px;
+    color: #a8b4c0;
+    line-height: 1.7;
+    margin: 0 0 1em;
+  }
+
+  .start-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 18px 10px 20px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--red), var(--red-light));
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-decoration: none;
+    box-shadow: 0 0 0 1px rgba(224,64,64,0.4), 0 8px 22px rgba(224,64,64,0.3);
+    transition: transform 160ms ease, box-shadow 160ms ease;
+  }
+  .start-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgba(224,64,64,0.6), 0 10px 26px rgba(224,64,64,0.45);
+  }
+  .start-cta .arrow { font-family: var(--serif); font-weight: 400; font-size: 16px; line-height: 1; }
+
+  /* ----- About strip -------------------------------------------------------- */
+  .about-strip {
+    margin: -28px 0 48px;
+    padding: 24px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .about-strip p { margin: 0 0 14px; }
+  .about-strip p:last-child { margin: 0; }
+
+  /* ----- Takeaway callout --------------------------------------------------- */
+  aside.takeaway {
+    background: rgba(13,17,23,0.6);
+    border: 1px solid rgba(224,64,64,0.3);
+    border-radius: 8px;
+    padding: 22px 24px;
+    margin: 28px 0;
+    color: #e0e8f0;
+  }
+  aside.takeaway .label {
+    display: block;
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--red-light);
+    margin: 0 0 10px;
+  }
+  aside.takeaway ul {
+    margin: 0; padding: 0; list-style: none;
+    font-family: var(--serif); font-size: 17px; line-height: 1.55;
+  }
+  aside.takeaway li {
+    padding: 6px 0 6px 22px;
+    position: relative;
+    border-top: 1px solid rgba(224,64,64,0.15);
+  }
+  aside.takeaway li:first-child { border-top: none; }
+  aside.takeaway li::before {
+    content: "\25b8";
+    position: absolute; left: 2px; top: 6px;
+    color: var(--red);
+    font-family: var(--sans);
+  }
+
+  /* ----- TOC ----------------------------------------------------------------- */
+  .toc-heading {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-quiet);
+    margin: 0 0 18px;
+  }
+  ol.toc {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 72px;
+    border-top: 1px solid var(--rule);
+  }
+  ol.toc li {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  ol.toc .num {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 22px;
+    color: var(--red);
+  }
+  ol.toc a {
+    color: var(--fg);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  ol.toc a:hover { color: var(--red-light); }
+  ol.toc .blurb {
+    display: block;
+    font-style: italic;
+    color: var(--fg-muted);
+    font-weight: 400;
+    margin-top: 2px;
+    font-size: 16px;
+  }
+
+  /* ----- Chapters ----------------------------------------------------------- */
+  section.chapter {
+    margin: 72px 0;
+    scroll-margin-top: 88px;
+  }
+
+  .chapter-eyebrow {
+    font-family: var(--sans);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-quiet);
+    margin: 0 0 10px;
+  }
+
+  section.chapter h2 {
+    font-family: var(--serif);
+    font-size: clamp(32px, 4.5vw, 44px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+
+  .epigraph {
+    font-style: italic;
+    color: var(--fg-muted);
+    font-size: 17px;
+    margin: 0 0 28px;
+    padding: 0 0 0 16px;
+    border-left: 2px solid var(--red);
+  }
+  .epigraph cite {
+    display: block;
+    font-family: var(--sans);
+    font-style: normal;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-quiet);
+    margin-top: 4px;
+  }
+
+  .chapter-opener::first-letter {
+    initial-letter: 3 2;
+    -webkit-initial-letter: 3 2;
+    font-family: var(--display);
+    font-weight: 900;
+    color: var(--red);
+    margin-right: 10px;
+    padding-right: 4px;
+  }
+
+  section.chapter h3 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.01em;
+    margin: 36px 0 14px;
+    color: var(--fg);
+  }
+
+  section.chapter > ul { padding-left: 22px; }
+  section.chapter > ul > li::marker { content: "\2014  "; color: var(--fg-quiet); }
+
+  /* ----- Concept callout ---------------------------------------------------- */
+  aside.concept {
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    padding: 16px 20px;
+    border-radius: 4px;
+    margin: 28px 0;
+  }
+  aside.concept .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--blue);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  aside.concept p { margin: 0; font-size: 16px; color: var(--fg-muted); line-height: 1.65; }
+
+  /* ----- Goal callout ------------------------------------------------------- */
+  .goal {
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--green);
+    background: var(--paper);
+    padding: 14px 18px;
+    border-radius: 4px;
+    margin: 28px 0;
+  }
+  .goal-label {
+    display: block;
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin: 0 0 6px;
+  }
+  .goal p { margin: 0; font-style: italic; color: var(--fg); }
+
+  /* ----- Code blocks -------------------------------------------------------- */
+  pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border-radius: 6px;
+    padding: 18px 20px;
+    margin: 22px 0;
+    overflow-x: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--code-rule);
+    box-shadow:
+      inset 0 0 0 1px rgba(224,64,64,0.08),
+      0 4px 18px rgba(0,0,0,0.3);
+  }
+  pre code {
+    font-family: var(--mono);
+    color: inherit;
+    background: none;
+    padding: 0;
+    white-space: pre;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: rgba(224,64,64,0.08);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--fg);
+  }
+  pre code { background: none; padding: 0; }
+
+  p.code-caption {
+    margin: -14px 0 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-quiet);
+    padding-left: 4px;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 10px; right: 10px;
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--blue);
+    background: rgba(88,166,255,0.08);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 3px;
+    padding: 4px 10px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 140ms ease;
+  }
+  pre:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(88,166,255,0.16); }
+  .copy-btn.copied { color: var(--green); border-color: rgba(86,211,100,0.5); }
+
+  /* ----- Blockquote --------------------------------------------------------- */
+  blockquote {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1.45;
+    color: var(--fg);
+    margin: 36px 0;
+    padding: 0 24px;
+    border: none;
+    position: relative;
+    text-wrap: balance;
+  }
+  blockquote::before {
+    content: "";
+    position: absolute; left: 0; top: 10px; bottom: 10px;
+    width: 3px;
+    background: linear-gradient(180deg, var(--red), var(--blue));
+    border-radius: 2px;
+  }
+
+  /* ----- Checkpoint --------------------------------------------------------- */
+  .checkpoint {
+    margin: 40px 0 0;
+    padding: 18px 20px;
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--red);
+    border-radius: 0 0 4px 4px;
+    background: var(--paper);
+  }
+  .checkpoint-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin: 0 0 6px;
+  }
+  .checkpoint p:last-child {
+    font-style: italic;
+    margin: 0;
+    color: var(--fg);
+  }
+
+  hr.section-rule {
+    border: 0;
+    height: 2px;
+    margin: 72px auto;
+    background: linear-gradient(90deg, transparent, var(--red) 20%, var(--blue) 80%, transparent);
+    opacity: 0.4;
+  }
+
+  /* ----- Pipeline diagram --------------------------------------------------- */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 28px 0;
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+  .pipeline .stage {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-bottom: none;
+  }
+  .pipeline .stage:first-child { border-radius: 6px 6px 0 0; }
+  .pipeline .stage:last-child { border-bottom: 1px solid var(--rule); border-radius: 0 0 6px 6px; }
+  .pipeline .stage-icon {
+    width: 28px;
+    text-align: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .pipeline .stage-name {
+    color: var(--fg);
+    font-weight: 600;
+  }
+  .pipeline .stage-desc {
+    color: var(--fg-muted);
+    font-weight: 400;
+    margin-left: auto;
+    font-size: 12px;
+  }
+  .pipeline .arrow-down {
+    text-align: center;
+    color: var(--red);
+    font-size: 14px;
+    padding: 2px 0;
+    background: var(--paper);
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+  }
+
+  /* ----- External links ----------------------------------------------------- */
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { color: #79b8ff; }
+
+  /* ----- Sticky chapter nav ------------------------------------------------- */
+  nav.chapter-nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    background: rgba(20,22,25,0.9);
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--sans);
+    font-size: 13px;
+    transform: translateY(-100%);
+    transition: transform 220ms cubic-bezier(0.2,0.8,0.2,1);
+  }
+  nav.chapter-nav.is-visible { transform: translateY(0); }
+  nav.chapter-nav .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 10px 20px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+  }
+  nav.chapter-nav .prev, nav.chapter-nav .next {
+    color: var(--fg-quiet);
+    text-decoration: none;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  nav.chapter-nav .next { text-align: right; }
+  nav.chapter-nav .prev:hover, nav.chapter-nav .next:hover { color: var(--red-light); }
+  nav.chapter-nav .current {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  nav.chapter-nav .progress {
+    position: absolute;
+    left: 0; bottom: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--red), var(--blue));
+    width: 0%;
+    transition: width 120ms linear;
+  }
+
+  /* ----- Footer ------------------------------------------------------------- */
+  footer {
+    max-width: 720px;
+    margin: 72px auto;
+    padding: 24px 28px 48px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--fg-quiet);
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ----- Mobile ------------------------------------------------------------- */
+  @media (max-width: 720px) {
+    article.page { padding: 48px 20px 100px; }
+    .hero { padding: 72px 20px 56px; }
+    h1.title { font-size: clamp(36px, 9vw, 52px); }
+    .subtitle { font-size: 19px; }
+    ol.toc li { grid-template-columns: 32px 1fr; gap: 12px; }
+    .copy-btn { opacity: 1; font-size: 12px; padding: 6px 12px; }
+    nav.chapter-nav .prev, nav.chapter-nav .next { font-size: 11px; }
+    .pipeline .stage-desc { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="chapter-nav" aria-label="Chapter navigation">
+  <div class="wrap">
+    <a class="prev" href="#" aria-label="Previous chapter"></a>
+    <span class="current">VoxClaw</span>
+    <a class="next" href="#" aria-label="Next chapter"></a>
+  </div>
+  <div class="progress"></div>
+</nav>
+
+<main>
+<article class="page">
+
+<!-- ============================ HERO ============================ -->
+<header class="hero">
+  <p class="eyebrow">Hacker Dojo &middot; Talk</p>
+  <h1 class="title">Giving Your AI Agent a&nbsp;Voice.</h1>
+  <p class="subtitle">Your agent runs on a Mac Mini under the desk. It finishes a task and&hellip; nothing. No sound, no signal. <b>VoxClaw</b> is a menu bar app that listens on the network, speaks with neural voices, and shows a teleprompter overlay &mdash; so your agent can <em>talk</em> to you.</p>
+
+  <p class="lede">One HTTP endpoint. One <code>curl</code> command. Thirty seconds from silent agent to speaking assistant. This is the story of building it &mdash; from a simple CLI to a multi-agent voice system that knows when to shut up.</p>
+
+  <a href="#ch1" class="start-cta">Start the story <span class="arrow">&rarr;</span></a>
+</header>
+
+<!-- ============================ About strip ============================ -->
+<section class="about-strip" aria-label="About this talk">
+  <p>VoxClaw started as a weekend hack: <em>can I make my agent say something out loud?</em> Thirty lines of Swift, Apple TTS, done. But then the questions piled up. What if the agent is on another machine? What if two agents are talking? What if I'm on a Zoom call? What if I just want it to <em>know</em> I'm listening?</p>
+  <p>Each question became a feature. Each feature taught something about the surprisingly tricky space between text and speech. This talk walks through seven chapters of that evolution, ending with where it's going next: an AI camera that reads your gaze and takes turns like a human would.</p>
+  <p>The landing page is at <a href="https://malpern.github.io/VoxClaw/" target="_blank" rel="noopener">malpern.github.io/VoxClaw</a> &mdash; the source is on <a href="https://github.com/malpern/VoxClaw" target="_blank" rel="noopener">GitHub</a>.</p>
+</section>
+
+<aside class="takeaway">
+  <span class="label">What this talk covers</span>
+  <ul>
+    <li>The problem: agents that can think but can't speak</li>
+    <li>A network TTS server in a menu bar, discovered via Bonjour</li>
+    <li>Multi-agent voices, speech queuing, and turn-taking</li>
+    <li>Context-aware pausing &mdash; detecting Zoom calls via CoreAudio</li>
+    <li>Three hard problems: audio-text sync, queue coordination, sandbox compromise</li>
+    <li>Future work: AI camera gaze detection for natural turn-taking</li>
+  </ul>
+</aside>
+
+<!-- ============================ TOC ============================ -->
+<p class="toc-heading">Seven chapters</p>
+<ol class="toc">
+  <li><span class="num">01</span><div><a href="#ch1">The silent agent problem</a><span class="blurb">Your agent finishes work and nobody notices. The case for giving it a voice.</span></div></li>
+  <li><span class="num">02</span><div><a href="#ch2">One endpoint, thirty seconds</a><span class="blurb">A menu bar app, an HTTP listener, and the fastest path from silent to speaking.</span></div></li>
+  <li><span class="num">03</span><div><a href="#ch3">Live demo</a><span class="blurb">Curl a message, watch the overlay, hear the voice. Then change the voice mid-stream.</span></div></li>
+  <li><span class="num">04</span><div><a href="#ch4">How it evolved</a><span class="blurb">From CLI to multi-agent: Bonjour discovery, distinct voices, queuing, and knowing when to yield.</span></div></li>
+  <li><span class="num">05</span><div><a href="#ch5">Three hard problems</a><span class="blurb">Audio-text synchronization, polite-wait via CoreAudio, and queue coordination across agents.</span></div></li>
+  <li><span class="num">06</span><div><a href="#ch6">Architecture</a><span class="blurb">56 Swift files, 13 modules, protocol-based engines, and a shared core for macOS + iOS.</span></div></li>
+  <li><span class="num">07</span><div><a href="#ch7">Future: natural turn-taking</a><span class="blurb">An AI camera, visual eyes, and gaze as the new wake word.</span></div></li>
+</ol>
+
+
+<!-- ============================ CHAPTER 1 ============================ -->
+<section class="chapter" id="ch1">
+  <p class="chapter-eyebrow">Chapter I</p>
+  <h2>The silent agent problem</h2>
+  <div class="epigraph">"The best interface is no interface." Except when your agent finishes a ten-minute task and you don't notice for an hour.<cite>Every agent developer, eventually</cite></div>
+
+  <p class="chapter-opener">Picture the setup: you have an AI agent &mdash; maybe it's Claude Code, maybe it's a custom pipeline &mdash; running on a Mac Mini, a server, or just a different terminal tab. It fetches data, writes code, runs tests. It finishes. And then&hellip; it updates a log file. Maybe it sends a notification that gets buried under thirty others.</p>
+
+  <p>The fundamental mismatch is this: agents are getting better at <em>doing</em> work, but they're terrible at <em>announcing</em> work. A notification badge is not a conversation. A log line is not a report. What you actually want is for your agent to <em>say something</em> &mdash; out loud, in a human voice, at the right moment.</p>
+
+  <p>But "just add TTS" runs into problems immediately:</p>
+  <ul>
+    <li>The agent might be on a different machine than your speakers</li>
+    <li>You might be on a Zoom call &mdash; the agent shouldn't interrupt</li>
+    <li>Three agents might finish at the same time &mdash; who talks first?</li>
+    <li>You want to <em>see</em> what it's saying, not just hear it</li>
+    <li>Different agents should sound different so you know who's talking</li>
+  </ul>
+
+  <p>These aren't edge cases. They're the first five things that happen when you actually try to give an agent a voice. VoxClaw is the result of solving them one at a time.</p>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">The premise</p>
+    <p>Speech is the missing output channel for AI agents. Not chat, not notifications &mdash; actual voice. But doing it well means solving network delivery, interruption awareness, multi-agent coordination, and visual feedback.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 2 ============================ -->
+<section class="chapter" id="ch2">
+  <p class="chapter-eyebrow">Chapter II</p>
+  <h2>One endpoint, thirty seconds</h2>
+  <div class="epigraph">The best API is one line of curl.<cite>The VoxClaw design principle</cite></div>
+
+  <p class="chapter-opener">VoxClaw runs as a macOS menu bar app. When it starts, it opens an HTTP listener on port 4140 and advertises itself on the local network via Bonjour. Any agent on the same LAN can find it and send it text to speak.</p>
+
+  <p>The entire API surface for basic use is one endpoint:</p>
+
+<pre><code class="language-bash">curl -X POST http://your-mac.local:4140/read \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "Build complete. All 47 tests passed.", "voice": "onyx"}'</code></pre>
+
+  <p>That's it. The Mac speaks the text, shows a floating overlay with word-by-word highlighting, and dismisses the panel when it's done. No SDK, no WebSocket, no auth token for local use.</p>
+
+  <h3>Three endpoints, three jobs</h3>
+
+  <ul>
+    <li><code>POST /read</code> &mdash; Speak text immediately or queue it. Accepts <code>text</code>, <code>voice</code>, <code>rate</code>, and <code>instructions</code> for speaking style.</li>
+    <li><code>POST /agent-notify</code> &mdash; Structured notifications with <code>kind</code> (summary, progress, failure) for different treatment.</li>
+    <li><code>GET /status</code> &mdash; Health check that returns the current state: idle, loading, playing, paused, finished. Useful for agents that want to wait their turn.</li>
+  </ul>
+
+  <h3>Discovery via Bonjour</h3>
+
+  <p>The agent doesn't need to know your Mac's IP address. VoxClaw advertises a <code>_voxclaw._tcp</code> service on the local network. Any agent with a Bonjour client can discover it automatically &mdash; zero configuration, zero hardcoded addresses.</p>
+
+  <aside class="concept">
+    <span class="label">Why HTTP, not WebSocket?</span>
+    <p>WebSocket would let VoxClaw push state changes back to the agent. But agents are fire-and-forget speakers &mdash; they rarely need to know when speech finishes. HTTP keeps the integration dead simple: every language has <code>curl</code> or an HTTP client. The browser extension polls <code>/status</code> on a timer, which is good enough for a UI update every second.</p>
+  </aside>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">Thirty-second setup</p>
+    <p>Install VoxClaw, pick a voice, done. The onboarding wizard generates a copy-paste config block your agent can consume &mdash; URLs, port, voice preference, health check endpoint.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 3 ============================ -->
+<section class="chapter" id="ch3">
+  <p class="chapter-eyebrow">Chapter III</p>
+  <h2>Live demo</h2>
+  <div class="epigraph">Show, don't tell. Especially when the thing you're showing literally talks.<cite></cite></div>
+
+  <p class="chapter-opener">This chapter is a live demo during the talk. Here's the script:</p>
+
+  <div class="goal">
+    <span class="goal-label">Demo 1 &mdash; Basic speech</span>
+    <p>Open a terminal. Curl a message to VoxClaw. Watch the overlay appear with word-by-word highlighting. Hear the neural voice.</p>
+  </div>
+
+<pre><code class="language-bash"># Basic speech
+curl -X POST http://macbook-air-m4.local:4140/read \
+  -d '{"text": "Hello Hacker Dojo. This is VoxClaw speaking."}'
+
+# Check status
+curl -s http://macbook-air-m4.local:4140/status | python3 -m json.tool</code></pre>
+
+  <div class="goal">
+    <span class="goal-label">Demo 2 &mdash; Different voices</span>
+    <p>Send two messages with different voices back-to-back. Show the queue in action &mdash; the second waits for the first to finish, then speaks in a different voice.</p>
+  </div>
+
+<pre><code class="language-bash"># Agent 1 speaks with "onyx"
+curl -X POST http://macbook-air-m4.local:4140/read \
+  -d '{"text": "Deploy finished. All services healthy.", "voice": "onyx"}'
+
+# Agent 2 speaks with "nova" — queued behind the first
+curl -X POST http://macbook-air-m4.local:4140/read \
+  -d '{"text": "I found three unused API keys in the config.", "voice": "nova"}'</code></pre>
+
+  <div class="goal">
+    <span class="goal-label">Demo 3 &mdash; Keyboard controls</span>
+    <p>Send a longer text. Press Space to pause/resume. Press arrow keys to skip. Press Escape to stop.</p>
+  </div>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">What you just saw</p>
+    <p>Network speech delivery, word-synchronized overlay, voice selection, queuing, and keyboard control &mdash; all from curl.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 4 ============================ -->
+<section class="chapter" id="ch4">
+  <p class="chapter-eyebrow">Chapter IV</p>
+  <h2>How it evolved</h2>
+  <div class="epigraph">Every feature started as a problem that showed up on the second day of using the previous feature.<cite></cite></div>
+
+  <p class="chapter-opener">VoxClaw didn't start as a multi-agent voice system. It started as thirty lines of Swift that called Apple's built-in TTS. Here's the path from there to here, in roughly chronological order.</p>
+
+  <h3>1. A simple CLI</h3>
+  <p>The first version was <code>voxclaw "Hello world"</code> &mdash; a command-line tool that spoke text using Apple's <code>AVSpeechSynthesizer</code>. Fine for a demo. Useless for an agent on another machine.</p>
+
+  <h3>2. Network listener</h3>
+  <p>The first real feature: an HTTP server on port 4140. Now an agent running anywhere on the LAN could POST text and hear it come out of the Mac's speakers. This was the "aha" moment &mdash; speech as a network service.</p>
+
+  <h3>3. Bonjour discovery</h3>
+  <p>Hardcoding IP addresses is fragile. VoxClaw advertises <code>_voxclaw._tcp</code> via Bonjour, so agents find it automatically. Zero config. The agent doesn't even need to know which machine has the speakers.</p>
+
+  <h3>4. Teleprompter overlay</h3>
+  <p>Hearing speech is good. <em>Seeing</em> it is better. A floating <code>NSPanel</code> appears over everything, highlighting each word as it's spoken. This turned out to be the hardest feature &mdash; synchronizing text highlighting to audio playback at the word level (more on this in chapter V).</p>
+
+  <h3>5. Multi-agent support with distinct voices</h3>
+  <p>Once you have two agents reporting to VoxClaw, you need to tell them apart. Each agent can specify a voice &mdash; <code>onyx</code>, <code>nova</code>, <code>echo</code>, <code>shimmer</code> &mdash; and VoxClaw remembers per-project voice assignments. You hear "onyx" and know it's the deploy agent; you hear "nova" and know it's the code reviewer.</p>
+
+  <h3>6. Speech queue and agent turn-taking</h3>
+  <p>Two agents finishing at the same time means two speech requests arriving simultaneously. VoxClaw maintains a FIFO queue with a 20-item cap. Agents take turns. Smooth fade transitions between speakers give each message a natural boundary. A one-second pause between items provides a "breath" &mdash; a subtle cue that a new speaker is about to talk.</p>
+
+  <h3>7. Context awareness &mdash; knowing when to shut up</h3>
+  <p>This was the feature nobody asked for until it was obvious. VoxClaw enumerates running audio processes via CoreAudio. If it detects a Zoom call, a Teams meeting, or FaceTime, it auto-pauses. When the call ends, it resumes. If <em>you</em> start talking, it yields. It checks every second with a 150-second timeout fallback.</p>
+
+  <h3>8. iOS companion app</h3>
+  <p>Shared <code>VoxClawCore</code> library, iCloud KVS for settings sync. Your iPhone can be a relay target &mdash; speech arrives at the Mac and forwards to the phone via peer-to-peer. Cross-device pause/resume via a <code>/control</code> endpoint.</p>
+
+  <h3>9. Browser extension</h3>
+  <p>A Chrome extension that polls <code>/status</code> and gives a visual indicator of what VoxClaw is doing. No WebSocket needed &mdash; a one-second poll loop is perfectly fine for a status badge.</p>
+
+  <h3>10. App Store dual-distribution</h3>
+  <p>The "polite-wait" CoreAudio feature doesn't work in the App Store sandbox. Solution: ship two builds. The direct download has full functionality; the App Store build compiles out the sandboxed features and ships with a feature-gated subset. Same codebase, different entitlements.</p>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">Ten layers deep</p>
+    <p>Each layer solved the problem the previous layer created. CLI &rarr; network &rarr; discovery &rarr; overlay &rarr; multi-voice &rarr; queue &rarr; context &rarr; cross-device &rarr; browser &rarr; App Store. The common thread: speech is a systems problem, not a TTS problem.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 5 ============================ -->
+<section class="chapter" id="ch5">
+  <p class="chapter-eyebrow">Chapter V</p>
+  <h2>Three hard problems</h2>
+  <div class="epigraph">The easy part is making the computer talk. The hard part is making it talk at the right time, in the right way, and in sync with what's on screen.<cite></cite></div>
+
+  <p class="chapter-opener">Behind VoxClaw's simple API are three problems that took disproportionate effort to solve. Each one looks trivial from the outside.</p>
+
+  <h3>Problem 1: Audio-text synchronization</h3>
+
+  <p>When VoxClaw speaks a paragraph, the overlay highlights each word in real time. This requires knowing <em>exactly</em> when each word is being spoken. The problem: not all TTS engines give you that information.</p>
+
+  <p>VoxClaw uses three progressively better strategies:</p>
+
+  <div class="pipeline">
+    <div class="stage">
+      <span class="stage-icon">1</span>
+      <span class="stage-name">Cadence-based</span>
+      <span class="stage-desc">Estimate duration from word count, distribute evenly</span>
+    </div>
+    <div class="arrow-down">&darr;</div>
+    <div class="stage">
+      <span class="stage-icon">2</span>
+      <span class="stage-name">Proportional</span>
+      <span class="stage-desc">Weight by character count &mdash; "the" gets less time than "synchronization"</span>
+    </div>
+    <div class="arrow-down">&darr;</div>
+    <div class="stage">
+      <span class="stage-icon">3</span>
+      <span class="stage-name">Aligned</span>
+      <span class="stage-desc">OpenAI returns precise per-word timestamps &mdash; pixel-perfect sync</span>
+    </div>
+  </div>
+
+  <p>The system starts with cadence-based timing (instant, available before audio loads) and upgrades transparently when better data arrives. The user never sees a loading state or a misaligned highlight &mdash; the worst case is slightly imprecise timing, not broken timing.</p>
+
+  <h3>Problem 2: Polite-wait via CoreAudio</h3>
+
+  <p>Detecting whether you're on a video call sounds like it should be a one-liner. It is not.</p>
+
+  <p>macOS doesn't have an "is the user on a call?" API. What it <em>does</em> have is <code>kAudioHardwarePropertyProcessObjectList</code> &mdash; a way to enumerate every process using the audio hardware, and whether each one is actively running input (microphone) or output (speakers).</p>
+
+  <p>VoxClaw polls this every second. When it sees Zoom, Teams, FaceTime, or any app actively using both input <em>and</em> output, it pauses the speech queue. When the call ends (the process stops using audio), it resumes. A 150-second timeout prevents getting stuck forever if the detection goes stale.</p>
+
+  <aside class="concept">
+    <span class="label">The sandbox problem</span>
+    <p>This CoreAudio enumeration requires entitlements that the App Store sandbox doesn't allow. VoxClaw solves this with conditional compilation: the direct-download build includes polite-wait; the App Store build compiles it out entirely and falls back to manual pause. Same source, two targets, no runtime feature flags.</p>
+  </aside>
+
+  <h3>Problem 3: Queue coordination</h3>
+
+  <p>The speech queue coordinator is the most regression-prone component in VoxClaw. It seems simple &mdash; a FIFO queue with a play head &mdash; but the edge cases multiply:</p>
+
+  <ul>
+    <li>An agent sends 15 items in a burst. The queue cap is 20. What happens at 21?</li>
+    <li>The user pauses mid-sentence. A new item arrives. Does it queue behind the paused item, or interrupt it?</li>
+    <li>The TTS engine hangs (network timeout, API error). The queue is stuck. How long do you wait before declaring the current item dead?</li>
+    <li>Two items from different agents arrive 200ms apart. The fade-out from item 1 overlaps with the fade-in of item 2. Do they cross-fade, or does one wait?</li>
+  </ul>
+
+  <p>The answers: drop at 21 with an error response. Queue behind, never interrupt. Five-minute timeout kills zombie streams. Sequential &mdash; fade-out completes, one-second gap, then fade-in. Each answer was earned from a bug report.</p>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">The takeaway</p>
+    <p>The API is one line of curl. The implementation behind that line handles three timing systems, a CoreAudio process enumerator, and a queue coordinator with five-minute deadman switches. Simple APIs require complex internals.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 6 ============================ -->
+<section class="chapter" id="ch6">
+  <p class="chapter-eyebrow">Chapter VI</p>
+  <h2>Architecture</h2>
+  <div class="epigraph">Protocols, not inheritance. Modules, not folders.<cite></cite></div>
+
+  <p class="chapter-opener">VoxClaw is a SwiftPM package with two targets: <code>VoxClawCore</code> (the library, 56 Swift files) and <code>VoxClaw</code> (a thin executable that imports the core). The iOS companion app imports the same core. This means every feature is implemented once and tested once.</p>
+
+  <h3>Thirteen modules</h3>
+
+  <div class="pipeline">
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Audio</span>
+      <span class="stage-desc">Speech engines, playback, timing</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Network</span>
+      <span class="stage-desc">HTTP listener, Bonjour, peer browsing</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Reading</span>
+      <span class="stage-desc">Speech sessions, word timing</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Input</span>
+      <span class="stage-desc">CLI args, stdin, file, clipboard, URL scheme</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Panel</span>
+      <span class="stage-desc">Floating overlay (NSPanel + SwiftUI)</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Coordination</span>
+      <span class="stage-desc">Speech queue, session management</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Voice</span>
+      <span class="stage-desc">Voice pool, per-project bindings</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Settings</span>
+      <span class="stage-desc">Preferences, iCloud KVS sync</span>
+    </div>
+    <div class="stage">
+      <span class="stage-icon"></span>
+      <span class="stage-name">Views</span>
+      <span class="stage-desc">Menu bar, settings, onboarding</span>
+    </div>
+  </div>
+
+  <h3>The speech engine protocol</h3>
+
+  <p>The key architectural decision: speech engines are protocol-based. <code>Apple</code>, <code>OpenAI</code>, and <code>ElevenLabs</code> all conform to the same interface. The coordinator doesn't know or care which engine is active. Adding a new TTS provider means implementing one protocol &mdash; no changes to the queue, the overlay, or the network layer.</p>
+
+  <p>Fallback is automatic: if the OpenAI API key is invalid or the network is down, VoxClaw falls back to Apple's built-in TTS. The user hears a different voice but never sees an error dialog. A <code>SilentEngine</code> exists for cases where even Apple TTS shouldn't fire (iOS system mute, testing).</p>
+
+  <h3>By the numbers</h3>
+  <ul>
+    <li>56 Swift source files across 13 modules</li>
+    <li>75+ unit tests</li>
+    <li>Swift 6.2 with strict concurrency</li>
+    <li>Targets macOS 26+ and iOS 26+</li>
+    <li>Three speech engine implementations + two test engines</li>
+    <li>Five input methods (CLI, stdin, file, clipboard, network)</li>
+  </ul>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">Architecture principle</p>
+    <p>One library, two platforms, three engines, five inputs. The protocol-based engine abstraction is the load-bearing decision &mdash; everything else follows from it.</p>
+  </div>
+</section>
+
+<hr class="section-rule">
+
+
+<!-- ============================ CHAPTER 7 ============================ -->
+<section class="chapter" id="ch7">
+  <p class="chapter-eyebrow">Chapter VII</p>
+  <h2>Future: natural turn-taking</h2>
+  <div class="epigraph">The best wake word is no wake word. Just look at me.<cite></cite></div>
+
+  <p class="chapter-opener">Everything VoxClaw does today is one-directional: the agent speaks, you listen. The next step is making it a conversation &mdash; but not with a wake word, not with a push-to-talk button. With <em>eye contact</em>.</p>
+
+  <h3>The AI camera</h3>
+
+  <p>The idea: a camera component (built-in Mac camera or an external one) that uses vision AI to detect whether you're looking at the device. When you look at it, transcription activates &mdash; VoxClaw starts listening. When you look away, it stops. No "Hey Siri," no button press. The same signal humans use to manage turn-taking in real life.</p>
+
+  <h3>Visual eyes</h3>
+
+  <p>But gaze detection alone isn't enough. You need <em>feedback</em>. When VoxClaw detects you're looking at it, it should acknowledge that &mdash; visually, immediately, unmistakably.</p>
+
+  <p>The plan: animated eyes on the overlay that respond in real time:</p>
+
+  <ul>
+    <li><strong>You look at it</strong> &mdash; the eyes make eye contact back. Pupils track your position. A subtle widening says <em>I see you</em>.</li>
+    <li><strong>It's speaking</strong> &mdash; the eyes animate expressively. Blinks, shifts, slight widening on emphasis. Not a static icon &mdash; a presence.</li>
+    <li><strong>You look away</strong> &mdash; the eyes look away too, or close. Mutual disengagement. The transcription stops. The agent knows you're done.</li>
+    <li><strong>It's listening</strong> &mdash; the eyes are attentive, steady, slightly wider. A visual signal that it's your turn to speak.</li>
+  </ul>
+
+  <blockquote>The goal isn't to build a face. It's to build a <em>social signal</em>. The minimum viable presence that makes an AI agent feel like it's in the room with you &mdash; not just reading text into a speaker.</blockquote>
+
+  <h3>Why this matters</h3>
+
+  <p>Every voice assistant today uses an explicit trigger: a wake word, a button, a keyboard shortcut. These work, but they break the conversational metaphor. You don't say "Hey Human" before talking to a colleague. You make eye contact, and they know it's their turn.</p>
+
+  <p>If VoxClaw can detect gaze reliably and respond with visual acknowledgment, it collapses the distance between "AI tool" and "AI presence." Not a chatbot. Not a smart speaker. Something closer to a colleague sitting across the desk who happens to be an AI.</p>
+
+  <div class="checkpoint">
+    <p class="checkpoint-label">The vision</p>
+    <p>Replace wake words and push-to-talk with the same social cues humans already use &mdash; eye contact, gaze aversion, turn-taking. Make the agent feel present, not just audible. Give it eyes that see you seeing it.</p>
+  </div>
+</section>
+
+</article>
+</main>
+
+<footer>VoxClaw &middot; Hacker Dojo Talk &middot; Micah Alpern &middot; 2026</footer>
+
+<!-- ============================ JS ============================ -->
+<script>
+(() => {
+  const nav = document.querySelector('nav.chapter-nav');
+  const progress = nav.querySelector('.progress');
+  const current = nav.querySelector('.current');
+  const prevA = nav.querySelector('.prev');
+  const nextA = nav.querySelector('.next');
+  const chapters = Array.from(document.querySelectorAll('section.chapter'));
+  const hero = document.querySelector('.hero');
+
+  const heroObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      nav.classList.toggle('is-visible', !e.isIntersecting);
+    });
+  }, { rootMargin: '-20px 0px 0px 0px' });
+  heroObs.observe(hero);
+
+  const chapterObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const id = e.target.id;
+      const i = chapters.findIndex(c => c.id === id);
+      if (i === -1) return;
+      const h2 = e.target.querySelector('h2');
+      current.textContent = romanize(i+1) + '. ' + h2.textContent;
+      if (i > 0) {
+        const prev = chapters[i-1].querySelector('h2').textContent;
+        prevA.textContent = '‹ ' + prev;
+        prevA.href = '#' + chapters[i-1].id;
+        prevA.style.visibility = 'visible';
+      } else {
+        prevA.style.visibility = 'hidden';
+      }
+      if (i < chapters.length - 1) {
+        const next = chapters[i+1].querySelector('h2').textContent;
+        nextA.textContent = next + ' ›';
+        nextA.href = '#' + chapters[i+1].id;
+        nextA.style.visibility = 'visible';
+      } else {
+        nextA.style.visibility = 'hidden';
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  chapters.forEach(c => chapterObs.observe(c));
+
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    const pct = Math.max(0, Math.min(100, (h.scrollTop / max) * 100));
+    progress.style.width = pct + '%';
+  }, { passive: true });
+
+  function romanize(n) {
+    return ['I','II','III','IV','V','VI','VII'][n-1] || String(n);
+  }
+})();
+
+document.querySelectorAll('pre').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.textContent = 'Copy';
+  btn.addEventListener('click', async () => {
+    const code = pre.querySelector('code');
+    const text = code ? code.textContent : pre.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy';
+        btn.classList.remove('copied');
+      }, 1400);
+    } catch (_) { btn.textContent = 'Copy failed'; }
+  });
+  pre.appendChild(btn);
+});
+</script>
+
+</body>
+</html>
